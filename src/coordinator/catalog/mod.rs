@@ -2,23 +2,34 @@ use std::sync::mpsc;
 use std::ops::RangeFrom;
 use std::collections::BTreeMap;
 use std::marker::PhantomData;
+use std::thread;
 
 use query::{QueryId, QueryConfig};
 use executor::{ExecutorId, ExecutorType};
 use messaging::response::Promise;
 
-pub use self::request::*;
+pub use coordinator::request::*;
 
 use self::pending::*;
 use self::query::*;
 use self::executor::*;
 
-mod request;
 mod pending;
 mod executor;
 mod query;
 
-pub type CatalogRef = mpsc::Sender<Request>;
+#[derive(Clone)]
+pub struct CatalogRef(mpsc::Sender<Message>);
+
+impl CatalogRef {
+    pub fn send(&self, msg: Message) {
+        self.0.send(msg).expect("invalid catalog ref")
+    }
+}
+
+pub enum Message {
+    Submission(Submission, SubmissionPromise),
+}
 
 pub struct Catalog {
     pending: BTreeMap<QueryId, Pending>,
@@ -27,13 +38,14 @@ pub struct Catalog {
     executors: Executors,
 
     query_id: Generator<QueryId>,
-    requests: mpsc::Receiver<Request>,
+    requests: mpsc::Receiver<Message>,
 }
 
 impl Catalog {
     pub fn new() -> (CatalogRef, Catalog) {
         let (tx, rx) = mpsc::channel();
 
+        let catalog_ref = CatalogRef(tx);
         let catalog = Catalog {
             pending: BTreeMap::new(),
             queries: BTreeMap::new(),
@@ -42,8 +54,8 @@ impl Catalog {
             query_id: Generator::new(),
             requests: rx,
         };
-
-        (tx, catalog)
+        
+        (catalog_ref, catalog)
     }
 
     pub fn run(&mut self) {
@@ -51,9 +63,13 @@ impl Catalog {
             self.process(request);
         }
     }
+    
+    pub fn detach(mut self) {
+        thread::spawn(move || self.run());
+    }
 
-    pub fn process(&mut self, request: Request) {
-        use self::Request::*;
+    pub fn process(&mut self, request: Message) {
+        use self::Message::*;
         match request {
             Submission(submission, promise) => self.submission(submission, promise),
         };
@@ -63,8 +79,31 @@ impl Catalog {
                       submission: Submission,
                       promise: Promise<QueryId, SubmissionError>) {
         let id = self.query_id.generate();
-        let pending = Pending::new(id, submission.config, promise);
-        // TODO select and inform executors
+        let config = submission.config;
+        
+        // find suiting executors
+        let selected = self.executors.select(config.binary, config.num_executors);
+        
+        // check if we have enough executors of the right type
+        let executors = match selected {
+            Some(ref executors) if executors.len() < config.num_executors => {
+                return promise.failed(SubmissionError::NotEnoughExecutors);
+            }
+            None => {
+                return promise.failed(SubmissionError::NoExecutorsForType);
+            }
+            Some(executors) => executors,
+        };
+               
+        // ask executors to spawn a new query
+        for executor in executors {
+            executor.spawn(id, &config);
+        }
+
+        // install pending query
+        let pending = Pending::new(id, config, promise);
+
+        // TODO maybe we should add a timeout for the pending query..?!
         self.pending.insert(id, pending);
     }
 }

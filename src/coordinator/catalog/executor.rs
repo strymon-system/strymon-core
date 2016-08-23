@@ -2,13 +2,17 @@ use std::collections::BTreeMap;
 
 use rand;
 
+use query::{QueryId, QueryConfig};
 use executor::{ExecutorId, ExecutorType};
+
 use coordinator::catalog::Generator;
+use coordinator::executor::{ExecutorRef, Message as ExecutorMessage};
 
 pub type ExecutorTypeId = u8;
 
 pub struct Executor {
     id: ExecutorId,
+    tx: ExecutorRef,
 }
 
 pub struct Executors {
@@ -34,5 +38,11 @@ impl Executors {
         } else {
             None
         }
+    }
+}
+
+impl Executor {
+    pub fn spawn(&self, id: QueryId, config: &QueryConfig) {
+        self.tx.send(ExecutorMessage::Spawn(id, config.clone()))
     }
 }

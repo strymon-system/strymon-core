@@ -1,8 +1,26 @@
 use std::any::{Any, TypeId};
+use std::io::{Result, Error, ErrorKind, Read, Write};
 use std::mem;
 use std::sync::Arc;
 
 use abomonation::{self, Abomonation};
+use byteorder::{NetworkEndian, ReadBytesExt, WriteBytesExt, ByteOrder};
+
+pub fn read<R: Read>(reader: &mut R) -> Result<Frame> {
+    let length = try!(reader.read_u32::<NetworkEndian>());
+    let mut bytes = vec![0u8; length as usize]; // TODO optimize this
+    try!(reader.read_exact(&mut bytes));
+
+    Ok((Frame::new(bytes)))
+}
+
+pub fn write<W: Write>(writer: &mut W, frame: Frame) -> Result<()> {
+    assert!(frame.len() <= ::std::u32::MAX as usize, "frame is too big!");
+    try!(writer.write_u32::<NetworkEndian>(frame.len() as u32));
+    try!(writer.write_all(frame.as_ref()));
+    
+    Ok(())
+}
 
 #[derive(Clone)]
 pub struct Frame {
@@ -22,8 +40,13 @@ impl Frame {
         T::is_bytes(&self.payload)
     }
 
-    pub fn decode<T: Decode>(mut self) -> Option<T> {
+    pub fn decode<T: Decode>(mut self) -> Result<T> {
         T::bytes(&mut *Arc::make_mut(&mut self.payload))
+          .ok_or(Error::new(ErrorKind::Other, "unexpected message"))
+    }
+    
+    fn len(&self) -> usize {
+        self.payload.len()
     }
 }
 
@@ -95,5 +118,18 @@ mod tests {
         let msg = Frame::encode(s.clone());
         assert!(msg.is::<String>());
         assert_eq!(msg.decode::<String>().unwrap(), s);
+    }
+
+    #[test]
+    fn test_read_write() {
+        let s1 = "Some Content".to_string();
+        let msg1 = Frame::encode(s1.clone());
+        
+        let mut stream = Vec::<u8>::new();
+        write(&mut stream, msg1).expect("failed to write");
+
+        let msg2 = read(&mut &*stream).expect("failed to read");
+        let s2 = msg2.decode::<String>().expect("failed to decode");
+        assert_eq!(s1, s2);
     }
 }

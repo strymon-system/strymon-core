@@ -13,10 +13,10 @@ impl From<u64> for QueryId {
 
 #[derive(Clone, Debug)]
 pub struct QueryConfig {
-    fetch: String,
-    binary: ExecutorType,
-    num_executors: usize,
-    num_workers: usize, // per executor
+    pub fetch: String,
+    pub binary: ExecutorType,
+    pub num_executors: usize,
+    pub num_workers: usize, // per executor
 }
 
 unsafe_abomonate!(QueryId);
