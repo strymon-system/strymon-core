@@ -2,7 +2,7 @@ use std::sync::mpsc;
 use std::cell::RefCell;
 use std::thread;
 use std::io::Result;
-use std::net::{TcpStream, TcpListener, Shutdown};
+use std::net::{Shutdown, TcpListener, TcpStream};
 
 use messaging::frame::{self, Frame};
 
@@ -18,18 +18,14 @@ fn from_native(tcp: TcpStream) -> Result<(Sender, Receiver)> {
                 break;
             }
         }
-        
+
         let _ = outstream.shutdown(Shutdown::Both);
     });
 
-    let tx = Sender {
-        inner: out_tx,
-    };
-    
-    let rx = Receiver {
-        inner: RefCell::new(instream),
-    };
-    
+    let tx = Sender { inner: out_tx };
+
+    let rx = Receiver { inner: RefCell::new(instream) };
+
     Ok((tx, rx))
 }
 
@@ -59,9 +55,7 @@ impl Receiver {
 
 pub fn listen(addr: Option<&str>) -> Result<Listener> {
     let addr = addr.unwrap_or("[::]:0");
-    Ok(Listener {
-        inner: try!(TcpListener::bind(addr)),
-    })
+    Ok(Listener { inner: try!(TcpListener::bind(addr)) })
 }
 
 pub struct Listener {

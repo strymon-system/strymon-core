@@ -1,10 +1,10 @@
 use std::any::{Any, TypeId};
-use std::io::{Result, Error, ErrorKind, Read, Write};
+use std::io::{Error, ErrorKind, Read, Result, Write};
 use std::mem;
 use std::sync::Arc;
 
 use abomonation::{self, Abomonation};
-use byteorder::{NetworkEndian, ReadBytesExt, WriteBytesExt, ByteOrder};
+use byteorder::{ByteOrder, NetworkEndian, ReadBytesExt, WriteBytesExt};
 
 pub fn read<R: Read>(reader: &mut R) -> Result<Frame> {
     let length = try!(reader.read_u32::<NetworkEndian>());
@@ -18,7 +18,7 @@ pub fn write<W: Write>(writer: &mut W, frame: Frame) -> Result<()> {
     assert!(frame.len() <= ::std::u32::MAX as usize, "frame is too big!");
     try!(writer.write_u32::<NetworkEndian>(frame.len() as u32));
     try!(writer.write_all(frame.as_ref()));
-    
+
     Ok(())
 }
 
@@ -42,9 +42,9 @@ impl Frame {
 
     pub fn decode<T: Decode>(mut self) -> Result<T> {
         T::bytes(&mut *Arc::make_mut(&mut self.payload))
-          .ok_or(Error::new(ErrorKind::Other, "unexpected message"))
+            .ok_or(Error::new(ErrorKind::Other, "unexpected message"))
     }
-    
+
     fn len(&self) -> usize {
         self.payload.len()
     }
@@ -124,7 +124,7 @@ mod tests {
     fn test_read_write() {
         let s1 = "Some Content".to_string();
         let msg1 = Frame::encode(s1.clone());
-        
+
         let mut stream = Vec::<u8>::new();
         write(&mut stream, msg1).expect("failed to write");
 

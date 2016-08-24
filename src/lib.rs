@@ -14,7 +14,10 @@ pub mod query;
 pub mod messaging;
 pub mod coordinator;
 pub mod executor;
-pub mod worker;
+
+mod worker;
+mod util;
+mod topic;
 
 #[cfg(test)]
 mod tests {

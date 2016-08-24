@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use rand;
 
-use query::{QueryId, QueryConfig};
+use query::{QueryConfig, QueryId};
 use executor::{ExecutorId, ExecutorType};
 
 use coordinator::catalog::Generator;

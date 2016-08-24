@@ -1,7 +1,7 @@
-use std::io::{Result, Error};
+use std::io::{Error, Result};
 use std::thread;
 
-use messaging::{self, Sender, Receiver};
+use messaging::{self, Receiver, Sender};
 use self::catalog::{Catalog, CatalogRef};
 use self::request::Announce;
 use self::worker::Worker;
@@ -23,7 +23,7 @@ pub struct Connection {
 
 impl Connection {
     fn new(tx: Sender, rx: Receiver, catalog: CatalogRef) -> Self {
-        Connection  {
+        Connection {
             tx: tx,
             rx: rx,
             catalog: catalog,
@@ -32,15 +32,9 @@ impl Connection {
 
     fn dispatch(self) -> Result<()> {
         match try!(self.rx.recv::<request::Announce>()) {
-            Announce::Worker(queryid, workerindex) => {
-                Worker::new(queryid, workerindex, self).run()
-            }
-            Announce::Executor(executortype) => {
-                Executor::new(executortype, self).run()
-            }
-            Announce::Client(submission) => {
-                Client::new(submission, self).run()
-            }
+            Announce::Worker(queryid, workerindex) => Worker::new(queryid, workerindex, self).run(),
+            Announce::Executor(executortype) => Executor::new(executortype, self).run(),
+            Announce::Client(submission) => Client::new(submission, self).run(),
         }
     }
 }
@@ -54,6 +48,7 @@ pub fn coordinate(addr: &str) -> Result<()> {
         let (tx, rx) = try!(listener.accept());
         let catalog = catalog_ref.clone();
         thread::spawn(move || {
+            debug!("accepted new connection");
             let connection = Connection::new(tx, rx, catalog);
             if let Err(err) = connection.dispatch() {
                 error!("dispatch failed: {:?}", err);

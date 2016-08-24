@@ -2,7 +2,7 @@ use std::sync::mpsc;
 use std::io::Result;
 
 use messaging;
-use query::{QueryId, QueryConfig};
+use query::{QueryConfig, QueryId};
 use executor::ExecutorType;
 
 use super::Connection;
@@ -32,8 +32,8 @@ impl Executor {
     pub fn new(ty: ExecutorType, conn: Connection) -> Self {
         Executor {}
     }
-    
-    pub fn run(&mut self) -> Result<()> {
+
+    pub fn run(self) -> Result<()> {
         Ok(())
     }
 }

@@ -1,6 +1,4 @@
-use std::io;
-
-use futures::{self, Future, Complete, Oneshot, Poll};
+use futures::{self, Complete, Future, Oneshot, Poll};
 
 pub fn pair<T, E>() -> (Promise<T, E>, Response<T, E>) {
     let (tx, rx) = futures::oneshot();
@@ -10,12 +8,13 @@ pub fn pair<T, E>() -> (Promise<T, E>, Response<T, E>) {
     (promise, response)
 }
 
+#[must_use]
 pub struct Promise<T, E> {
     inner: Complete<Result<T, E>>,
 }
 
 impl<T, E> Promise<T, E> {
-    pub fn fullfil(self, t: T) {
+    pub fn fulfil(self, t: T) {
         self.complete(Ok(t))
     }
 
@@ -28,8 +27,15 @@ impl<T, E> Promise<T, E> {
     }
 }
 
+#[must_use]
 pub struct Response<T, E> {
     inner: Oneshot<Result<T, E>>,
+}
+
+impl<T, E> Response<T, E> {
+    pub fn wait(self) -> Result<T, E> {
+        Future::wait(self)
+    }
 }
 
 impl<T, E> Future for Response<T, E> {
