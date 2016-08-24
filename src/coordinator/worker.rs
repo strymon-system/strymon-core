@@ -31,7 +31,7 @@ pub enum Message {
 
 enum Event {
     Catalog(Message),
-    Network(Result<PubSubRequest>),
+    Network(PubSubRequest),
 }
 
 impl Worker {
@@ -48,10 +48,12 @@ impl Worker {
             Err(err) => tx.send(err),
         }
 
-        let tx_net = tx_event.clone();
-        rx.detach::<PubSubRequest, _>(move |res| {
-            tx_net.send(Event::Network(res)).expect("dangling worker connection")
-        });
+/*
+        Dispatcher::new()
+            .on_error(move |err| err_tx.send(Event::NetworkError(err)).unwrap())
+            .on_recv<Publish, _>(move |publish| pub_tx.send())
+            .detach();
+*/
 
         Worker {
             catalog: catalog,

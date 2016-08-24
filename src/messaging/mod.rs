@@ -2,13 +2,15 @@ use std::io::Result;
 use std::sync::mpsc;
 use std::thread;
 
-use self::frame::Frame;
-pub use self::frame::{Decode, Encode};
+pub use self::frame::{Frame, Decode, Encode};
 
+pub mod decoder;
+pub mod request;
 mod frame;
 mod tcp;
 
-pub type Message = Frame;
+pub trait Transport: Encode + Decode /* + Boxed */ {}
+impl<T: Encode + Decode> Transport for T { }
 
 fn from_tcp((tx, rx): (tcp::Sender, tcp::Receiver)) -> (Sender, Receiver) {
     (Sender { inner: tx }, Receiver { inner: rx })
@@ -33,22 +35,23 @@ pub struct Receiver {
 }
 
 impl Receiver {
-    pub fn recv_any(&self) -> Result<Message> {
+    pub fn recv(&self) -> Result<Frame> {
         self.inner.recv()
     }
 
-    pub fn recv<T: Decode>(&self) -> Result<T> {
+    #[deprecated]
+    pub fn recv_decode<T: Decode>(&self) -> Result<T> {
         self.inner.recv().and_then(|frame| frame.decode::<T>())
     }
 
-    pub fn detach<T: Decode, F>(mut self, mut f: F)
-        where F: FnMut(Result<T>),
+    pub fn detach<F>(mut self, mut f: F)
+        where F: FnMut(Result<Frame>),
               F: Send + 'static
     {
         thread::spawn(move || {
             let mut is_ok = true;
             while is_ok {
-                let res = self.recv::<T>();
+                let res = self.recv();
                 is_ok = res.is_ok();
                 f(res);
             }
