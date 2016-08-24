@@ -6,6 +6,7 @@ pub use self::frame::{Frame, Decode, Encode};
 
 pub mod decoder;
 pub mod request;
+
 mod frame;
 mod tcp;
 

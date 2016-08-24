@@ -1,68 +1,84 @@
-use std::io::{Error, Result};
+use std::io::{Result, Error};
 
 use messaging::{Frame, Decode};
 
-#[must_use]
-pub struct Decoder {
-    inner: Option<Result<Frame>>,
+enum Inner<T> {
+    Frame(Frame),
+    Error(Error),
+    Decoded(T),
 }
 
-impl From<Result<Frame>> for Decoder {
-    fn from(result: Result<Frame>) -> Decoder {
+#[must_use]
+pub struct Decoder<T = ()> {
+    inner: Inner<T>,
+}
+
+impl<T> From<Result<Frame>> for Decoder<T> {
+    fn from(result: Result<Frame>) -> Decoder<T> {
+        let inner = match result {
+            Ok(frame) => Inner::Frame(frame),
+            Err(err) => Inner::Error(err),
+        };
+
         Decoder {
-            inner: Some(result)
+            inner: inner,
         }
     }
 }
 
-impl Decoder {
-    pub fn done() -> Self {
-        Decoder { inner: None }
+impl<T> Decoder<T> {
+    pub fn done(t: T) -> Self {
+        Decoder {
+            inner: Inner::Decoded(t),
+        }
     }
 
-    pub fn when<T: Decode, F>(mut self, f: F) -> Self
-        where F: FnOnce(T) {
+    pub fn when<D: Decode, F>(self, f: F) -> Self
+        where F: FnOnce(D) -> T {
 
-        let can_decode = match self.inner {
-            Some(Ok(ref frame)) if frame.is::<T>() => true,
-            _ => false
+        let valid = if let Inner::Frame(ref frame) = self.inner {
+            frame.is::<D>()
+        } else {
+            false
         };
-        
-        if can_decode {
-            let frame = self.inner.unwrap().unwrap();
-            f(frame.decode::<T>().expect("unexpected decoder error"));
 
-            Decoder::done()
+        if valid {
+            if let Inner::Frame(frame) = self.inner {
+                let decoded = frame.decode::<D>().expect("decoder failed unexpectedly");
+                Decoder::done(f(decoded))
+            } else {
+                unreachable!()
+            }
+        } else {
+            self
+        }
+
+    }
+    
+    pub fn forward<F>(self, f: F) -> Self
+        where F: FnOnce(Frame) -> Decoder<T>
+    {
+        if let Inner::Frame(frame) = self.inner {
+            f(frame)
         } else {
             self
         }
     }
     
     pub fn when_err<F>(self, f: F) -> Self
-        where F: FnOnce(Error) {
-        if let Some(Err(err)) = self.inner {
-            f(err);
-            Decoder::done()
-        } else {
-            self
-        }
-    }
-    
-    pub fn forward<F>(self, f: F) -> Self
-        where F: FnOnce(Result<Frame>) -> Self {
-        
-        if let Some(res) = self.inner {
-            f(res)
+        where F: FnOnce(Error) -> T {
+        if let Inner::Error(err) = self.inner {
+            Decoder::done(f(err))
         } else {
             self
         }
     }
 
-    pub fn else_panic(self, message: &str) {
+    pub fn expect(self, message: &str) -> T {
         match self.inner {
-            None => (),
-            Some(Ok(_)) => panic!("{:?}", message),
-            Some(Err(err)) => panic!("{:?}: {:?}", message, err),
+            Inner::Frame(_) => panic!("{:?}", message),
+            Inner::Error(err) => panic!("{:?}: {:?}", message, err),
+            Inner::Decoded(t) => t
         }
     }
 }
@@ -75,26 +91,18 @@ mod tests {
 
     #[test]
     fn test_bytes_message() {
-        let s = "Hello, World".to_string();
-        let msg = Frame::encode(s.clone());
-        
-        Decoder::from(Ok(msg))
-            .when::<String, _>(|_| ())
-            .when_err(|err| panic!("unexpected error"))
-            .else_panic("failed to decode string");
+        let s1 = "Hello, World".to_string();
+        let msg = Frame::encode(s1.clone());
 
-        Decoder::from(Err(Error::new(ErrorKind::Other, "okay")))
-            .when_err(|_| ())
-            .else_panic("failed to handle error")
+        let s2 = Decoder::from(Ok(msg))
+            .when::<String, _>(|s| s)
+            .when_err(|err| panic!("unexpected error"))
+            .expect("failed to decode string");
+        assert_eq!(s1, s2);
+
+        let err = Decoder::<Error>::from(Err(Error::new(ErrorKind::Other, "okay")))
+            .when_err(|e| e)
+            .expect("failed to handle error");
+        assert_eq!(err.kind(), ErrorKind::Other);
     }
 }
-
-/*
-
-
-Decoder::from(result)
-    .when::<Foo, _>(|foo| {
-        
-    })
-    .forward()
-*/
