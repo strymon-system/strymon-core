@@ -4,17 +4,17 @@ use std::thread;
 use std::io::Result;
 use std::net::{Shutdown, TcpListener, TcpStream};
 
-use messaging::frame::{self, Frame};
+use messaging::bytes;
 
 fn from_native(tcp: TcpStream) -> Result<(Sender, Receiver)> {
     let instream = try!(tcp.try_clone());
     let mut outstream = tcp;
 
-    let (out_tx, out_rx) = mpsc::channel::<Frame>();
+    let (out_tx, out_rx) = mpsc::channel::<Vec<u8>>();
     thread::spawn(move || {
-        while let Ok(frame) = out_rx.recv() {
-            if let Err(err) = frame::write(&mut outstream, frame) {
-                info!("unexpected error while writing frame: {:?}", err);
+        while let Ok(bytes) = out_rx.recv() {
+            if let Err(err) = bytes::write(&mut outstream, bytes) {
+                info!("unexpected error while writing bytes: {:?}", err);
                 break;
             }
         }
@@ -34,12 +34,12 @@ pub fn connect(to: &str) -> Result<(Sender, Receiver)> {
 }
 
 pub struct Sender {
-    inner: mpsc::Sender<Frame>,
+    inner: mpsc::Sender<Vec<u8>>,
 }
 
 impl Sender {
-    pub fn send(&self, frame: Frame) {
-        let _ = self.inner.send(frame);
+    pub fn send(&self, bytes: Vec<u8>) {
+        let _ = self.inner.send(bytes);
     }
 }
 
@@ -48,8 +48,8 @@ pub struct Receiver {
 }
 
 impl Receiver {
-    pub fn recv(&self) -> Result<Frame> {
-        frame::read(&mut *self.inner.borrow_mut())
+    pub fn recv(&self) -> Result<Vec<u8>> {
+        bytes::read(&mut *self.inner.borrow_mut())
     }
 }
 

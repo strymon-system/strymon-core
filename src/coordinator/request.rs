@@ -5,8 +5,6 @@ use worker::WorkerIndex;
 use executor::ExecutorType;
 use topic::{Topic, TopicId, TypeId};
 
-use util::promise::Promise;
-
 #[derive(Debug, Clone)]
 pub enum Announce {
     Worker(QueryId, WorkerIndex),

@@ -31,11 +31,13 @@ impl Connection {
     }
 
     fn dispatch(self) -> Result<()> {
-        match try!(self.rx.recv_decode::<request::Announce>()) {
-            Announce::Worker(queryid, workerindex) => Worker::new(queryid, workerindex, self).run(),
-            Announce::Executor(executortype) => Executor::new(executortype, self).run(),
-            Announce::Client(submission) => Client::new(submission, self).run(),
-        }
+        Ok(())
+        // match try!(self.rx.recv_decode::<request::Announce>()) {
+        // Announce::Worker(queryid, workerindex) => Worker::new(queryid, workerindex, self).run(),
+        // Announce::Executor(executortype) => Executor::new(executortype, self).run(),
+        // Announce::Client(submission) => Client::new(submission, self).run(),
+        // }
+        //
     }
 }
 

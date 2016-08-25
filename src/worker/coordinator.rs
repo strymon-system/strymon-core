@@ -10,6 +10,4 @@ impl Coordinator {
     pub fn announce(config: Worker) -> Result<Self> {
         unimplemented!()
     }
-
-
 }

@@ -8,6 +8,5 @@ pub struct Worker {
     query_id: QueryId,
     worker_index: WorkerIndex,
 
-    coordinator: String,
-    // TODO external ip address.. inherit from executor?
+    coordinator: String, // TODO external ip address.. inherit from executor?
 }

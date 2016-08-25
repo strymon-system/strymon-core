@@ -42,18 +42,18 @@ impl Worker {
         let worker_ref = WorkerRef(tx_event.clone());
         let (ready_tx, ready_rx) = promise::pair();
         catalog.send(CatalogMessage::WorkerReady(query_id, worker_index, worker_ref, ready_tx));
-        match ready_rx.wait() {
-            // TODO response type
-            Ok(id) => tx.send(id),
-            Err(err) => tx.send(err),
-        }
-
-/*
-        Dispatcher::new()
-            .on_error(move |err| err_tx.send(Event::NetworkError(err)).unwrap())
-            .on_recv<Publish, _>(move |publish| pub_tx.send())
-            .detach();
-*/
+        // match ready_rx.wait() {
+        // TODO response type
+        // Ok(id) => tx.send(id),
+        // Err(err) => tx.send(err),
+        // }
+        //
+        //
+        // Dispatcher::new()
+        // .on_error(move |err| err_tx.send(Event::NetworkError(err)).unwrap())
+        // .on_recv<Publish, _>(move |publish| pub_tx.send())
+        // .detach();
+        //
 
         Worker {
             catalog: catalog,

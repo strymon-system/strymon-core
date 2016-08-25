@@ -1,17 +1,37 @@
 use std::io::Result;
+use std::any::Any;
 use std::sync::mpsc;
 use std::thread;
 
-pub use self::frame::{Frame, Decode, Encode};
+use self::bytes::{Decode, Encode};
 
 pub mod decoder;
 pub mod request;
 
-mod frame;
+mod bytes;
 mod tcp;
 
-pub trait Transport: Encode + Decode /* + Boxed */ {}
-impl<T: Encode + Decode> Transport for T { }
+pub trait Transfer: Encode + Decode + Send + 'static {}
+impl<T: Encode + Decode + Send + 'static> Transfer for T {}
+
+#[derive(Clone)]
+pub enum Message {
+    Bytes(Vec<u8>),
+}
+
+impl Message {
+    pub fn downcast<T: Transfer>(self) -> ::std::result::Result<T, Self> {
+        match self {
+            Message::Bytes(mut bytes) => {
+                if T::is(&bytes) {
+                    Ok(T::decode(&mut bytes).expect("decode failed"))
+                } else {
+                    Err(Message::Bytes(bytes))
+                }
+            }
+        }
+    }
+}
 
 fn from_tcp((tx, rx): (tcp::Sender, tcp::Receiver)) -> (Sender, Receiver) {
     (Sender { inner: tx }, Receiver { inner: rx })
@@ -26,8 +46,8 @@ pub struct Sender {
 }
 
 impl Sender {
-    pub fn send<T: Encode>(&self, msg: T) {
-        self.inner.send(Frame::encode(msg))
+    pub fn send<T: Transfer>(&self, msg: &T) {
+        self.inner.send(T::encode(msg))
     }
 }
 
@@ -36,25 +56,20 @@ pub struct Receiver {
 }
 
 impl Receiver {
-    pub fn recv(&self) -> Result<Frame> {
-        self.inner.recv()
-    }
-
-    #[deprecated]
-    pub fn recv_decode<T: Decode>(&self) -> Result<T> {
-        self.inner.recv().and_then(|frame| frame.decode::<T>())
+    pub fn recv(&self) -> Result<Message> {
+        self.inner.recv().map(Message::Bytes)
     }
 
     pub fn detach<F>(mut self, mut f: F)
-        where F: FnMut(Result<Frame>),
+        where F: FnMut(Result<Message>),
               F: Send + 'static
     {
         thread::spawn(move || {
             let mut is_ok = true;
             while is_ok {
-                let res = self.recv();
-                is_ok = res.is_ok();
-                f(res);
+                let result = self.recv();
+                is_ok = result.is_ok();
+                f(result);
             }
         });
     }
@@ -71,5 +86,27 @@ pub struct Listener {
 impl Listener {
     pub fn accept(&mut self) -> Result<(Sender, Receiver)> {
         self.inner.accept().map(from_tcp)
+    }
+}
+
+impl ::abomonation::Abomonation for Message {
+    #[inline]
+    unsafe fn embalm(&mut self) {
+        match *self {
+            Message::Bytes(ref mut b) => b.embalm(),
+        }
+    }
+
+    #[inline]
+    unsafe fn entomb(&self, bytes: &mut Vec<u8>) {
+        match *self {
+            Message::Bytes(ref b) => b.entomb(bytes),
+        }
+    }
+    #[inline]
+    unsafe fn exhume<'a, 'b>(&'a mut self, bytes: &'b mut [u8]) -> Option<&'b mut [u8]> {
+        match *self {
+            Message::Bytes(ref mut b) => b.exhume(bytes),
+        }
     }
 }

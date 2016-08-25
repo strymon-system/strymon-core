@@ -4,8 +4,8 @@ use rand;
 
 use query::{QueryConfig, QueryId};
 use executor::{ExecutorId, ExecutorType};
+use util::Generator;
 
-use coordinator::catalog::Generator;
 use coordinator::executor::{ExecutorRef, Message as ExecutorMessage};
 
 pub type ExecutorTypeId = u8;

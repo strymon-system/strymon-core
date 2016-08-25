@@ -1,8 +1,6 @@
 use std::sync::mpsc;
-use std::ops::RangeFrom;
 use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
-use std::marker::PhantomData;
 use std::thread;
 
 use query::{QueryConfig, QueryId};
@@ -10,6 +8,7 @@ use executor::{ExecutorId, ExecutorType};
 use topic::Topic;
 use worker::WorkerIndex;
 
+use util::Generator;
 use util::promise::Promise;
 
 use coordinator::request::*;
@@ -139,23 +138,5 @@ impl Catalog {
 
         // TODO maybe we should add a timeout for the pending query..?!
         self.pending.insert(id, pending);
-    }
-}
-
-struct Generator<T> {
-    generator: RangeFrom<u64>,
-    marker: PhantomData<T>,
-}
-
-impl<T: From<u64>> Generator<T> {
-    fn new() -> Self {
-        Generator {
-            generator: 0..,
-            marker: PhantomData,
-        }
-    }
-
-    fn generate(&mut self) -> T {
-        From::from(self.generator.next().unwrap())
     }
 }

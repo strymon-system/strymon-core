@@ -1,9 +1,9 @@
-use std::io::{Result, Error};
+use std::io::{Error, Result};
 
-use messaging::{Frame, Decode};
+use messaging::{Message, Transfer};
 
 enum Inner<T> {
-    Frame(Frame),
+    Message(Message),
     Error(Error),
     Decoded(T),
 }
@@ -13,60 +13,50 @@ pub struct Decoder<T = ()> {
     inner: Inner<T>,
 }
 
-impl<T> From<Result<Frame>> for Decoder<T> {
-    fn from(result: Result<Frame>) -> Decoder<T> {
+impl<T> From<Result<Message>> for Decoder<T> {
+    fn from(result: Result<Message>) -> Decoder<T> {
         let inner = match result {
-            Ok(frame) => Inner::Frame(frame),
+            Ok(msg) => Inner::Message(msg),
             Err(err) => Inner::Error(err),
         };
 
-        Decoder {
-            inner: inner,
-        }
+        Decoder { inner: inner }
     }
 }
 
 impl<T> Decoder<T> {
     pub fn done(t: T) -> Self {
-        Decoder {
-            inner: Inner::Decoded(t),
-        }
+        Decoder { inner: Inner::Decoded(t) }
     }
 
-    pub fn when<D: Decode, F>(self, f: F) -> Self
-        where F: FnOnce(D) -> T {
+    pub fn when<D: Transfer, F>(self, f: F) -> Self
+        where F: FnOnce(D) -> T
+    {
 
-        let valid = if let Inner::Frame(ref frame) = self.inner {
-            frame.is::<D>()
-        } else {
-            false
-        };
-
-        if valid {
-            if let Inner::Frame(frame) = self.inner {
-                let decoded = frame.decode::<D>().expect("decoder failed unexpectedly");
-                Decoder::done(f(decoded))
-            } else {
-                unreachable!()
+        if let Inner::Message(msg) = self.inner {
+            match msg.downcast::<D>() {
+                Ok(decoded) => Decoder::done(f(decoded)),
+                Err(msg) => Decoder::from(Ok(msg)),
             }
         } else {
             self
         }
 
     }
-    
+
     pub fn forward<F>(self, f: F) -> Self
-        where F: FnOnce(Frame) -> Decoder<T>
+        where F: FnOnce(Result<Message>) -> Decoder<T>
     {
-        if let Inner::Frame(frame) = self.inner {
-            f(frame)
-        } else {
-            self
+        match self.inner {
+            Inner::Message(msg) => f(Ok(msg)),
+            Inner::Error(err) => f(Err(err)),
+            Inner::Decoded(done) => Decoder::done(done),
         }
     }
-    
+
     pub fn when_err<F>(self, f: F) -> Self
-        where F: FnOnce(Error) -> T {
+        where F: FnOnce(Error) -> T
+    {
         if let Inner::Error(err) = self.inner {
             Decoder::done(f(err))
         } else {
@@ -76,9 +66,9 @@ impl<T> Decoder<T> {
 
     pub fn expect(self, message: &str) -> T {
         match self.inner {
-            Inner::Frame(_) => panic!("{:?}", message),
+            Inner::Message(_) => panic!("{:?}", message),
             Inner::Error(err) => panic!("{:?}: {:?}", message, err),
-            Inner::Decoded(t) => t
+            Inner::Decoded(t) => t,
         }
     }
 }
@@ -87,12 +77,13 @@ impl<T> Decoder<T> {
 mod tests {
     use super::*;
     use std::io::{Error, ErrorKind};
-    use messaging::Frame;
+    use messaging::Message;
+    use messaging::bytes::Encode;
 
     #[test]
     fn test_bytes_message() {
         let s1 = "Hello, World".to_string();
-        let msg = Frame::encode(s1.clone());
+        let msg = Message::Bytes(s1.clone().encode());
 
         let s2 = Decoder::from(Ok(msg))
             .when::<String, _>(|s| s)
