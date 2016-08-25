@@ -1,11 +1,13 @@
 use std::sync::mpsc;
 use std::io::Result;
 
-use messaging;
+use messaging::request::handler::Req;
+
 use query::{QueryConfig, QueryId};
-use executor::ExecutorType;
+use executor::{ExecutorType, ExecutorId};
 
 use super::Connection;
+use super::request::ExecutorReady;
 
 pub struct ExecutorRef(mpsc::Sender<Event>);
 
@@ -29,7 +31,7 @@ pub struct Executor {
 }
 
 impl Executor {
-    pub fn new(ty: ExecutorType, conn: Connection) -> Self {
+    pub fn new(req: Req<ExecutorReady>, conn: Connection) -> Self {
         Executor {}
     }
 

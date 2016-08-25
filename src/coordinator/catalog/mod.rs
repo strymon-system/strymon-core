@@ -9,7 +9,9 @@ use topic::Topic;
 use worker::WorkerIndex;
 
 use util::Generator;
-use util::promise::Promise;
+
+use messaging::request::Complete;
+use messaging::request::handler::Handoff;
 
 use coordinator::request::*;
 use coordinator::worker::WorkerRef;
@@ -33,9 +35,9 @@ impl CatalogRef {
 }
 
 pub enum Message {
-    Submission(Submission, Promise<QueryId, SubmissionError>),
-    WorkerReady(QueryId, WorkerIndex, WorkerRef, Promise<(), WorkerError>),
-    PubSubRequest(PubSubRequest, Promise<Topic, TopicError>),
+    Submission(Submission, Handoff<Submission>),
+    WorkerReady(WorkerReady, WorkerRef, Complete<WorkerReady>),
+    __todo,
 }
 
 pub struct Catalog {
@@ -79,8 +81,8 @@ impl Catalog {
         use self::Message::*;
         match request {
             Submission(submission, promise) => self.submission(submission, promise),
-            WorkerReady(query, index, worker_ref, promise) => {
-                self.worker_ready(query, index, worker_ref, promise)
+            WorkerReady(worker, worker_ref, promise) => {
+                self.worker_ready(worker.query, worker.index, worker_ref, promise)
             }
             _ => unimplemented!(),
         };
@@ -90,7 +92,7 @@ impl Catalog {
                         query_id: QueryId,
                         index: WorkerIndex,
                         worker_ref: WorkerRef,
-                        promise: Promise<(), WorkerError>) {
+                        promise: Complete<WorkerReady>) {
         match self.pending.entry(query_id) {
             Entry::Occupied(mut pending) => {
                 // add worker to wait list
@@ -110,7 +112,7 @@ impl Catalog {
 
     pub fn submission(&mut self,
                       submission: Submission,
-                      promise: Promise<QueryId, SubmissionError>) {
+                      promise: Handoff<Submission>) {
         let id = self.query_id.generate();
         let config = submission.config;
 

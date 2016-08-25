@@ -2,8 +2,11 @@ use std::io::{Error, Result};
 use std::thread;
 
 use messaging::{self, Receiver, Sender};
+use messaging::decoder::Decoder;
+use messaging::request::handler::Req;
+
 use self::catalog::{Catalog, CatalogRef};
-use self::request::Announce;
+use self::request::{WorkerReady, ExecutorReady, Submission};
 use self::worker::Worker;
 use self::executor::Executor;
 use self::client::Client;
@@ -31,13 +34,29 @@ impl Connection {
     }
 
     fn dispatch(self) -> Result<()> {
-        Ok(())
-        // match try!(self.rx.recv_decode::<request::Announce>()) {
-        // Announce::Worker(queryid, workerindex) => Worker::new(queryid, workerindex, self).run(),
-        // Announce::Executor(executortype) => Executor::new(executortype, self).run(),
-        // Announce::Client(submission) => Client::new(submission, self).run(),
-        // }
-        //
+        enum Incoming {
+            Worker(Req<WorkerReady>),
+            Executor(Req<ExecutorReady>),
+            Submission(Req<Submission>),
+        }
+
+        let incoming = Decoder::from(self.rx.recv())
+            .when::<Req<WorkerReady>, _>(Incoming::Worker)
+            .when::<Req<ExecutorReady>, _>(Incoming::Executor)
+            .when::<Req<Submission>, _>(Incoming::Submission)
+            .expect("failed to dispatch connection");
+
+        match incoming {
+            Incoming::Worker(worker) => {
+                Worker::new(worker, self).run()
+            }
+            Incoming::Executor(executor) => {
+                Executor::new(executor, self).run()
+            }
+            Incoming::Submission(submission) => {
+                Client::new(submission, self).run()
+            }
+        }
     }
 }
 

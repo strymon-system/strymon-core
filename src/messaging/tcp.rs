@@ -33,6 +33,7 @@ pub fn connect(to: &str) -> Result<(Sender, Receiver)> {
     from_native(try!(TcpStream::connect(to)))
 }
 
+#[derive(Clone)]
 pub struct Sender {
     inner: mpsc::Sender<Vec<u8>>,
 }

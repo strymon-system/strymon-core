@@ -1,24 +1,25 @@
-use coordinator::worker::WorkerRef;
-use coordinator::request::{SubmissionError, WorkerError};
-use coordinator::catalog::query::Query;
-
 use query::{QueryConfig, QueryId};
 use worker::WorkerIndex;
 
-use util::promise::Promise;
+use messaging::request::Complete;
+use messaging::request::handler::Handoff;
+
+use coordinator::worker::WorkerRef;
+use coordinator::request::*;
+use coordinator::catalog::query::Query;
 
 pub struct Pending {
     id: QueryId,
     config: QueryConfig,
 
-    submission: Promise<QueryId, SubmissionError>,
-    workers: Vec<Option<(WorkerRef, Promise<(), WorkerError>)>>,
+    submission: Handoff<Submission>,
+    workers: Vec<Option<(WorkerRef, Complete<WorkerReady>)>>,
 }
 
 impl Pending {
     pub fn new(id: QueryId,
                config: QueryConfig,
-               promise: Promise<QueryId, SubmissionError>)
+               promise: Handoff<Submission>)
                -> Self {
         let total_workers = config.num_executors * config.num_workers;
         Pending {
@@ -32,7 +33,7 @@ impl Pending {
     pub fn add_worker(&mut self,
                       index: WorkerIndex,
                       worker_ref: WorkerRef,
-                      promise: Promise<(), WorkerError>) {
+                      promise: Complete<WorkerReady>) {
         // check validity of worker index
         if index >= self.workers.len() || self.workers[index].is_some() {
             return promise.failed(WorkerError::InvalidWorkerId);
@@ -52,12 +53,12 @@ impl Pending {
             .into_iter()
             .map(|opt| opt.expect("missing worker in pending query"))
             .map(|(worker, promise)| {
-                promise.fulfil(());
+                promise.success(());
                 worker
             })
             .collect();
 
-        self.submission.fulfil(self.id);
+        self.submission.success(self.id);
 
         Query::new(self.id, self.config, workers)
     }

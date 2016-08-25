@@ -41,6 +41,7 @@ pub fn connect(to: &str) -> Result<(Sender, Receiver)> {
     tcp::connect(to).map(from_tcp)
 }
 
+#[derive(Clone)]
 pub struct Sender {
     inner: tcp::Sender,
 }

@@ -4,12 +4,14 @@ use std::sync::mpsc;
 use worker::WorkerIndex;
 use query::QueryId;
 
-use coordinator::catalog::{CatalogRef, Message as CatalogMessage};
-use coordinator::request::PubSubRequest;
-use coordinator::Connection;
+use messaging::request;
+use messaging::request::handler::Req;
+
+use super::catalog::{CatalogRef, Message as CatalogMessage};
+use super::request::WorkerReady;
+use super::Connection;
 
 use messaging::Sender;
-use util::promise;
 
 pub struct Worker {
     catalog: CatalogRef,
@@ -31,29 +33,21 @@ pub enum Message {
 
 enum Event {
     Catalog(Message),
-    Network(PubSubRequest),
 }
 
 impl Worker {
-    pub fn new(query_id: QueryId, worker_index: WorkerIndex, conn: Connection) -> Self {
+    pub fn new(req: Req<WorkerReady>, conn: Connection) -> Self {
         let Connection { tx, rx, catalog } = conn;
         let (tx_event, rx_event) = mpsc::channel();
-
+        
         let worker_ref = WorkerRef(tx_event.clone());
-        let (ready_tx, ready_rx) = promise::pair();
-        catalog.send(CatalogMessage::WorkerReady(query_id, worker_index, worker_ref, ready_tx));
-        // match ready_rx.wait() {
-        // TODO response type
-        // Ok(id) => tx.send(id),
-        // Err(err) => tx.send(err),
-        // }
-        //
-        //
-        // Dispatcher::new()
-        // .on_error(move |err| err_tx.send(Event::NetworkError(err)).unwrap())
-        // .on_recv<Publish, _>(move |publish| pub_tx.send())
-        // .detach();
-        //
+
+        // this is a bit ugly, but we do not want to do a hand-off just yet
+        let (ready_tx, ready_rx) = request::promise::<WorkerReady>();
+        catalog.send(CatalogMessage::WorkerReady((&*req).clone(), worker_ref, ready_tx));
+        
+        // wait for catalog, then send back response
+        tx.send(&req.respond(ready_rx.await()));
 
         Worker {
             catalog: catalog,

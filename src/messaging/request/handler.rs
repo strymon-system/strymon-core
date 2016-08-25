@@ -14,9 +14,16 @@ use abomonation::Abomonation;
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Token(u64);
 
+#[derive(Clone, Debug)]
 pub struct Req<R: Request> {
     token: Token,
     request: R,
+}
+
+impl<R: Request> Req<R> {
+    pub fn respond(self, result: Result<R::Success, R::Error>) -> Response {
+        Response::new::<R>(result, self.token)
+    }
 }
 
 #[derive(Clone)]
@@ -43,14 +50,14 @@ impl Response {
     }
 }
 
-pub struct Waiter {
+pub struct AsyncHandler {
     generator: Generator<Token>,
     waiting: BTreeMap<Token, Box<Fn(Response) -> Option<Response> + Send>>,
 }
 
-impl Waiter {
+impl AsyncHandler {
     pub fn new() -> Self {
-        Waiter {
+        AsyncHandler {
             generator: Generator::new(),
             waiting: BTreeMap::new(),
         }
@@ -192,19 +199,19 @@ mod tests {
     use messaging::request::Request;
 
     #[test]
-    fn waiter() {
-        let mut waiter = Waiter::new();
+    fn async() {
+        let mut async = AsyncHandler::new();
 
-        let (req1, rx1) = waiter.submit(());
-        let (req2, rx2) = waiter.submit(());
+        let (req1, rx1) = async.submit(());
+        let (req2, rx2) = async.submit(());
 
         let resp2 = Response::new::<()>(Ok(1337), req2.token);
-        assert!(waiter.resolve(resp2.clone()).is_none());
-        assert!(waiter.resolve(resp2).is_some());
+        assert!(async.resolve(resp2.clone()).is_none());
+        assert!(async.resolve(resp2).is_some());
         assert_eq!(rx2.await(), Ok(1337));
 
         let resp1 = Response::new::<()>(Err(false), req1.token);
-        assert!(waiter.resolve(resp1).is_none());
+        assert!(async.resolve(resp1).is_none());
         assert_eq!(rx1.await(), Err(false));
     }
 }

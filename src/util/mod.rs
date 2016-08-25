@@ -1,8 +1,6 @@
 use std::ops::RangeFrom;
 use std::marker::PhantomData;
 
-pub mod promise;
-
 pub struct Generator<T> {
     generator: RangeFrom<u64>,
     marker: PhantomData<T>,
