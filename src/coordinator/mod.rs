@@ -9,12 +9,12 @@ use self::catalog::{Catalog, CatalogRef};
 use self::request::{ExecutorReady, Submission, WorkerReady};
 use self::worker::Worker;
 use self::executor::Executor;
-use self::client::Client;
+use self::submitter::Submitter;
 
 pub mod catalog;
 pub mod request;
 
-mod client;
+mod submitter;
 mod executor;
 mod worker;
 
@@ -49,7 +49,7 @@ impl Connection {
         match incoming {
             Incoming::Worker(worker) => Worker::new(worker, self).run(),
             Incoming::Executor(executor) => Executor::new(executor, self).run(),
-            Incoming::Submission(submission) => Client::new(submission, self).run(),
+            Incoming::Submission(submission) => Submitter::new(submission, self).run(),
         }
     }
 }

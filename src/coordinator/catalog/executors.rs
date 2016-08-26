@@ -42,6 +42,13 @@ impl Executors {
             ty: req.ty,
             tx: tx,
         };
+
+        self.executors
+            .entry(executor.ty as ExecutorTypeId)
+            .or_insert(BTreeMap::new())
+            .insert(id, executor);
+
+        promise.success(id);
     }
 
     pub fn select<'a>(&'a self,
