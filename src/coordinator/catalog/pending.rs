@@ -17,10 +17,7 @@ pub struct Pending {
 }
 
 impl Pending {
-    pub fn new(id: QueryId,
-               config: QueryConfig,
-               promise: Handoff<Submission>)
-               -> Self {
+    pub fn new(id: QueryId, config: QueryConfig, promise: Handoff<Submission>) -> Self {
         let total_workers = config.num_executors * config.num_workers;
         Pending {
             id: id,

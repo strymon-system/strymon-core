@@ -5,8 +5,6 @@ extern crate abomonation;
 
 extern crate timely;
 
-extern crate futures;
-
 extern crate rand;
 extern crate byteorder;
 

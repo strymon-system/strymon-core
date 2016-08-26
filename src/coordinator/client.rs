@@ -1,35 +1,35 @@
 use std::io::Result;
 
-use messaging::request::handler::Req;
+use messaging::{Receiver, Sender};
+use messaging::request::handler::{self, Req};
 
 use query::QueryId;
 
-use super::catalog::Message;
+use super::catalog::{CatalogRef, Message};
 use super::request::{Submission, SubmissionError};
 use super::Connection;
 
 pub struct Client {
-    conn: Connection,
+    tx: Sender,
+    rx: Receiver,
+    catalog: CatalogRef,
     submission: Req<Submission>,
 }
 
 impl Client {
     pub fn new(req: Req<Submission>, conn: Connection) -> Self {
+        let Connection { tx, rx, catalog } = conn;
         Client {
-            conn: conn,
+            tx: tx,
+            rx: rx,
+            catalog: catalog,
             submission: req,
         }
     }
 
     pub fn run(mut self) -> Result<()> {
-        //let (tx, rx) = promise::pair();
-        //self.conn.catalog.send(Message::Submission(self.submission, tx));
-        // match rx.wait() {
-        // TODO response type
-        // Ok(id) => self.conn.tx.send(id),
-        // Err(err) => self.conn.tx.send(err),
-        // }
-        //
+        let (req, resp) = handler::handoff(self.submission, self.tx);
+        self.catalog.send(Message::Submission(req, resp));
         Ok(())
     }
 }

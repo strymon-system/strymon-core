@@ -6,12 +6,16 @@ use query::{QueryConfig, QueryId};
 use executor::{ExecutorId, ExecutorType};
 use util::Generator;
 
+use messaging::request::Complete;
+
 use coordinator::executor::{ExecutorRef, Message as ExecutorMessage};
+use coordinator::request::ExecutorReady;
 
 pub type ExecutorTypeId = u8;
 
 pub struct Executor {
     id: ExecutorId,
+    ty: ExecutorType,
     tx: ExecutorRef,
 }
 
@@ -26,6 +30,18 @@ impl Executors {
             executor_id: Generator::new(),
             executors: BTreeMap::new(),
         }
+    }
+
+    pub fn executor_ready(&mut self,
+                          req: ExecutorReady,
+                          tx: ExecutorRef,
+                          promise: Complete<ExecutorReady>) {
+        let id = self.executor_id.generate();
+        let executor = Executor {
+            id: id,
+            ty: req.ty,
+            tx: tx,
+        };
     }
 
     pub fn select<'a>(&'a self,

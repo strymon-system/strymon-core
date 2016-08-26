@@ -6,7 +6,7 @@ use messaging::decoder::Decoder;
 use messaging::request::handler::Req;
 
 use self::catalog::{Catalog, CatalogRef};
-use self::request::{WorkerReady, ExecutorReady, Submission};
+use self::request::{ExecutorReady, Submission, WorkerReady};
 use self::worker::Worker;
 use self::executor::Executor;
 use self::client::Client;
@@ -47,15 +47,9 @@ impl Connection {
             .expect("failed to dispatch connection");
 
         match incoming {
-            Incoming::Worker(worker) => {
-                Worker::new(worker, self).run()
-            }
-            Incoming::Executor(executor) => {
-                Executor::new(executor, self).run()
-            }
-            Incoming::Submission(submission) => {
-                Client::new(submission, self).run()
-            }
+            Incoming::Worker(worker) => Worker::new(worker, self).run(),
+            Incoming::Executor(executor) => Executor::new(executor, self).run(),
+            Incoming::Submission(submission) => Client::new(submission, self).run(),
         }
     }
 }

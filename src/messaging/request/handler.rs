@@ -3,7 +3,8 @@ use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
 use std::marker::PhantomData;
 
-use messaging::{Message, Sender, Transfer};
+use messaging::{Message, Receiver, Sender, Transfer};
+use messaging::decoder::Decoder;
 use messaging::bytes::{Decode, Encode};
 use messaging::request::*;
 
@@ -21,30 +22,34 @@ pub struct Req<R: Request> {
 }
 
 impl<R: Request> Req<R> {
-    pub fn respond(self, result: Result<R::Success, R::Error>) -> Response {
-        Response::new::<R>(result, self.token)
+    pub fn respond(self, result: Result<R::Success, R::Error>) -> Resp {
+        Resp::new::<R>(result, self.token)
     }
 }
 
 #[derive(Clone)]
-pub struct Response {
+pub struct Resp {
     token: Token,
     success: bool,
     bytes: Vec<u8>,
 }
 
-impl Response {
+impl Resp {
     fn new<R: Request>(result: Result<R::Success, R::Error>, token: Token) -> Self {
         match result {
-            Ok(s) => Response {
-                token: token,
-                success: true,
-                bytes: s.encode(),
-            },
-            Err(e) => Response {
-                token: token,
-                success: false,
-                bytes: e.encode(),
+            Ok(s) => {
+                Resp {
+                    token: token,
+                    success: true,
+                    bytes: s.encode(),
+                }
+            }
+            Err(e) => {
+                Resp {
+                    token: token,
+                    success: false,
+                    bytes: e.encode(),
+                }
             }
         }
     }
@@ -52,7 +57,7 @@ impl Response {
 
 pub struct AsyncHandler {
     generator: Generator<Token>,
-    waiting: BTreeMap<Token, Box<Fn(Response) -> Option<Response> + Send>>,
+    waiting: BTreeMap<Token, Box<Fn(Resp) -> Option<Resp> + Send>>,
 }
 
 impl AsyncHandler {
@@ -71,32 +76,32 @@ impl AsyncHandler {
         };
 
         let (tx, rx) = promise::<R>();
-        let fnbox = Box::new(move |mut response: Response| {
-            assert_eq!(response.token, token);
+        let fnbox = Box::new(move |mut resp: Resp| {
+            assert_eq!(resp.token, token);
 
             // TODO: This is a bit of a hack, because we cannot deocode messages
             //       partially. Thus the manual decode step here.
             //       Additionally, we work around Box<FnOnce> by using `tx.tx`
             //       directly.
-            if response.success {
-                if <R as Request>::Success::is(&response.bytes) {
-                    let s = <R as Request>::Success::decode(&mut response.bytes)
-                        .expect("failed to decode successful response");
+            if resp.success {
+                if <R as Request>::Success::is(&resp.bytes) {
+                    let s = <R as Request>::Success::decode(&mut resp.bytes)
+                        .expect("failed to decode successful resp");
                     let _ = tx.tx.send(Ok(s));
 
                     None
                 } else {
-                    Some(response)
+                    Some(resp)
                 }
             } else {
-                if <R as Request>::Error::is(&response.bytes) {
-                    let e = <R as Request>::Error::decode(&mut response.bytes)
-                        .expect("failed to decode error response");
+                if <R as Request>::Error::is(&resp.bytes) {
+                    let e = <R as Request>::Error::decode(&mut resp.bytes)
+                        .expect("failed to decode error resp");
                     let _ = tx.tx.send(Err(e));
 
                     None
                 } else {
-                    Some(response)
+                    Some(resp)
                 }
             }
         });
@@ -106,18 +111,18 @@ impl AsyncHandler {
         (req, rx)
     }
 
-    pub fn resolve(&mut self, mut response: Response) -> Option<Response> {
-        let token = response.token;
+    pub fn resolve(&mut self, mut resp: Resp) -> Option<Resp> {
+        let token = resp.token;
         match self.waiting.entry(token) {
             Entry::Occupied(e) => {
-                if let Some(response) = e.get()(response) {
-                    Some(response)
+                if let Some(resp) = e.get()(resp) {
+                    Some(resp)
                 } else {
                     e.remove();
                     None
                 }
             }
-            _ => Some(response),
+            _ => Some(resp),
         }
     }
 }
@@ -146,8 +151,8 @@ impl<R: Request> Handoff<R> {
     }
 
     pub fn result(self, result: Result<R::Success, R::Error>) {
-        let response = Response::new::<R>(result, self.token);
-        self.tx.send::<Response>(&response);
+        let resp = Resp::new::<R>(result, self.token);
+        self.tx.send::<Resp>(&resp);
     }
 }
 
@@ -155,9 +160,37 @@ pub fn handoff<R: Request>(req: Req<R>, tx: Sender) -> (R, Handoff<R>) {
     (req.request, Handoff::new(tx, req.token))
 }
 
+pub struct SyncHandler {
+    tx: Sender,
+    rx: Receiver,
+    generator: Generator<Token>,
+}
+
+impl SyncHandler {
+    pub fn new(tx: Sender, rx: Receiver) -> Self {
+        SyncHandler {
+            tx: tx,
+            rx: rx,
+            generator: Generator::new(),
+        }
+    }
+
+    pub fn submit<R: Request>(&mut self, request: R) -> Result<R::Success, R::Error> {
+        let req = Req {
+            token: self.generator.generate(),
+            request: request,
+        };
+        // TODO: what if we get an out-of-order message or a network failure?
+        unimplemented!()
+    }
+
+    pub fn done(self) -> (Sender, Receiver) {
+        (self.tx, self.rx)
+    }
+}
 
 unsafe_abomonate!(Token);
-unsafe_abomonate!(Response: token, success, bytes);
+unsafe_abomonate!(Resp: token, success, bytes);
 
 impl<R: Request + Abomonation> Abomonation for Req<R> {
     #[inline]
@@ -205,12 +238,12 @@ mod tests {
         let (req1, rx1) = async.submit(());
         let (req2, rx2) = async.submit(());
 
-        let resp2 = Response::new::<()>(Ok(1337), req2.token);
+        let resp2 = Resp::new::<()>(Ok(1337), req2.token);
         assert!(async.resolve(resp2.clone()).is_none());
         assert!(async.resolve(resp2).is_some());
         assert_eq!(rx2.await(), Ok(1337));
 
-        let resp1 = Response::new::<()>(Err(false), req1.token);
+        let resp1 = Resp::new::<()>(Err(false), req1.token);
         assert!(async.resolve(resp1).is_none());
         assert_eq!(rx1.await(), Err(false));
     }

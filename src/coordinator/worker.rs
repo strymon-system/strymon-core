@@ -39,13 +39,13 @@ impl Worker {
     pub fn new(req: Req<WorkerReady>, conn: Connection) -> Self {
         let Connection { tx, rx, catalog } = conn;
         let (tx_event, rx_event) = mpsc::channel();
-        
+
         let worker_ref = WorkerRef(tx_event.clone());
 
         // this is a bit ugly, but we do not want to do a hand-off just yet
         let (ready_tx, ready_rx) = request::promise::<WorkerReady>();
         catalog.send(CatalogMessage::WorkerReady((&*req).clone(), worker_ref, ready_tx));
-        
+
         // wait for catalog, then send back response
         tx.send(&req.respond(ready_rx.await()));
 

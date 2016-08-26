@@ -19,10 +19,10 @@ use coordinator::executor::ExecutorRef;
 
 use self::pending::*;
 use self::query::*;
-use self::executor::*;
+use self::executors::*;
 
 mod pending;
-mod executor;
+mod executors;
 mod query;
 
 #[derive(Clone)]
@@ -37,7 +37,7 @@ impl CatalogRef {
 pub enum Message {
     Submission(Submission, Handoff<Submission>),
     WorkerReady(WorkerReady, WorkerRef, Complete<WorkerReady>),
-    __todo,
+    ExecutorReady(ExecutorReady, ExecutorRef, Complete<ExecutorReady>),
 }
 
 pub struct Catalog {
@@ -82,9 +82,11 @@ impl Catalog {
         match request {
             Submission(submission, promise) => self.submission(submission, promise),
             WorkerReady(worker, worker_ref, promise) => {
-                self.worker_ready(worker.query, worker.index, worker_ref, promise)
+                self.worker_ready(worker.query, worker.index, worker_ref, promise);
             }
-            _ => unimplemented!(),
+            ExecutorReady(executor, executor_ref, promise) => {
+                self.executors.executor_ready(executor, executor_ref, promise);
+            }
         };
     }
 
@@ -110,9 +112,7 @@ impl Catalog {
         }
     }
 
-    pub fn submission(&mut self,
-                      submission: Submission,
-                      promise: Handoff<Submission>) {
+    pub fn submission(&mut self, submission: Submission, promise: Handoff<Submission>) {
         let id = self.query_id.generate();
         let config = submission.config;
 
