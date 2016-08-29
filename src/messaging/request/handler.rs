@@ -160,35 +160,6 @@ pub fn handoff<R: Request>(req: Req<R>, tx: Sender) -> (R, Handoff<R>) {
     (req.request, Handoff::new(tx, req.token))
 }
 
-pub struct SyncHandler {
-    tx: Sender,
-    rx: Receiver,
-    generator: Generator<Token>,
-}
-
-impl SyncHandler {
-    pub fn new(tx: Sender, rx: Receiver) -> Self {
-        SyncHandler {
-            tx: tx,
-            rx: rx,
-            generator: Generator::new(),
-        }
-    }
-
-    pub fn submit<R: Request>(&mut self, request: R) -> Result<R::Success, R::Error> {
-        let req = Req {
-            token: self.generator.generate(),
-            request: request,
-        };
-        // TODO: what if we get an out-of-order message or a network failure?
-        unimplemented!()
-    }
-
-    pub fn done(self) -> (Sender, Receiver) {
-        (self.tx, self.rx)
-    }
-}
-
 unsafe_abomonate!(Token);
 unsafe_abomonate!(Resp: token, success, bytes);
 

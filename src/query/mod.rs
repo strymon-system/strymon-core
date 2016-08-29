@@ -20,4 +20,4 @@ pub struct QueryConfig {
 }
 
 unsafe_abomonate!(QueryId);
-unsafe_abomonate!(QueryConfig: fetch, num_executors, num_workers);
+unsafe_abomonate!(QueryConfig: fetch, binary, num_executors, num_workers);
