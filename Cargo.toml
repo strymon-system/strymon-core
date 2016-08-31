@@ -11,6 +11,10 @@ path = "src/bin/coordinator.rs"
 name = "executor"
 path = "src/bin/executor.rs"
 
+[[bin]]
+name = "timely-submit"
+path = "src/bin/timely-submit.rs"
+
 [dependencies]
 abomonation = "^0.4.2"
 byteorder = "0.5.3"

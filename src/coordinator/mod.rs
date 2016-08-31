@@ -3,7 +3,7 @@ use std::thread;
 
 use messaging::{self, Receiver, Sender};
 use messaging::decoder::Decoder;
-use messaging::request::handler::AsyncReq;
+use messaging::request::handshake::Handshake;
 
 use self::catalog::{Catalog, CatalogRef};
 use self::request::{ExecutorReady, Submission, WorkerReady};
@@ -35,15 +35,16 @@ impl Connection {
 
     fn dispatch(self) -> Result<()> {
         enum Incoming {
-            Worker(AsyncReq<WorkerReady>),
-            Executor(AsyncReq<ExecutorReady>),
-            Submission(AsyncReq<Submission>),
+            Worker(Handshake<WorkerReady>),
+            Executor(Handshake<ExecutorReady>),
+            Submission(Handshake<Submission>),
         }
 
+        // encode the handshake into a enum so Rust knows it is safe to move `self`
         let incoming = Decoder::from(self.rx.recv())
-            .when::<AsyncReq<WorkerReady>, _>(Incoming::Worker)
-            .when::<AsyncReq<ExecutorReady>, _>(Incoming::Executor)
-            .when::<AsyncReq<Submission>, _>(Incoming::Submission)
+            .when::<Handshake<WorkerReady>, _>(Incoming::Worker)
+            .when::<Handshake<ExecutorReady>, _>(Incoming::Executor)
+            .when::<Handshake<Submission>, _>(Incoming::Submission)
             .expect("failed to dispatch connection");
 
         match incoming {

@@ -48,6 +48,7 @@ impl Executors {
             .or_insert(BTreeMap::new())
             .insert(id, executor);
 
+        debug!("successfully added new executor: {:?}", id);
         promise.success(id);
     }
 

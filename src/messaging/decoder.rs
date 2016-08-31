@@ -24,6 +24,12 @@ impl<T> From<Result<Message>> for Decoder<T> {
     }
 }
 
+impl<T> From<Message> for Decoder<T> {
+    fn from(msg: Message) -> Decoder<T> {
+        Decoder { inner: Inner::Message(msg) }
+    }
+}
+
 impl<T> Decoder<T> {
     pub fn done(t: T) -> Self {
         Decoder { inner: Inner::Decoded(t) }
@@ -69,6 +75,14 @@ impl<T> Decoder<T> {
             Inner::Message(_) => panic!("{:?}", message),
             Inner::Error(err) => panic!("{:?}: {:?}", message, err),
             Inner::Decoded(t) => t,
+        }
+    }
+    
+    pub fn unwrap_result(self) -> Result<T> {
+        match self.inner {
+            Inner::Message(_) => panic!("unable to decode message"),
+            Inner::Error(err) => Err(err),
+            Inner::Decoded(t) => Ok(t),
         }
     }
 }

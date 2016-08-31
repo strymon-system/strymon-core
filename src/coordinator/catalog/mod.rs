@@ -9,7 +9,6 @@ use worker::WorkerIndex;
 use util::Generator;
 
 use messaging::request::Complete;
-use messaging::request::handler::Handoff;
 
 use coordinator::request::*;
 use coordinator::worker::WorkerRef;
@@ -33,7 +32,7 @@ impl CatalogRef {
 }
 
 pub enum Message {
-    Submission(Submission, Handoff<Submission>),
+    Submission(Submission, Complete<Submission>),
     WorkerReady(WorkerReady, WorkerRef, Complete<WorkerReady>),
     ExecutorReady(ExecutorReady, ExecutorRef, Complete<ExecutorReady>),
 }
@@ -110,7 +109,7 @@ impl Catalog {
         }
     }
 
-    pub fn submission(&mut self, submission: Submission, promise: Handoff<Submission>) {
+    pub fn submission(&mut self, submission: Submission, promise: Complete<Submission>) {
         let id = self.query_id.generate();
         let config = submission.config;
 

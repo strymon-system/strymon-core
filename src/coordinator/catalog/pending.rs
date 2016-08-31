@@ -2,7 +2,6 @@ use query::{QueryConfig, QueryId};
 use worker::WorkerIndex;
 
 use messaging::request::Complete;
-use messaging::request::handler::Handoff;
 
 use coordinator::worker::WorkerRef;
 use coordinator::request::*;
@@ -12,12 +11,12 @@ pub struct Pending {
     id: QueryId,
     config: QueryConfig,
 
-    submission: Handoff<Submission>,
+    submission: Complete<Submission>,
     workers: Vec<Option<(WorkerRef, Complete<WorkerReady>)>>,
 }
 
 impl Pending {
-    pub fn new(id: QueryId, config: QueryConfig, promise: Handoff<Submission>) -> Self {
+    pub fn new(id: QueryId, config: QueryConfig, promise: Complete<Submission>) -> Self {
         let total_workers = config.num_executors * config.num_workers;
         Pending {
             id: id,

@@ -5,7 +5,7 @@ use worker::WorkerIndex;
 use query::QueryId;
 
 use messaging::request;
-use messaging::request::handler::AsyncReq;
+use messaging::request::handshake::{Handshake, Response};
 
 use super::catalog::{CatalogRef, Message as CatalogMessage};
 use super::request::WorkerReady;
@@ -36,18 +36,17 @@ enum Event {
 }
 
 impl Worker {
-    pub fn new(req: AsyncReq<WorkerReady>, conn: Connection) -> Self {
+    pub fn new(req: Handshake<WorkerReady>, conn: Connection) -> Self {
         let Connection { tx, rx, catalog } = conn;
         let (tx_event, rx_event) = mpsc::channel();
 
         let worker_ref = WorkerRef(tx_event.clone());
-
-        // this is a bit ugly, but we do not want to do a hand-off just yet
         let (ready_tx, ready_rx) = request::promise::<WorkerReady>();
-        catalog.send(CatalogMessage::WorkerReady((&*req).clone(), worker_ref, ready_tx));
+        catalog.send(CatalogMessage::WorkerReady(req.0, worker_ref, ready_tx));
 
         // wait for catalog, then send back response
-        tx.send(&req.reply(ready_rx.await()));
+        let resp = Response::<WorkerReady>::from(ready_rx.await());
+        tx.send(&resp);
 
         Worker {
             catalog: catalog,

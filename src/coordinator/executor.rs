@@ -3,7 +3,7 @@ use std::io::Result;
 
 use messaging::{Message as NetMessage, Receiver, Sender};
 use messaging::request;
-use messaging::request::handler::AsyncReq;
+use messaging::request::handshake::{Handshake, Response};
 
 use query::{QueryConfig, QueryId};
 use executor::{ExecutorId, ExecutorType};
@@ -33,11 +33,11 @@ pub struct Executor {
     tx: Sender,
     rx: Receiver,
     catalog: CatalogRef,
-    req: AsyncReq<ExecutorReady>,
+    req: Handshake<ExecutorReady>,
 }
 
 impl Executor {
-    pub fn new(req: AsyncReq<ExecutorReady>, conn: Connection) -> Self {
+    pub fn new(req: Handshake<ExecutorReady>, conn: Connection) -> Self {
         let Connection { tx, rx, catalog } = conn;
         Executor {
             tx: tx,
@@ -53,9 +53,10 @@ impl Executor {
 
         let (ready_tx, ready_rx) = request::promise::<ExecutorReady>();
         self.catalog
-            .send(CatalogMessage::ExecutorReady((&*self.req).clone(), executor_ref, ready_tx));
+            .send(CatalogMessage::ExecutorReady(self.req.0, executor_ref, ready_tx));
 
-        let result = ready_rx.await();
+        let resp = Response::<ExecutorReady>::from(ready_rx.await());
+        self.tx.send(&resp);
 
         Ok(())
     }

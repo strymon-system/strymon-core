@@ -1,14 +1,14 @@
 use std::io;
 
-use coordinator::request::{Submission, SubmissionError};
+use coordinator::request::{Submission as SubmissionReq, SubmissionError};
 
 use query::{QueryId, QueryConfig};
 
 use messaging::{self, Sender, Receiver};
 use messaging::decoder::Decoder;
-use messaging::request::AsyncResult;
-use messaging::request::handler::{AsyncHandler};
+use messaging::request::handshake::{Handshake, Response};
 
+#[derive(Debug)]
 pub enum SubmitError {
     Io(io::Error),
     Submission(SubmissionError),
@@ -26,23 +26,24 @@ impl From<SubmissionError> for SubmitError {
     }
 }
 
-pub struct Submit {
+pub struct Submission {
     tx: Sender,
     rx: Receiver,
-    handler: AsyncHandler,
 }
 
-impl Submit {
-    pub fn new(coordinator: &str) -> io::Result<Self> {
+impl Submission {
+    pub fn connect(coordinator: &str) -> io::Result<Self> {
         let (tx, rx) = try!(messaging::connect(coordinator));
-        Ok(Submit {
+        Ok(Submission {
             tx: tx,
             rx: rx,
-            handler: AsyncHandler::new(),
         })
     }
-    
-    pub fn query(&mut self, query: QueryConfig) -> Result<QueryId, SubmitError> {
-        unimplemented!()
+
+    pub fn query(self, query: QueryConfig) -> Result<QueryId, SubmitError> {
+        let handshake = Handshake(SubmissionReq { config: query });
+        let response = try!(handshake.wait(&self.tx, &self.rx));
+
+        response.into_result().map_err(SubmitError::from)
     }
 }
