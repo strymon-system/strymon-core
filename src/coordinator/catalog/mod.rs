@@ -3,9 +3,7 @@ use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
 use std::thread;
 
-use query::{QueryConfig, QueryId};
-use executor::{ExecutorId, ExecutorType};
-use topic::Topic;
+use query::QueryId;
 use worker::WorkerIndex;
 
 use util::Generator;

@@ -1,10 +1,8 @@
 use std::ops::Deref;
 use std::collections::BTreeMap;
-use std::collections::btree_map::Entry;
 use std::marker::PhantomData;
 
-use messaging::{Message, Receiver, Sender, Transfer};
-use messaging::decoder::Decoder;
+use messaging::Sender;
 use messaging::bytes::{Decode, Encode};
 use messaging::request::*;
 
@@ -16,48 +14,43 @@ use abomonation::Abomonation;
 pub struct Token(u64);
 
 #[derive(Clone, Debug)]
-pub struct Req<R: Request> {
+pub struct AsyncReq<R: Request> {
     token: Token,
     request: R,
 }
 
-impl<R: Request> Req<R> {
-    pub fn respond(self, result: Result<R::Success, R::Error>) -> Resp {
-        Resp::new::<R>(result, self.token)
+impl<R: Request> AsyncReq<R> {
+    pub fn reply(self, result: Result<R::Success, R::Error>) -> AsyncReply {
+        AsyncReply::new::<R>(result, self.token)
     }
 }
 
 #[derive(Clone)]
-pub struct Resp {
+pub struct AsyncReply {
     token: Token,
     success: bool,
     bytes: Vec<u8>,
 }
 
-impl Resp {
+impl AsyncReply {
     fn new<R: Request>(result: Result<R::Success, R::Error>, token: Token) -> Self {
-        match result {
-            Ok(s) => {
-                Resp {
-                    token: token,
-                    success: true,
-                    bytes: s.encode(),
-                }
-            }
-            Err(e) => {
-                Resp {
-                    token: token,
-                    success: false,
-                    bytes: e.encode(),
-                }
-            }
+        let success = result.is_ok();
+        let bytes = match result {
+            Ok(s) => s.encode(),
+            Err(e) => e.encode(),
+        };
+
+        AsyncReply {
+            token: token,
+            success: success,
+            bytes: bytes,
         }
     }
 }
 
 pub struct AsyncHandler {
     generator: Generator<Token>,
-    waiting: BTreeMap<Token, Box<Fn(Resp) -> Option<Resp> + Send>>,
+    waiting: BTreeMap<Token, Box<FnMut(AsyncReply) + Send>>,
 }
 
 impl AsyncHandler {
@@ -68,42 +61,32 @@ impl AsyncHandler {
         }
     }
 
-    pub fn submit<R: Request>(&mut self, r: R) -> (Req<R>, AsyncResult<R::Success, R::Error>) {
+    pub fn submit<R: Request>(&mut self, r: R) -> (AsyncReq<R>, AsyncResult<R::Success, R::Error>) {
         let token = self.generator.generate();
-        let req = Req {
+        let req = AsyncReq {
             token: token,
             request: r,
         };
 
         let (tx, rx) = promise::<R>();
-        let fnbox = Box::new(move |mut resp: Resp| {
-            assert_eq!(resp.token, token);
 
-            // TODO: This is a bit of a hack, because we cannot deocode messages
-            //       partially. Thus the manual decode step here.
-            //       Additionally, we work around Box<FnOnce> by using `tx.tx`
-            //       directly.
-            if resp.success {
-                if <R as Request>::Success::is(&resp.bytes) {
-                    let s = <R as Request>::Success::decode(&mut resp.bytes)
-                        .expect("failed to decode successful resp");
-                    let _ = tx.tx.send(Ok(s));
+        let mut tx = Some(tx);
+        let fnbox = Box::new(move |mut reply: AsyncReply| {
+            assert_eq!(reply.token, token);
 
-                    None
-                } else {
-                    Some(resp)
-                }
+            // FIXME: a bit of a hack since partial decoding is not supported
+            let result = if reply.success {
+                let success = <R as Request>::Success::decode(&mut reply.bytes)
+                                .expect("failed to decode successful reply");
+                Ok(success)
             } else {
-                if <R as Request>::Error::is(&resp.bytes) {
-                    let e = <R as Request>::Error::decode(&mut resp.bytes)
-                        .expect("failed to decode error resp");
-                    let _ = tx.tx.send(Err(e));
+                let error = <R as Request>::Error::decode(&mut reply.bytes)
+                                .expect("failed to decode error reply");
+                Err(error)
+            };
 
-                    None
-                } else {
-                    Some(resp)
-                }
-            }
+            // FIXME: work around the fact that FnBox is still not a thing
+            tx.take().expect("reply handler called twice?!").result(result);
         });
 
         self.waiting.insert(token, fnbox);
@@ -111,19 +94,11 @@ impl AsyncHandler {
         (req, rx)
     }
 
-    pub fn resolve(&mut self, mut resp: Resp) -> Option<Resp> {
-        let token = resp.token;
-        match self.waiting.entry(token) {
-            Entry::Occupied(e) => {
-                if let Some(resp) = e.get()(resp) {
-                    Some(resp)
-                } else {
-                    e.remove();
-                    None
-                }
-            }
-            _ => Some(resp),
-        }
+    pub fn resolve(&mut self, reply: AsyncReply) {
+        self.waiting
+            .remove(&reply.token)
+            .map(move |mut notify| notify(reply))
+            .expect("unexpected reply!");
     }
 }
 
@@ -151,19 +126,19 @@ impl<R: Request> Handoff<R> {
     }
 
     pub fn result(self, result: Result<R::Success, R::Error>) {
-        let resp = Resp::new::<R>(result, self.token);
-        self.tx.send::<Resp>(&resp);
+        let reply = AsyncReply::new::<R>(result, self.token);
+        self.tx.send::<AsyncReply>(&reply);
     }
 }
 
-pub fn handoff<R: Request>(req: Req<R>, tx: Sender) -> (R, Handoff<R>) {
+pub fn handoff<R: Request>(req: AsyncReq<R>, tx: Sender) -> (R, Handoff<R>) {
     (req.request, Handoff::new(tx, req.token))
 }
 
 unsafe_abomonate!(Token);
-unsafe_abomonate!(Resp: token, success, bytes);
+unsafe_abomonate!(AsyncReply: token, success, bytes);
 
-impl<R: Request + Abomonation> Abomonation for Req<R> {
+impl<R: Request + Abomonation> Abomonation for AsyncReq<R> {
     #[inline]
     unsafe fn embalm(&mut self) {
         self.token.embalm();
@@ -183,7 +158,7 @@ impl<R: Request + Abomonation> Abomonation for Req<R> {
 }
 
 
-impl<R: Request> Deref for Req<R> {
+impl<R: Request> Deref for AsyncReq<R> {
     type Target = R;
 
     fn deref(&self) -> &Self::Target {
@@ -209,13 +184,12 @@ mod tests {
         let (req1, rx1) = async.submit(());
         let (req2, rx2) = async.submit(());
 
-        let resp2 = Resp::new::<()>(Ok(1337), req2.token);
-        assert!(async.resolve(resp2.clone()).is_none());
-        assert!(async.resolve(resp2).is_some());
+        let reply2 = AsyncReply::new::<()>(Ok(1337), req2.token);
+        async.resolve(reply2.clone());
         assert_eq!(rx2.await(), Ok(1337));
 
-        let resp1 = Resp::new::<()>(Err(false), req1.token);
-        assert!(async.resolve(resp1).is_none());
+        let reply1 = AsyncReply::new::<()>(Err(false), req1.token);
+        async.resolve(reply1);
         assert_eq!(rx1.await(), Err(false));
     }
 }

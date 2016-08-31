@@ -3,7 +3,7 @@ use std::io::Result;
 
 use messaging::{Message as NetMessage, Receiver, Sender};
 use messaging::request;
-use messaging::request::handler::Req;
+use messaging::request::handler::AsyncReq;
 
 use query::{QueryConfig, QueryId};
 use executor::{ExecutorId, ExecutorType};
@@ -33,11 +33,11 @@ pub struct Executor {
     tx: Sender,
     rx: Receiver,
     catalog: CatalogRef,
-    req: Req<ExecutorReady>,
+    req: AsyncReq<ExecutorReady>,
 }
 
 impl Executor {
-    pub fn new(req: Req<ExecutorReady>, conn: Connection) -> Self {
+    pub fn new(req: AsyncReq<ExecutorReady>, conn: Connection) -> Self {
         let Connection { tx, rx, catalog } = conn;
         Executor {
             tx: tx,

@@ -1,9 +1,7 @@
 use std::io::Result;
 
 use messaging::{Receiver, Sender};
-use messaging::request::handler::{self, Req};
-
-use query::QueryId;
+use messaging::request::handler::{self, AsyncReq};
 
 use super::catalog::{CatalogRef, Message};
 use super::request::{Submission, SubmissionError};
@@ -13,11 +11,11 @@ pub struct Submitter {
     tx: Sender,
     rx: Receiver,
     catalog: CatalogRef,
-    submission: Req<Submission>,
+    submission: AsyncReq<Submission>,
 }
 
 impl Submitter {
-    pub fn new(req: Req<Submission>, conn: Connection) -> Self {
+    pub fn new(req: AsyncReq<Submission>, conn: Connection) -> Self {
         let Connection { tx, rx, catalog } = conn;
         Submitter {
             tx: tx,

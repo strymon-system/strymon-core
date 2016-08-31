@@ -4,7 +4,7 @@ use worker::Worker;
 
 use messaging;
 use messaging::{Receiver, Sender};
-use messaging::request::handler::{AsyncHandler, Req, Resp};
+use messaging::request::handler::{AsyncHandler};
 
 use coordinator::request::WorkerReady;
 

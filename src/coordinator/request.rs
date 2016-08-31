@@ -6,7 +6,6 @@ use abomonation::Abomonation;
 use query::{QueryConfig, QueryId};
 use worker::WorkerIndex;
 use executor::{ExecutorId, ExecutorType};
-use topic::{Topic, TopicId, TypeId};
 
 use messaging::request::Request;
 

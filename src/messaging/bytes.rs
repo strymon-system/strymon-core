@@ -1,9 +1,9 @@
 use std::any::{Any, TypeId};
-use std::io::{Error, ErrorKind, Read, Result, Write};
+use std::io::{Read, Result, Write};
 use std::mem;
 
 use abomonation::{self, Abomonation};
-use byteorder::{ByteOrder, NetworkEndian, ReadBytesExt, WriteBytesExt};
+use byteorder::{NetworkEndian, ReadBytesExt, WriteBytesExt};
 
 pub fn read<R: Read>(reader: &mut R) -> Result<Vec<u8>> {
     let length = try!(reader.read_u32::<NetworkEndian>());

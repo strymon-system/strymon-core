@@ -5,6 +5,9 @@ use coordinator::request::{Submission, SubmissionError};
 use query::{QueryId, QueryConfig};
 
 use messaging::{self, Sender, Receiver};
+use messaging::decoder::Decoder;
+use messaging::request::AsyncResult;
+use messaging::request::handler::{AsyncHandler};
 
 pub enum SubmitError {
     Io(io::Error),
@@ -26,6 +29,7 @@ impl From<SubmissionError> for SubmitError {
 pub struct Submit {
     tx: Sender,
     rx: Receiver,
+    handler: AsyncHandler,
 }
 
 impl Submit {
@@ -34,10 +38,11 @@ impl Submit {
         Ok(Submit {
             tx: tx,
             rx: rx,
+            handler: AsyncHandler::new(),
         })
     }
     
-    pub fn query(query: QueryConfig) -> Result<QueryId, SubmitError> {
+    pub fn query(&mut self, query: QueryConfig) -> Result<QueryId, SubmitError> {
         unimplemented!()
     }
 }

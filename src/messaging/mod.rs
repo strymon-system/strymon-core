@@ -1,6 +1,4 @@
 use std::io::Result;
-use std::any::Any;
-use std::sync::mpsc;
 use std::thread;
 
 use self::bytes::{Decode, Encode};
@@ -61,7 +59,7 @@ impl Receiver {
         self.inner.recv().map(Message::Bytes)
     }
 
-    pub fn detach<F>(mut self, mut f: F)
+    pub fn detach<F>(self, mut f: F)
         where F: FnMut(Result<Message>),
               F: Send + 'static
     {

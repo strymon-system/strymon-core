@@ -1,9 +1,9 @@
-use std::io::{Error, Result};
+use std::io::Result;
 use std::thread;
 
 use messaging::{self, Receiver, Sender};
 use messaging::decoder::Decoder;
-use messaging::request::handler::Req;
+use messaging::request::handler::AsyncReq;
 
 use self::catalog::{Catalog, CatalogRef};
 use self::request::{ExecutorReady, Submission, WorkerReady};
@@ -35,15 +35,15 @@ impl Connection {
 
     fn dispatch(self) -> Result<()> {
         enum Incoming {
-            Worker(Req<WorkerReady>),
-            Executor(Req<ExecutorReady>),
-            Submission(Req<Submission>),
+            Worker(AsyncReq<WorkerReady>),
+            Executor(AsyncReq<ExecutorReady>),
+            Submission(AsyncReq<Submission>),
         }
 
         let incoming = Decoder::from(self.rx.recv())
-            .when::<Req<WorkerReady>, _>(Incoming::Worker)
-            .when::<Req<ExecutorReady>, _>(Incoming::Executor)
-            .when::<Req<Submission>, _>(Incoming::Submission)
+            .when::<AsyncReq<WorkerReady>, _>(Incoming::Worker)
+            .when::<AsyncReq<ExecutorReady>, _>(Incoming::Executor)
+            .when::<AsyncReq<Submission>, _>(Incoming::Submission)
             .expect("failed to dispatch connection");
 
         match incoming {

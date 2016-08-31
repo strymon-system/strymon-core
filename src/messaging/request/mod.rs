@@ -4,6 +4,7 @@ use std::cell::RefCell;
 use messaging::Transfer;
 
 pub mod handler;
+pub mod handshake;
 
 pub trait Request: Transfer {
     type Success: Transfer;
