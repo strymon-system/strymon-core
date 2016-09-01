@@ -4,7 +4,7 @@ use timely_communication::{Allocator, WorkerGuards};
 use timely::{self, Configuration};
 use timely::dataflow::scopes::Root;
 
-use worker::catalog::{Coordinator, Catalog};
+use worker::coordinator::{Coordinator, Catalog};
 use executor::executable::ExecutableConfig;
 
 pub fn execute<T, F>(func: F) -> Result<WorkerGuards<T>, String> 
@@ -16,6 +16,7 @@ pub fn execute<T, F>(func: F) -> Result<WorkerGuards<T>, String>
     let query = exec_conf.query;
     let query_id = query.id;
 
+    // create timely configuration
     let timely_conf = if query.processes > 1 {
         Configuration::Cluster(query.threads, query.processes, query.hostlist, true)
     } else if query.threads > 1 {
@@ -24,14 +25,14 @@ pub fn execute<T, F>(func: F) -> Result<WorkerGuards<T>, String>
         Configuration::Thread
     };
 
-    let host = exec_conf.host;
     let coord = exec_conf.coord;
-
     timely::execute(timely_conf, move |root| {
         let index = root.index();
-        let coord = Coordinator::announce(&*coord, &*host, query_id, root.index())
+        let (coord, catalog) = Coordinator::announce(&*coord, query_id, root.index())
                         .expect("failed to connect to coordinator");
-
-        func(root, coord.catalog())
+        
+        coord.detach();
+        
+        func(root, catalog)
     })
 }
