@@ -1,13 +1,19 @@
 use std::io::{Error, ErrorKind, Result};
+use std::sync::mpsc;
 
-use worker::WorkerConfig;
+use worker::config::WorkerConfig;
 
 use messaging;
 use messaging::{Receiver, Sender};
 use messaging::request::handshake::{Handshake, Response};
-use messaging::request::handler::{AsyncHandler, AsyncReply};
+use messaging::request::handler::{AsyncHandler};
 
 use coordinator::request::WorkerReady;
+
+pub enum Message {
+    Publish,
+    Subscribe,
+}
 
 pub struct Coordinator {
     tx: Sender,
@@ -31,4 +37,8 @@ impl Coordinator {
             tx: tx,
         })
     }
+}
+
+pub struct Catalog {
+    tx: mpsc::Sender<Message>,
 }

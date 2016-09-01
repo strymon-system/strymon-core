@@ -12,27 +12,26 @@ pub struct Submitter {
     tx: Sender,
     rx: Receiver,
     catalog: CatalogRef,
-    submission: Submission,
 }
 
 impl Submitter {
     pub fn new(req: Handshake<Submission>, conn: Connection) -> Self {
         let Connection { tx, rx, catalog } = conn;
+
+        let (ready_tx, ready_rx) = request::promise::<Submission>();
+        catalog.send(Message::Submission(req.0, ready_tx));
+
+        let resp = Response::<Submission>::from(ready_rx.await());
+        tx.send(&resp);
+
         Submitter {
             tx: tx,
             rx: rx,
             catalog: catalog,
-            submission: req.0,
         }
     }
 
-    pub fn run(mut self) -> Result<()> {
-        let (ready_tx, ready_rx) = request::promise::<Submission>();
-        self.catalog.send(Message::Submission(self.submission, ready_tx));
-
-        let resp = Response::<Submission>::from(ready_rx.await());
-        self.tx.send(&resp);
-        
+    pub fn run(mut self) -> Result<()> {       
         Ok(())
     }
 }

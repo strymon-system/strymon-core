@@ -11,6 +11,7 @@ pub trait Request: Transfer {
     type Error: Transfer;
 }
 
+#[must_use]
 pub struct Complete<R: Request> {
     tx: Sender<Result<R::Success, R::Error>>,
 }
@@ -33,6 +34,7 @@ impl<R: Request> Complete<R> {
     }
 }
 
+#[must_use]
 pub struct AsyncResult<T, E> {
     rx: Receiver<Result<T, E>>,
     buf: RefCell<Option<Result<T, E>>>,

@@ -6,6 +6,7 @@ extern crate log;
 extern crate abomonation;
 
 extern crate timely;
+extern crate timely_communication;
 
 extern crate rand;
 extern crate byteorder;
@@ -20,8 +21,4 @@ mod worker;
 mod util;
 mod topic;
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {}
-}
+pub use self::worker::execute::execute;

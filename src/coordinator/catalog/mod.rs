@@ -111,14 +111,13 @@ impl Catalog {
 
     pub fn submission(&mut self, submission: Submission, promise: Complete<Submission>) {
         let id = self.query_id.generate();
-        let config = submission.config;
 
         // find suiting executors
-        let selected = self.executors.select(config.binary, config.num_executors);
+        let selected = self.executors.select(submission.binary, submission.num_executors);
 
         // check if we have enough executors of the right type
         let executors = match selected {
-            Some(ref executors) if executors.len() < config.num_executors => {
+            Some(ref executors) if executors.len() < submission.num_executors => {
                 return promise.failed(SubmissionError::NotEnoughExecutors);
             }
             None => {
@@ -127,13 +126,16 @@ impl Catalog {
             Some(executors) => executors,
         };
 
+        let query = unimplemented!();
+
         // ask executors to spawn a new query
         for executor in executors {
-            executor.spawn(id, &config);
+            // TODO need to deal with the asyncresults somehow
+            //executor.spawn(id, &config);
         }
 
         // install pending query
-        let pending = Pending::new(id, config, promise);
+        let pending = Pending::new(query, promise);
 
         // TODO maybe we should add a timeout for the pending query..?!
         self.pending.insert(id, pending);

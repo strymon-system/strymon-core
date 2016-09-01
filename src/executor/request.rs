@@ -1,13 +1,14 @@
 use abomonation::Abomonation;
 
-use query::{QueryId, QueryConfig};
+use query::{QueryId, QueryParams};
 
 use messaging::request::Request;
 
 #[derive(Debug, Clone)]
 pub struct Spawn {
-    pub id: QueryId,
-    pub query: QueryConfig,
+    pub fetch: String,
+    pub query: QueryParams,
+    pub process: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -21,5 +22,5 @@ impl Request for Spawn {
     type Error = SpawnError;
 }
 
-unsafe_abomonate!(Spawn : id, query);
+unsafe_abomonate!(Spawn : fetch, query, process);
 unsafe_abomonate!(SpawnError);

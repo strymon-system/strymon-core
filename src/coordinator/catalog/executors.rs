@@ -2,11 +2,12 @@ use std::collections::BTreeMap;
 
 use rand;
 
-use query::{QueryConfig, QueryId};
+use query::{QueryParams, QueryId};
 use executor::{ExecutorId, ExecutorType};
+use executor::request::{Spawn, SpawnError};
 use util::Generator;
 
-use messaging::request::Complete;
+use messaging::request::{self, Complete, AsyncResult};
 
 use coordinator::executor::{ExecutorRef, Message as ExecutorMessage};
 use coordinator::request::ExecutorReady;
@@ -66,7 +67,17 @@ impl Executors {
 }
 
 impl Executor {
-    pub fn spawn(&self, id: QueryId, config: &QueryConfig) {
-        self.tx.send(ExecutorMessage::Spawn(id, config.clone()))
+    pub fn spawn(&self, fetch: &str, query: &QueryParams, process: usize) -> AsyncResult<(), SpawnError> {
+        debug!("spawn request for {:?} on {:?}", query.id, self.id);
+
+        let (tx, rx) = request::promise::<Spawn>();
+        let spawn = Spawn {
+            fetch: fetch.to_string(),
+            query: query.clone(),
+            process: process,
+        };
+
+        self.tx.send(ExecutorMessage::Spawn(spawn, tx));
+        rx
     }
 }

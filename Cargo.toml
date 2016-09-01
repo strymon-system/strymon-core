@@ -22,8 +22,8 @@ env_logger = "0.3"
 log = "0.3"
 rand = "0.3.14"
 
-[dependencies.futures]
-git = "https://github.com/alexcrichton/futures-rs"
-
 [dependencies.timely]
-git = "https://github.com/frankmcsherry/timely-dataflow"
+path = "./timely-dataflow"
+
+[dependencies.timely_communication]
+path = "./timely-dataflow/communication"

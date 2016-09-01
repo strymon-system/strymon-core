@@ -1,8 +1,8 @@
 use std::io;
 
-use coordinator::request::{Submission as SubmissionReq, SubmissionError};
+use coordinator::request::{Submission as QuerySubmission, SubmissionError};
 
-use query::{QueryId, QueryConfig};
+use query::QueryId;
 
 use messaging::{self, Sender, Receiver};
 use messaging::decoder::Decoder;
@@ -40,8 +40,8 @@ impl Submission {
         })
     }
 
-    pub fn query(self, query: QueryConfig) -> Result<QueryId, SubmitError> {
-        let handshake = Handshake(SubmissionReq { config: query });
+    pub fn query(self, submission: QuerySubmission) -> Result<QueryId, SubmitError> {
+        let handshake = Handshake(submission);
         let response = try!(handshake.wait(&self.tx, &self.rx));
 
         response.into_result().map_err(SubmitError::from)

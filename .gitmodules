@@ -1,0 +1,3 @@
+[submodule "timely-dataflow"]
+	path = timely-dataflow
+	url = https://github.com/frankmcsherry/timely-dataflow

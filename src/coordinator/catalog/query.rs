@@ -1,20 +1,18 @@
-use query::{QueryConfig, QueryId};
+use query::{QueryParams, QueryId};
 
 use coordinator::worker::WorkerRef;
 
 pub struct Query {
-    id: QueryId,
-    config: QueryConfig,
+    params: QueryParams,
     workers: Vec<WorkerRef>,
 }
 
 impl Query {
-    pub fn new(id: QueryId, config: QueryConfig, workers: Vec<WorkerRef>) -> Self {
-        assert_eq!(config.num_workers * config.num_executors, workers.len());
+    pub fn new(query: QueryParams, workers: Vec<WorkerRef>) -> Self {
+        assert_eq!(query.processes * query.threads, workers.len());
 
         Query {
-            id: id,
-            config: config,
+            params: query,
             workers: workers,
         }
     }

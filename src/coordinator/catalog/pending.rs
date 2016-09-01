@@ -1,4 +1,4 @@
-use query::{QueryConfig, QueryId};
+use query::{QueryParams, QueryId};
 use worker::WorkerIndex;
 
 use messaging::request::Complete;
@@ -8,19 +8,18 @@ use coordinator::request::*;
 use coordinator::catalog::query::Query;
 
 pub struct Pending {
-    id: QueryId,
-    config: QueryConfig,
+    params: QueryParams,
 
     submission: Complete<Submission>,
     workers: Vec<Option<(WorkerRef, Complete<WorkerReady>)>>,
 }
 
 impl Pending {
-    pub fn new(id: QueryId, config: QueryConfig, promise: Complete<Submission>) -> Self {
-        let total_workers = config.num_executors * config.num_workers;
+    pub fn new(query: QueryParams, promise: Complete<Submission>) -> Self {
+        let total_workers = query.threads * query.processes;
+
         Pending {
-            id: id,
-            config: config,
+            params: query,
             submission: promise,
             workers: (0..total_workers).map(|_| None).collect(),
         }
@@ -54,8 +53,8 @@ impl Pending {
             })
             .collect();
 
-        self.submission.success(self.id);
+        self.submission.success(self.params.id);
 
-        Query::new(self.id, self.config, workers)
+        Query::new(self.params, workers)
     }
 }

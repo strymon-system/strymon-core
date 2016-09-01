@@ -1,9 +1,10 @@
 use std::fmt;
 use std::error::Error;
+use std::ops::Range;
 
 use abomonation::Abomonation;
 
-use query::{QueryConfig, QueryId};
+use query::QueryId;
 use worker::WorkerIndex;
 use executor::{ExecutorId, ExecutorType};
 
@@ -52,7 +53,10 @@ unsafe_abomonate!(WorkerError);
 
 #[derive(Clone, Debug)]
 pub struct Submission {
-    pub config: QueryConfig,
+    pub fetch: String,
+    pub binary: ExecutorType,
+    pub num_executors: usize,
+    pub num_workers: usize, // per executor
 }
 
 #[derive(Clone, Debug)]
@@ -66,12 +70,14 @@ impl Request for Submission {
     type Error = SubmissionError;
 }
 
-unsafe_abomonate!(Submission: config);
+unsafe_abomonate!(Submission: fetch, binary, num_executors, num_workers);
 unsafe_abomonate!(SubmissionError);
 
 #[derive(Clone, Debug)]
 pub struct ExecutorReady {
     pub ty: ExecutorType,
+    pub host: String,
+    pub ports: Range<u16>,
 }
 
 #[derive(Clone, Debug)]
@@ -82,5 +88,5 @@ impl Request for ExecutorReady {
     type Error = ExecutorError;
 }
 
-unsafe_abomonate!(ExecutorReady: ty);
+unsafe_abomonate!(ExecutorReady: ty, host);
 unsafe_abomonate!(ExecutorError);

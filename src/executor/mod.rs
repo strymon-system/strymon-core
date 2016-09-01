@@ -1,10 +1,12 @@
 use std::io;
+use std::path::PathBuf;
+use std::ops::Range;
 
 use abomonation::Abomonation;
 
 use coordinator::request::ExecutorReady;
 
-use query::{QueryId, QueryConfig};
+use query::{QueryId, QueryParams};
 
 use messaging::{self, Sender, Receiver};
 use messaging::decoder::Decoder;
@@ -14,7 +16,8 @@ use messaging::request::handler::AsyncReq;
 use self::request::*;
 
 pub mod request;
-mod executable;
+pub mod executable;
+
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ExecutorId(pub u64);
@@ -38,14 +41,17 @@ pub struct Executor {
     id: ExecutorId,
     tx: Sender,
     rx: Receiver,
+    coord: String,
 }
 
 impl Executor {
-    pub fn new(coordinator: &str) -> io::Result<Self> {
-        let (tx, rx) = try!(messaging::connect(coordinator));
+    pub fn new(coord: String, host: String, ports: Range<u16>) -> io::Result<Self> {
+        let (tx, rx) = try!(messaging::connect(&coord));
 
         let handshake = Handshake(ExecutorReady {
-            ty: ExecutorType::Executable
+            ty: ExecutorType::Executable,
+            host: host,
+            ports: ports,
         });
 
         let resp = try!(handshake.wait(&tx, &rx));
@@ -57,6 +63,7 @@ impl Executor {
             id: id,
             tx: tx,
             rx: rx,
+            coord: coord,
         })
     }
 
@@ -64,10 +71,19 @@ impl Executor {
         while let Ok(message) = self.rx.recv() {
             Decoder::from(message)
                 .when::<AsyncReq<Spawn>, _>(|req| {
-                    let res = executable::spawn(req.id, &req.query);
-                    self.tx.send(&req.reply(res));
+                    let res = self.spawn(&req.fetch, &req.query, req.process);
+                    self.tx.send(&req.response(res));
                 })
                 .expect("failed to decode executor request");
         }
+    }
+
+    pub fn spawn(&self, fetch: &str, query: &QueryParams, process: usize) -> Result<(), SpawnError> {
+        let executable = PathBuf::from(fetch);
+        if !executable.exists() {
+            return Err(SpawnError::FetchFailed);
+        }
+
+        executable::spawn(executable, query, process)
     }
 }

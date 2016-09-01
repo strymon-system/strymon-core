@@ -20,19 +20,19 @@ pub struct AsyncReq<R: Request> {
 }
 
 impl<R: Request> AsyncReq<R> {
-    pub fn reply(self, result: Result<R::Success, R::Error>) -> AsyncReply {
-        AsyncReply::new::<R>(result, self.token)
+    pub fn response(self, result: Result<R::Success, R::Error>) -> AsyncResponse {
+        AsyncResponse::new::<R>(result, self.token)
     }
 }
 
 #[derive(Clone)]
-pub struct AsyncReply {
+pub struct AsyncResponse {
     token: Token,
     success: bool,
     bytes: Vec<u8>,
 }
 
-impl AsyncReply {
+impl AsyncResponse {
     fn new<R: Request>(result: Result<R::Success, R::Error>, token: Token) -> Self {
         let success = result.is_ok();
         let bytes = match result {
@@ -40,7 +40,7 @@ impl AsyncReply {
             Err(e) => e.encode(),
         };
 
-        AsyncReply {
+        AsyncResponse {
             token: token,
             success: success,
             bytes: bytes,
@@ -50,7 +50,7 @@ impl AsyncReply {
 
 pub struct AsyncHandler {
     generator: Generator<Token>,
-    waiting: BTreeMap<Token, Box<FnMut(AsyncReply) + Send>>,
+    waiting: BTreeMap<Token, Box<FnMut(AsyncResponse) + Send>>,
 }
 
 impl AsyncHandler {
@@ -61,44 +61,42 @@ impl AsyncHandler {
         }
     }
 
-    pub fn submit<R: Request>(&mut self, r: R) -> (AsyncReq<R>, AsyncResult<R::Success, R::Error>) {
+    pub fn submit<R: Request>(&mut self, r: R, tx: Complete<R>) -> AsyncReq<R> {
         let token = self.generator.generate();
         let req = AsyncReq {
             token: token,
             request: r,
         };
 
-        let (tx, rx) = promise::<R>();
-
         let mut tx = Some(tx);
-        let fnbox = Box::new(move |mut reply: AsyncReply| {
-            assert_eq!(reply.token, token);
+        let fnbox = Box::new(move |mut response: AsyncResponse| {
+            assert_eq!(response.token, token);
 
             // FIXME: a bit of a hack since partial decoding is not supported
-            let result = if reply.success {
-                let success = <R as Request>::Success::decode(&mut reply.bytes)
-                                .expect("failed to decode successful reply");
+            let result = if response.success {
+                let success = <R as Request>::Success::decode(&mut response.bytes)
+                                .expect("failed to decode successful response");
                 Ok(success)
             } else {
-                let error = <R as Request>::Error::decode(&mut reply.bytes)
-                                .expect("failed to decode error reply");
+                let error = <R as Request>::Error::decode(&mut response.bytes)
+                                .expect("failed to decode error response");
                 Err(error)
             };
 
             // FIXME: work around the fact that FnBox is still not a thing
-            tx.take().expect("reply handler called twice?!").result(result);
+            tx.take().expect("response handler called twice?!").result(result);
         });
 
         self.waiting.insert(token, fnbox);
 
-        (req, rx)
+        req
     }
 
-    pub fn resolve(&mut self, reply: AsyncReply) {
+    pub fn resolve(&mut self, response: AsyncResponse) {
         self.waiting
-            .remove(&reply.token)
-            .map(move |mut notify| notify(reply))
-            .expect("unexpected reply!");
+            .remove(&response.token)
+            .map(move |mut notify| notify(response))
+            .expect("unexpected response!");
     }
 }
 
@@ -126,8 +124,8 @@ impl<R: Request> Handoff<R> {
     }
 
     pub fn result(self, result: Result<R::Success, R::Error>) {
-        let reply = AsyncReply::new::<R>(result, self.token);
-        self.tx.send::<AsyncReply>(&reply);
+        let response = AsyncResponse::new::<R>(result, self.token);
+        self.tx.send::<AsyncResponse>(&response);
     }
 }
 
@@ -136,7 +134,7 @@ pub fn handoff<R: Request>(req: AsyncReq<R>, tx: Sender) -> (R, Handoff<R>) {
 }
 
 unsafe_abomonate!(Token);
-unsafe_abomonate!(AsyncReply: token, success, bytes);
+unsafe_abomonate!(AsyncResponse: token, success, bytes);
 
 impl<R: Request + Abomonation> Abomonation for AsyncReq<R> {
     #[inline]
@@ -175,21 +173,23 @@ impl From<u64> for Token {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use messaging::request::Request;
+    use messaging::request;
 
     #[test]
     fn async() {
         let mut async = AsyncHandler::new();
 
-        let (req1, rx1) = async.submit(());
-        let (req2, rx2) = async.submit(());
+        let (tx1, rx1) = request::promise::<()>();
+        let req1 = async.submit((), tx1);
+        let (tx2, rx2) = request::promise::<()>();
+        let req2 = async.submit((), tx2);
 
-        let reply2 = AsyncReply::new::<()>(Ok(1337), req2.token);
-        async.resolve(reply2.clone());
+        let response2 = AsyncResponse::new::<()>(Ok(1337), req2.token);
+        async.resolve(response2.clone());
         assert_eq!(rx2.await(), Ok(1337));
 
-        let reply1 = AsyncReply::new::<()>(Err(false), req1.token);
-        async.resolve(reply1);
+        let response1 = AsyncResponse::new::<()>(Err(false), req1.token);
+        async.resolve(response1);
         assert_eq!(rx1.await(), Err(false));
     }
 }

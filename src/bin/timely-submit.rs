@@ -5,8 +5,8 @@ use std::env;
 use std::fs;
 use std::io;
 
+use timely_query::coordinator::request::Submission as QuerySubmission;
 use timely_query::submitter::Submission;
-use timely_query::query::QueryConfig;
 use timely_query::executor::ExecutorType;
 
 fn main() {
@@ -23,7 +23,7 @@ fn main() {
                     })
                     .expect("binary not found");
 
-    let config = QueryConfig {
+    let query = QuerySubmission {
         fetch: fetch,
         binary: ExecutorType::Executable,
         num_executors: 1,
@@ -31,7 +31,7 @@ fn main() {
     };
 
     let submission = Submission::connect(&addr).expect("failed to connect to coordinator");
-    let id = submission.query(config).expect("failed to spawn query");
+    let id = submission.query(query).expect("failed to spawn query");
     
     println!("spawend query: {:?}", id);
 }

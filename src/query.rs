@@ -1,3 +1,4 @@
+use timely::Configuration;
 use abomonation::Abomonation;
 
 use executor::ExecutorType;
@@ -12,12 +13,14 @@ impl From<u64> for QueryId {
 }
 
 #[derive(Clone, Debug)]
-pub struct QueryConfig {
-    pub fetch: String,
-    pub binary: ExecutorType,
-    pub num_executors: usize,
-    pub num_workers: usize, // per executor
+pub struct QueryParams {
+    pub id: QueryId,
+    pub threads: usize,
+    pub processes: usize,
+    pub hostlist: Vec<String>,
+    pub coord: String,
+    pub host: String,
 }
 
 unsafe_abomonate!(QueryId);
-unsafe_abomonate!(QueryConfig: fetch, binary, num_executors, num_workers);
+unsafe_abomonate!(QueryParams : id, threads, processes, hostlist, coord, host);
