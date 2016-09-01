@@ -1,5 +1,4 @@
-pub mod coordinator;
-pub mod config;
+pub mod catalog;
 pub mod execute;
 
 pub type WorkerIndex = usize;

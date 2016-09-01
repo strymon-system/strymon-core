@@ -8,7 +8,7 @@ use messaging::request::Request;
 pub struct Spawn {
     pub fetch: String,
     pub query: QueryParams,
-    pub process: usize,
+    pub procindex: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -22,5 +22,5 @@ impl Request for Spawn {
     type Error = SpawnError;
 }
 
-unsafe_abomonate!(Spawn : fetch, query, process);
+unsafe_abomonate!(Spawn : fetch, query, procindex);
 unsafe_abomonate!(SpawnError);

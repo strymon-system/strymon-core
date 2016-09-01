@@ -42,6 +42,7 @@ pub struct Executor {
     tx: Sender,
     rx: Receiver,
     coord: String,
+    host: String,
 }
 
 impl Executor {
@@ -50,7 +51,7 @@ impl Executor {
 
         let handshake = Handshake(ExecutorReady {
             ty: ExecutorType::Executable,
-            host: host,
+            host: host.clone(),
             ports: ports,
         });
 
@@ -64,6 +65,7 @@ impl Executor {
             tx: tx,
             rx: rx,
             coord: coord,
+            host: host,
         })
     }
 
@@ -71,19 +73,19 @@ impl Executor {
         while let Ok(message) = self.rx.recv() {
             Decoder::from(message)
                 .when::<AsyncReq<Spawn>, _>(|req| {
-                    let res = self.spawn(&req.fetch, &req.query, req.process);
+                    let res = self.spawn(&req.fetch, &req.query, req.procindex);
                     self.tx.send(&req.response(res));
                 })
                 .expect("failed to decode executor request");
         }
     }
 
-    pub fn spawn(&self, fetch: &str, query: &QueryParams, process: usize) -> Result<(), SpawnError> {
+    pub fn spawn(&self, fetch: &str, query: &QueryParams, procindex: usize) -> Result<(), SpawnError> {
         let executable = PathBuf::from(fetch);
         if !executable.exists() {
             return Err(SpawnError::FetchFailed);
         }
 
-        executable::spawn(executable, query, process)
+        executable::spawn(executable, query, procindex, &self.coord, &self.host)
     }
 }

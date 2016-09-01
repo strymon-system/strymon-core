@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
 use std::thread;
 
-use query::QueryId;
+use query::{QueryId, QueryParams};
 use worker::WorkerIndex;
 
 use util::Generator;
@@ -116,7 +116,7 @@ impl Catalog {
         let selected = self.executors.select(submission.binary, submission.num_executors);
 
         // check if we have enough executors of the right type
-        let executors = match selected {
+        let mut executors = match selected {
             Some(ref executors) if executors.len() < submission.num_executors => {
                 return promise.failed(SubmissionError::NotEnoughExecutors);
             }
@@ -126,12 +126,30 @@ impl Catalog {
             Some(executors) => executors,
         };
 
-        let query = unimplemented!();
+        // assemble the hostlist needed for timely itself
+        let hostlist = if executors.len() > 1 {
+            executors.iter_mut()
+                .map(|e| {
+                    let port = e.allocate_port();
+                    format!("{}:{}", e.host(), port)
+                })
+                .collect()
+        } else {
+            vec![]
+        };
+
+        // all the query needs to know about itself
+        let query = QueryParams {
+            id: id,
+            threads: submission.num_workers,
+            processes: submission.num_executors,
+            hostlist: hostlist,
+        };
 
         // ask executors to spawn a new query
-        for executor in executors {
+        for (index, executor) in executors.iter().enumerate() {
             // TODO need to deal with the asyncresults somehow
-            //executor.spawn(id, &config);
+            executor.spawn(&submission.fetch, &query, index);
         }
 
         // install pending query

@@ -11,6 +11,8 @@ use timely::dataflow::operators::*;
 
 fn main() {
     drop(env_logger::init());
-    println!("hi");
-    //timely_query::execute(|root, coord| {});
+
+    timely_query::execute(|root, catalog| {
+        println!("hi");
+    }).unwrap();
 }

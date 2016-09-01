@@ -18,9 +18,7 @@ pub struct QueryParams {
     pub threads: usize,
     pub processes: usize,
     pub hostlist: Vec<String>,
-    pub coord: String,
-    pub host: String,
 }
 
 unsafe_abomonate!(QueryId);
-unsafe_abomonate!(QueryParams : id, threads, processes, hostlist, coord, host);
+unsafe_abomonate!(QueryParams : id, threads, processes, hostlist);

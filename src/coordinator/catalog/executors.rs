@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::ops::Range;
 
 use rand;
 
@@ -17,6 +18,8 @@ pub type ExecutorTypeId = u8;
 pub struct Executor {
     id: ExecutorId,
     ty: ExecutorType,
+    host: String,
+    ports: Range<u16>,
     tx: ExecutorRef,
 }
 
@@ -41,6 +44,8 @@ impl Executors {
         let executor = Executor {
             id: id,
             ty: req.ty,
+            host: req.host,
+            ports: req.ports,
             tx: tx,
         };
 
@@ -53,13 +58,13 @@ impl Executors {
         promise.success(id);
     }
 
-    pub fn select<'a>(&'a self,
+    pub fn select<'a>(&'a mut self,
                       ty: ExecutorType,
                       num_executors: usize)
-                      -> Option<Vec<&'a Executor>> {
-        if let Some(executors) = self.executors.get(&(ty as ExecutorTypeId)) {
+                      -> Option<Vec<&'a mut Executor>> {
+        if let Some(executors) = self.executors.get_mut(&(ty as ExecutorTypeId)) {
             let mut rng = rand::thread_rng();
-            Some(rand::sample(&mut rng, executors.values(), num_executors))
+            Some(rand::sample(&mut rng, executors.values_mut(), num_executors))
         } else {
             None
         }
@@ -67,14 +72,23 @@ impl Executors {
 }
 
 impl Executor {
-    pub fn spawn(&self, fetch: &str, query: &QueryParams, process: usize) -> AsyncResult<(), SpawnError> {
+    pub fn host(&self) -> &str {
+        &self.host
+    }
+
+    pub fn allocate_port(&mut self) -> u16 {
+        // TODO need a mechanism to free ports
+        self.ports.next().expect("run out of tcp ports to allocate!")
+    }
+
+    pub fn spawn(&self, fetch: &str, query: &QueryParams, procindex: usize) -> AsyncResult<(), SpawnError> {
         debug!("spawn request for {:?} on {:?}", query.id, self.id);
 
         let (tx, rx) = request::promise::<Spawn>();
         let spawn = Spawn {
             fetch: fetch.to_string(),
             query: query.clone(),
-            process: process,
+            procindex: procindex,
         };
 
         self.tx.send(ExecutorMessage::Spawn(spawn, tx));
