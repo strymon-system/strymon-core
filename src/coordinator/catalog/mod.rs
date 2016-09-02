@@ -9,18 +9,25 @@ use worker::WorkerIndex;
 use util::Generator;
 
 use messaging::request::Complete;
+use messaging::request::handler::Handoff;
 
 use coordinator::request::*;
 use coordinator::worker::WorkerRef;
 use coordinator::executor::ExecutorRef;
 
+use coordinator::catalog::request::*;
+
 use self::pending::*;
 use self::query::*;
 use self::executors::*;
+use self::topics::*;
 
 mod pending;
 mod executors;
 mod query;
+mod topics;
+
+pub mod request;
 
 #[derive(Clone)]
 pub struct CatalogRef(mpsc::Sender<Message>);
@@ -31,10 +38,18 @@ impl CatalogRef {
     }
 }
 
+pub enum TopicRequest {
+    Publish(QueryId, Publish, Handoff<Publish>),
+    Subscribe(QueryId, Subscribe, Handoff<Subscribe>),
+    Unpublish(QueryId, Unpublish, Handoff<Unpublish>),
+    Unsubscribe(QueryId, Unsubscribe, Handoff<Unsubscribe>),
+}
+
 pub enum Message {
     Submission(Submission, Complete<Submission>),
     WorkerReady(WorkerReady, WorkerRef, Complete<WorkerReady>),
     ExecutorReady(ExecutorReady, ExecutorRef, Complete<ExecutorReady>),
+    TopicRequest(TopicRequest),
 }
 
 pub struct Catalog {
@@ -42,6 +57,7 @@ pub struct Catalog {
     queries: BTreeMap<QueryId, Query>,
 
     executors: Executors,
+    topics: Topics,
 
     query_id: Generator<QueryId>,
     requests: mpsc::Receiver<Message>,
@@ -55,7 +71,9 @@ impl Catalog {
         let catalog = Catalog {
             pending: BTreeMap::new(),
             queries: BTreeMap::new(),
+
             executors: Executors::new(),
+            topics: Topics::new(),
 
             query_id: Generator::new(),
             requests: rx,
@@ -83,6 +101,9 @@ impl Catalog {
             }
             ExecutorReady(executor, executor_ref, promise) => {
                 self.executors.executor_ready(executor, executor_ref, promise);
+            },
+            TopicRequest(req) => {
+                self.topics.request(req);
             }
         };
     }
