@@ -2,7 +2,7 @@ use std::sync::mpsc;
 use std::cell::RefCell;
 use std::thread;
 use std::io::Result;
-use std::net::{Shutdown, TcpListener, TcpStream, SocketAddr};
+use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream};
 
 use messaging::bytes;
 

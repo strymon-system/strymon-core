@@ -101,7 +101,7 @@ impl Catalog {
             }
             ExecutorReady(executor, executor_ref, promise) => {
                 self.executors.executor_ready(executor, executor_ref, promise);
-            },
+            }
             TopicRequest(req) => {
                 self.topics.request(req);
             }

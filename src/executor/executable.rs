@@ -41,7 +41,7 @@ impl From<num::ParseIntError> for ParseError {
 }
 
 impl ExecutableConfig {
-    pub fn from_env() -> Result<Self, ParseError> {  
+    pub fn from_env() -> Result<Self, ParseError> {
         let hostlist = env::var(HOSTLIST)?.split('|').map(From::from).collect();
         let query = QueryParams {
             id: QueryId::from(env::var(QUERY_ID)?.parse::<u64>()?),
@@ -49,17 +49,22 @@ impl ExecutableConfig {
             processes: env::var(PROCESSES)?.parse::<usize>()?,
             hostlist: hostlist,
         };
-        
+
         Ok(ExecutableConfig {
             query: query,
             procindex: env::var(PROCINDEX)?.parse::<usize>()?,
             coord: env::var(COORD)?,
-            host: env::var(HOST)?
+            host: env::var(HOST)?,
         })
     }
 }
 
-pub fn spawn<S: AsRef<OsStr>>(exec: S, query: &QueryParams, procindex: usize, coord: &str, host: &str) -> Result<(), SpawnError> {
+pub fn spawn<S: AsRef<OsStr>>(exec: S,
+                              query: &QueryParams,
+                              procindex: usize,
+                              coord: &str,
+                              host: &str)
+                              -> Result<(), SpawnError> {
     Command::new(exec)
         .env(QUERY_ID, query.id.0.to_string())
         .env(THREADS, query.threads.to_string())

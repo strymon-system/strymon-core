@@ -16,12 +16,12 @@ fn main() {
     let addr = env::args().nth(2).unwrap_or("localhost:9189".to_string());
 
     let fetch = fs::canonicalize(binary)
-                    .and_then(|path| {
-                        path.to_str()
-                            .map(|s| s.to_string())
-                            .ok_or(io::Error::new(io::ErrorKind::Other, "invalid path"))
-                    })
-                    .expect("binary not found");
+        .and_then(|path| {
+            path.to_str()
+                .map(|s| s.to_string())
+                .ok_or(io::Error::new(io::ErrorKind::Other, "invalid path"))
+        })
+        .expect("binary not found");
 
     let query = QuerySubmission {
         fetch: fetch,
@@ -32,6 +32,6 @@ fn main() {
 
     let submission = Submission::connect(&addr).expect("failed to connect to coordinator");
     let id = submission.query(query).expect("failed to spawn query");
-    
+
     println!("spawend query: {:?}", id);
 }

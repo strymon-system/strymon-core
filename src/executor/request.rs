@@ -22,5 +22,5 @@ impl Request for Spawn {
     type Error = SpawnError;
 }
 
-unsafe_abomonate!(Spawn : fetch, query, procindex);
+unsafe_abomonate!(Spawn: fetch, query, procindex);
 unsafe_abomonate!(SpawnError);

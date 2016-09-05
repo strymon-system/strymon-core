@@ -77,7 +77,7 @@ impl<T> Decoder<T> {
             Inner::Decoded(t) => t,
         }
     }
-    
+
     pub fn unwrap_result(self) -> Result<T> {
         match self.inner {
             Inner::Message(_) => panic!("unable to decode message"),

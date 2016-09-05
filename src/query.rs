@@ -21,4 +21,4 @@ pub struct QueryParams {
 }
 
 unsafe_abomonate!(QueryId);
-unsafe_abomonate!(QueryParams : id, threads, processes, hostlist);
+unsafe_abomonate!(QueryParams: id, threads, processes, hostlist);

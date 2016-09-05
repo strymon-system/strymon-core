@@ -1,21 +1,16 @@
 extern crate timely;
-extern crate paperboy;
+extern crate timely_query;
 extern crate env_logger;
-
-use std::time::Duration;
-use std::thread;
 
 use timely::dataflow::Scope;
 use timely::dataflow::operators::*;
 
-use timely_query::Subscribe;
+use timely_query::Subscriber;
 
 fn main() {
     drop(env_logger::init());
 
-    scope.subscribe::<i32, _>("foo", )
-
-    timely_query::execute(|root| {
+    timely_query::execute(|root, catalog| {
         let mut input = root.scoped::<i32,_,_>(|scope| {
             let (input, stream) = scope.new_input();
             stream
@@ -25,10 +20,8 @@ fn main() {
             input
         });
 
-        let mut catalog = Catalog::from_env()
-                                  .expect("failed to connect to coordinator");
-        let topic = polling_lookup("numbers", &mut catalog);
-        let subscriber = Subscriber::<(i32, i32)>::from(topic)
+
+        let subscriber = Subscriber::<(i32, i32)>::from(&catalog, "numbers")
                                     .expect("failed to connect to publisher");
 
         for (item, ts) in subscriber.zip(1..) {

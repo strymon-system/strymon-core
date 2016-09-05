@@ -1,4 +1,4 @@
-use query::{QueryParams, QueryId};
+use query::{QueryId, QueryParams};
 
 use coordinator::worker::WorkerRef;
 

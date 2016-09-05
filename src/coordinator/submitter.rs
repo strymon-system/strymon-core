@@ -31,7 +31,7 @@ impl Submitter {
         }
     }
 
-    pub fn run(mut self) -> Result<()> {       
+    pub fn run(mut self) -> Result<()> {
         Ok(())
     }
 }

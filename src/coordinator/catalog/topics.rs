@@ -1,5 +1,5 @@
 use std::collections::BTreeSet;
-use std::collections::hash_map::{HashMap, Entry as HashEntry};
+use std::collections::hash_map::{Entry as HashEntry, HashMap};
 use std::collections::btree_map::{BTreeMap, Entry as BTreeEntry};
 
 use query::QueryId;
@@ -35,7 +35,12 @@ impl Topics {
         }
     }
 
-    pub fn publish(&mut self, query: QueryId, name: String, addr: String, dtype: TypeId) -> Result<TopicDesc, PublishError> {
+    pub fn publish(&mut self,
+                   query: QueryId,
+                   name: String,
+                   addr: String,
+                   dtype: TypeId)
+                   -> Result<TopicDesc, PublishError> {
         match self.directory.entry(name.clone()) {
             HashEntry::Occupied(_) => Err(PublishError::TopicAlreadyExists),
             HashEntry::Vacant(directory) => {
@@ -46,13 +51,14 @@ impl Topics {
                     addr: addr,
                     dtype: dtype,
                 };
-                
+
                 // create meta-topic
-                self.topics.insert(id, Topic {
-                    desc: desc.clone(),
-                    publisher: query,
-                    subscriber: BTreeSet::new(),
-                });
+                self.topics.insert(id,
+                                   Topic {
+                                       desc: desc.clone(),
+                                       publisher: query,
+                                       subscriber: BTreeSet::new(),
+                                   });
 
                 // finally insert new topic into name directory
                 directory.insert(id);
@@ -80,7 +86,10 @@ impl Topics {
         }
     }
 
-    pub fn unsubscribe(&mut self, query: QueryId, topic_id: TopicId) -> Result<(), UnsubscribeError> {
+    pub fn unsubscribe(&mut self,
+                       query: QueryId,
+                       topic_id: TopicId)
+                       -> Result<(), UnsubscribeError> {
         if let Some(topic) = self.topics.get_mut(&topic_id) {
             if topic.subscriber.remove(&query) {
                 Ok(())
@@ -92,7 +101,7 @@ impl Topics {
         }
     }
 
-    pub fn unpublish(&mut self, query: QueryId, topic_id: TopicId) -> Result<(), UnpublishError> {    
+    pub fn unpublish(&mut self, query: QueryId, topic_id: TopicId) -> Result<(), UnpublishError> {
         match self.topics.entry(topic_id) {
             BTreeEntry::Occupied(topic) => {
                 if topic.get().publisher == query {
@@ -102,10 +111,8 @@ impl Topics {
                 } else {
                     Err(UnpublishError::InvalidQueryId)
                 }
-            },
-            BTreeEntry::Vacant(_) => {
-                Err(UnpublishError::InvalidTopicId)
             }
+            BTreeEntry::Vacant(_) => Err(UnpublishError::InvalidTopicId),
         }
     }
 
@@ -125,7 +132,7 @@ impl Topics {
                 } else {
                     promise.result(result);
                 }
-            },
+            }
             TopicRequest::Unpublish(query, Unpublish { topic }, promise) => {
                 promise.result(self.unpublish(query, topic));
             }

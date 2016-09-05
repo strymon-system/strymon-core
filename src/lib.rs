@@ -24,5 +24,5 @@ mod publisher;
 mod subscriber;
 
 pub use self::worker::execute::execute;
-pub use self::publisher::{Publisher, Publish};
-pub use self::subscriber::{Subscribe};
+pub use self::publisher::{Publish, Publisher};
+pub use self::subscriber::Subscriber;

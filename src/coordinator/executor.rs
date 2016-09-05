@@ -60,16 +60,18 @@ impl Executor {
     }
 
     pub fn run(self) -> Result<()> {
-        let mut handler = AsyncHandler::new();    
+        let mut handler = AsyncHandler::new();
 
         while let Ok(event) = self.events.recv() {
             match event {
-                Event::Catalog(req) => match req {
-                    Message::Spawn(req, resp) => {
-                        let packet = handler.submit(req, resp);
-                        self.tx.send(&packet);
+                Event::Catalog(req) => {
+                    match req {
+                        Message::Spawn(req, resp) => {
+                            let packet = handler.submit(req, resp);
+                            self.tx.send(&packet);
+                        }
                     }
-                },
+                }
                 Event::Network(Ok(msg)) => {
                     Decoder::from(msg)
                         .when::<AsyncResponse, _>(|reply| handler.resolve(reply))
@@ -77,7 +79,7 @@ impl Executor {
                 }
                 Event::Network(Err(err)) => {
                     // TODO unregister
-                    return Err(err)
+                    return Err(err);
                 }
             }
         }

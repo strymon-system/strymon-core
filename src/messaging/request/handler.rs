@@ -75,11 +75,11 @@ impl AsyncHandler {
             // FIXME: a bit of a hack since partial decoding is not supported
             let result = if response.success {
                 let success = <R as Request>::Success::decode(&mut response.bytes)
-                                .expect("failed to decode successful response");
+                    .expect("failed to decode successful response");
                 Ok(success)
             } else {
                 let error = <R as Request>::Error::decode(&mut response.bytes)
-                                .expect("failed to decode error response");
+                    .expect("failed to decode error response");
                 Err(error)
             };
 

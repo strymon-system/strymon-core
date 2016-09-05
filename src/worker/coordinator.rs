@@ -7,9 +7,9 @@ use std::fmt::Debug;
 use abomonation::Abomonation;
 
 use messaging;
-use messaging::{Receiver, Sender, Message as NetworkMessage};
+use messaging::{Message as NetworkMessage, Receiver, Sender};
 use messaging::decoder::Decoder;
-use messaging::request::{self, Request, AsyncResult, Complete};
+use messaging::request::{self, AsyncResult, Complete, Request};
 use messaging::request::handshake::{Handshake, Response};
 use messaging::request::handler::{AsyncHandler, AsyncResponse};
 
@@ -57,13 +57,11 @@ impl Coordinator {
             queue: queue_rx,
             handler: AsyncHandler::new(),
         };
-        let catalog = Catalog {
-            tx: queue_tx,
-        };
+        let catalog = Catalog { tx: queue_tx };
 
         Ok((coord, catalog))
     }
-    
+
     pub fn detach(mut self) {
         thread::spawn(move || self.run());
     }
@@ -84,7 +82,7 @@ impl Coordinator {
                             self.handler.resolve(resp);
                         })
                         .expect("error while receiving from coordinator");
-                },
+                }
                 Message::Publish(req, tx) => self.submit(req, tx),
                 Message::Subscribe(req, tx) => self.submit(req, tx),
                 Message::Unpublish(req, tx) => self.submit(req, tx),
@@ -111,16 +109,25 @@ impl Catalog {
         rx
     }
 
-    pub fn publish(&self, name: String, addr: String, dtype: TypeId) -> AsyncResult<Topic, PublishError> {
-        self.request(Message::Publish, Publish {
-            name: name,
-            addr: addr,
-            dtype: dtype,
-        })
+    pub fn publish(&self,
+                   name: String,
+                   addr: String,
+                   dtype: TypeId)
+                   -> AsyncResult<Topic, PublishError> {
+        self.request(Message::Publish,
+                     Publish {
+                         name: name,
+                         addr: addr,
+                         dtype: dtype,
+                     })
     }
 
     pub fn subscribe(&self, name: String, blocking: bool) -> AsyncResult<Topic, SubscribeError> {
-        self.request(Message::Subscribe, Subscribe { name: name, blocking: blocking })
+        self.request(Message::Subscribe,
+                     Subscribe {
+                         name: name,
+                         blocking: blocking,
+                     })
     }
 
     pub fn unpublish(&self, id: TopicId) -> AsyncResult<(), UnpublishError> {

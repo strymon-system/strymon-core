@@ -3,12 +3,12 @@ use std::ops::Range;
 
 use rand;
 
-use query::{QueryParams, QueryId};
+use query::{QueryId, QueryParams};
 use executor::{ExecutorId, ExecutorType};
 use executor::request::{Spawn, SpawnError};
 use util::Generator;
 
-use messaging::request::{self, Complete, AsyncResult};
+use messaging::request::{self, AsyncResult, Complete};
 
 use coordinator::executor::{ExecutorRef, Message as ExecutorMessage};
 use coordinator::request::ExecutorReady;
@@ -81,7 +81,11 @@ impl Executor {
         self.ports.next().expect("run out of tcp ports to allocate!")
     }
 
-    pub fn spawn(&self, fetch: &str, query: &QueryParams, procindex: usize) -> AsyncResult<(), SpawnError> {
+    pub fn spawn(&self,
+                 fetch: &str,
+                 query: &QueryParams,
+                 procindex: usize)
+                 -> AsyncResult<(), SpawnError> {
         debug!("spawn request for {:?} on {:?}", query.id, self.id);
 
         let (tx, rx) = request::promise::<Spawn>();

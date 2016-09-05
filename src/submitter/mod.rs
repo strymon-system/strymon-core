@@ -4,7 +4,7 @@ use coordinator::request::{Submission as QuerySubmission, SubmissionError};
 
 use query::QueryId;
 
-use messaging::{self, Sender, Receiver};
+use messaging::{self, Receiver, Sender};
 use messaging::decoder::Decoder;
 use messaging::request::handshake::{Handshake, Response};
 
@@ -34,10 +34,7 @@ pub struct Submission {
 impl Submission {
     pub fn connect(coordinator: &str) -> io::Result<Self> {
         let (tx, rx) = try!(messaging::connect(coordinator));
-        Ok(Submission {
-            tx: tx,
-            rx: rx,
-        })
+        Ok(Submission { tx: tx, rx: rx })
     }
 
     pub fn query(self, submission: QuerySubmission) -> Result<QueryId, SubmitError> {

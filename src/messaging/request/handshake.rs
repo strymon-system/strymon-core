@@ -3,7 +3,7 @@ use std::any::Any;
 
 use abomonation::Abomonation;
 
-use messaging::{Sender, Receiver};
+use messaging::{Receiver, Sender};
 use messaging::request::Request;
 use messaging::decoder::Decoder;
 
@@ -14,7 +14,7 @@ impl<R: Request> Handshake<R>
     where R: Abomonation + Clone + Any,
           R::Success: Abomonation + Clone + Any,
           R::Error: Abomonation + Clone + Any
-{   
+{
     pub fn wait(self, tx: &Sender, rx: &Receiver) -> io::Result<Response<R>> {
         tx.send(&self);
         Decoder::from(rx.recv())
@@ -67,7 +67,7 @@ impl<R: Request> Abomonation for Handshake<R>
 
 impl<R: Request> Abomonation for Response<R>
     where R::Success: Abomonation,
-          R::Error: Abomonation,
+          R::Error: Abomonation
 {
     #[inline]
     unsafe fn embalm(&mut self) {

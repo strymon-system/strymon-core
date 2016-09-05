@@ -10,12 +10,12 @@ use timely::dataflow::channels::Content;
 use timely::dataflow::scopes::Scope;
 use timely::dataflow::stream::Stream;
 use timely::dataflow::operators::Unary;
-use timely::dataflow::channels::pact::{Exchange, Pipeline, ParallelizationContract};
+use timely::dataflow::channels::pact::{Exchange, ParallelizationContract, Pipeline};
 
-use timely_communication::{Allocate, Push, Pull};
+use timely_communication::{Allocate, Pull, Push};
 
 use coordinator::catalog::request::PublishError as CatalogError;
-use messaging::{self, Sender, Receiver, Message};
+use messaging::{self, Message, Receiver, Sender};
 
 use executor::executable;
 use worker::coordinator::Catalog;
@@ -35,7 +35,7 @@ impl From<IoError> for PublishError {
     }
 }
 
-impl From<CatalogError> for PublishError{
+impl From<CatalogError> for PublishError {
     fn from(c: CatalogError) -> Self {
         PublishError::Catalog(c)
     }
@@ -48,13 +48,18 @@ pub struct Publisher {
 
 const PUBLISH_WORKER_ID: usize = 0;
 
-enum Pact<D,  F: Fn(&D) -> u64 + 'static> {
+enum Pact<D, F: Fn(&D) -> u64 + 'static> {
     Pipeline(Pipeline),
     Exchange(Exchange<D, F>),
 }
 
-impl<T: Timestamp, D: Data, F: Fn(&D) -> u64 + 'static> ParallelizationContract<T, D> for Pact<D, F> {
-    fn connect<A: Allocate>(self, allocator: &mut A, identifier: usize) -> (Box<Push<(T, Content<D>)>>, Box<Pull<(T, Content<D>)>>) {
+impl<T: Timestamp, D: Data, F> ParallelizationContract<T, D> for Pact<D, F>
+    where F: Fn(&D) -> u64 + 'static
+{
+    fn connect<A: Allocate>(self,
+                            allocator: &mut A,
+                            identifier: usize)
+                            -> (Box<Push<(T, Content<D>)>>, Box<Pull<(T, Content<D>)>>) {
         match self {
             Pact::Pipeline(pipeline) => pipeline.connect(allocator, identifier),
             Pact::Exchange(exchange) => exchange.connect(allocator, identifier),
@@ -69,13 +74,16 @@ impl Publisher {
             per_worker: false,
         }
     }
-    
+
     pub fn per_worker(&mut self, flag: bool) -> &mut Self {
         self.per_worker = flag;
         self
     }
-    
-    pub fn publish<S: Scope, D: Data>(self, name: &str, stream: &Stream<S, D>) -> Result<Stream<S, D>, PublishError> {
+
+    pub fn publish<S: Scope, D: Data>(self,
+                                      name: &str,
+                                      stream: &Stream<S, D>)
+                                      -> Result<Stream<S, D>, PublishError> {
         let worker_index = stream.scope().index();
 
         let (name, pact) = if self.per_worker {
@@ -109,7 +117,6 @@ impl Publisher {
 
         Ok(stream)
     }
-
 }
 
 type SubscriberId = u64;
@@ -132,15 +139,13 @@ struct PublisherState<D> {
 impl<D: Data> PublisherState<D> {
     fn new(catalog: Catalog, name: String) -> Result<Self, PublishError> {
         let listener = messaging::listen(None)?;
-        let host  = env::var(executable::HOST).expect("unable to get external hostname");
+        let host = env::var(executable::HOST).expect("unable to get external hostname");
         let addr = listener.external_addr(&host)?;
         let topic = catalog.publish(name, addr, TypeId::of::<D>()).await()?;
 
         let (event_tx, event_rx) = mpsc::channel();
         let accept_tx = event_tx.clone();
-        listener.detach(move |res| {
-            drop(accept_tx.send(Event::NewSubscriber(res)))
-        });
+        listener.detach(move |res| drop(accept_tx.send(Event::NewSubscriber(res))));
 
         Ok(PublisherState {
             topic: topic,
@@ -159,21 +164,17 @@ impl<D: Data> PublisherState<D> {
                 Event::NewSubscriber(Ok((tx, rx))) => {
                     let event_tx = self.event_tx.clone();
                     let id = self.subscriber_id.generate();
-                    rx.detach(move |res| {
-                        drop(event_tx.send(Event::Subscriber(id, res)))
-                    });
+                    rx.detach(move |res| drop(event_tx.send(Event::Subscriber(id, res))));
                     self.subscribers.insert(id, tx);
-                },
-                Event::NewSubscriber(Err(err)) => {
-                    panic!("publisher listener failed: {:?}", err)
-                },
+                }
+                Event::NewSubscriber(Err(err)) => panic!("publisher listener failed: {:?}", err),
                 Event::Subscriber(id, Err(err)) => {
                     info!("removing subscriber {:?} because of {:?}", id, err);
                     self.subscribers.remove(&id);
-                },
+                }
                 Event::Subscriber(id, Ok(_)) => {
                     panic!("unexpected message from subscriber {:?}", id)
-                },
+                }
             }
         }
     }

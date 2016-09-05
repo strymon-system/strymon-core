@@ -8,7 +8,7 @@ use coordinator::request::ExecutorReady;
 
 use query::{QueryId, QueryParams};
 
-use messaging::{self, Sender, Receiver};
+use messaging::{self, Receiver, Sender};
 use messaging::decoder::Decoder;
 use messaging::request::handshake::Handshake;
 use messaging::request::handler::AsyncReq;
@@ -80,7 +80,11 @@ impl Executor {
         }
     }
 
-    pub fn spawn(&self, fetch: &str, query: &QueryParams, procindex: usize) -> Result<(), SpawnError> {
+    pub fn spawn(&self,
+                 fetch: &str,
+                 query: &QueryParams,
+                 procindex: usize)
+                 -> Result<(), SpawnError> {
         let executable = PathBuf::from(fetch);
         if !executable.exists() {
             return Err(SpawnError::FetchFailed);
