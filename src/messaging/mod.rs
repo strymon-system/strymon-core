@@ -1,4 +1,4 @@
-use std::io::Result;
+use std::io::{Result, ErrorKind};
 use std::thread;
 
 use self::bytes::{Decode, Encode};
@@ -85,6 +85,25 @@ pub struct Listener {
 impl Listener {
     pub fn accept(&mut self) -> Result<(Sender, Receiver)> {
         self.inner.accept().map(from_tcp)
+    }
+    
+    pub fn external_addr(&self, host: &str) -> Result<String> {
+        let sockaddr = self.inner.local_addr()?;
+        Ok(format!("{}:{}", host, sockaddr.port()))
+    }
+    
+    pub fn detach<F>(mut self, mut f: F)
+        where F: FnMut(Result<(Sender, Receiver)>),
+              F: Send + 'static
+    {
+        thread::spawn(move || {
+            let mut is_ok = true;
+            while is_ok {
+                let result = self.accept();
+                is_ok = result.is_ok();
+                f(result);
+            }
+        });
     }
 }
 

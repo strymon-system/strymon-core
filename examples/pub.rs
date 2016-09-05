@@ -8,24 +8,27 @@ use std::thread;
 use timely::dataflow::Scope;
 use timely::dataflow::operators::*;
 
+use timely_query::Publish;
 
 fn main() {
-    drop(env_logger::init());
-
+    env_logger::init().unwrap();
     timely_query::execute(|root, catalog| {
-        use std::{thread, time};
-        use std::any::TypeId;
-    
-        let topic = if root.index() == 0 {
-            catalog.publish("foo".to_string(), "nope".to_string(), TypeId::of::<()>())
-                .await()
-                .expect("failed to publish topic")
-        } else {
-            catalog.subscribe("foo".to_string(), true)
-                .await()
-                .expect("failed to subscribe")
-        };
-        
-        println!("worker {:?}, topic: {:?}", root.index(), topic)
+        let mut input = root.scoped::<i32,_,_>(|scope| {
+            let worker_id = (scope.index() + 1) as i32;
+            let (input, stream) = scope.new_input();
+            stream
+                .map(move |i| (worker_id, i))
+                .inspect(move |x| println!("pub({:?}): {:?}", worker_id, x))
+                .publish("numbers", &catalog).expect("failed to publish stream");
+
+            input
+        });
+
+        for round in 0..1000 {
+            input.send(round as i32);
+            input.advance_to(round + 1);
+            root.step();
+            thread::sleep(Duration::from_millis(10));
+        }
     }).unwrap();
 }

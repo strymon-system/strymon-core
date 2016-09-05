@@ -2,6 +2,7 @@ use std::io::{Error, ErrorKind, Result};
 use std::any::Any;
 use std::sync::mpsc;
 use std::thread;
+use std::fmt::Debug;
 
 use abomonation::Abomonation;
 
@@ -101,9 +102,10 @@ pub struct Catalog {
 
 
 impl Catalog {
-    fn request<R: Request, F>(&self, f: F, r: R) -> AsyncResult<R::Success, R::Error>
+    fn request<R: Request + Debug, F>(&self, f: F, r: R) -> AsyncResult<R::Success, R::Error>
         where F: Fn(R, Complete<R>) -> Message
     {
+        debug!("submitting request: {:?}", r);
         let (tx, rx) = request::promise::<R>();
         self.tx.send(f(r, tx)).expect("failed to issue request");
         rx

@@ -20,5 +20,9 @@ pub mod submitter;
 mod worker;
 mod util;
 mod topic;
+mod publisher;
+mod subscriber;
 
 pub use self::worker::execute::execute;
+pub use self::publisher::{Publisher, Publish};
+pub use self::subscriber::{Subscribe};

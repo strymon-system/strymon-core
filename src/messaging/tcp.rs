@@ -2,7 +2,7 @@ use std::sync::mpsc;
 use std::cell::RefCell;
 use std::thread;
 use std::io::Result;
-use std::net::{Shutdown, TcpListener, TcpStream};
+use std::net::{Shutdown, TcpListener, TcpStream, SocketAddr};
 
 use messaging::bytes;
 
@@ -69,5 +69,9 @@ impl Listener {
             Ok((tcp, _)) => from_native(tcp),
             Err(err) => Err(err),
         }
+    }
+
+    pub fn local_addr(&self) -> Result<SocketAddr> {
+        self.inner.local_addr()
     }
 }
