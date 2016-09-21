@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use timely_communication::{Allocator, WorkerGuards};
 use timely::{self, Configuration};
 use timely::dataflow::scopes::Root;
@@ -27,7 +25,6 @@ pub fn execute<T, F>(func: F) -> Result<WorkerGuards<T>, String>
 
     let coord = exec_conf.coord;
     timely::execute(timely_conf, move |root| {
-        let index = root.index();
         let (coord, catalog) = Coordinator::announce(&*coord, query_id, root.index())
             .expect("failed to connect to coordinator");
 

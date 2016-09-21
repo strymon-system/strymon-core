@@ -6,7 +6,7 @@ use abomonation::Abomonation;
 
 use coordinator::request::ExecutorReady;
 
-use query::{QueryId, QueryParams};
+use query::{QueryParams};
 
 use messaging::{self, Receiver, Sender};
 use messaging::decoder::Decoder;
@@ -38,7 +38,7 @@ unsafe_abomonate!(ExecutorId);
 unsafe_abomonate!(ExecutorType);
 
 pub struct Executor {
-    id: ExecutorId,
+    _id: ExecutorId,
     tx: Sender,
     rx: Receiver,
     coord: String,
@@ -61,7 +61,7 @@ impl Executor {
         debug!("successfully received executor id: {:?}", id);
 
         Ok(Executor {
-            id: id,
+            _id: id,
             tx: tx,
             rx: rx,
             coord: coord,

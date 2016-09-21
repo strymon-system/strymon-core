@@ -1,25 +1,12 @@
 use std::io::{Error as IoError, Result as IoResult};
-use std::env;
-use std::marker::PhantomData;
-use std::collections::BTreeMap;
 use std::sync::mpsc;
 
 use timely::Data;
-use timely::progress::{PathSummary, Timestamp};
-use timely::dataflow::channels::Content;
-use timely::dataflow::scopes::Scope;
-use timely::dataflow::stream::Stream;
-use timely::dataflow::operators::Unary;
-use timely::dataflow::operators::Capability;
-use timely::dataflow::channels::pact::{Exchange, ParallelizationContract, Pipeline};
-
-use timely_communication::{Allocate, Pull, Push};
 
 use coordinator::catalog::request::SubscribeError as CatalogError;
-use messaging::{self, Message, Receiver, Sender};
+use messaging::{self, Message, Sender};
 use messaging::decoder::Decoder;
 
-use executor::executable;
 use worker::coordinator::Catalog;
 use topic::{Topic, TypeId};
 

@@ -170,7 +170,7 @@ impl Catalog {
         // ask executors to spawn a new query
         for (index, executor) in executors.iter().enumerate() {
             // TODO need to deal with the asyncresults somehow
-            executor.spawn(&submission.fetch, &query, index);
+            let _ = executor.spawn(&submission.fetch, &query, index);
         }
 
         // install pending query

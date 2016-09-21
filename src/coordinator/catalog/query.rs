@@ -1,10 +1,10 @@
-use query::{QueryId, QueryParams};
+use query::{QueryParams};
 
 use coordinator::worker::WorkerRef;
 
 pub struct Query {
-    params: QueryParams,
-    workers: Vec<WorkerRef>,
+    _params: QueryParams,
+    _workers: Vec<WorkerRef>,
 }
 
 impl Query {
@@ -12,8 +12,8 @@ impl Query {
         assert_eq!(query.processes * query.threads, workers.len());
 
         Query {
-            params: query,
-            workers: workers,
+            _params: query,
+            _workers: workers,
         }
     }
 }

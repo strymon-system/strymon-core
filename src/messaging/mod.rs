@@ -1,4 +1,4 @@
-use std::io::{ErrorKind, Result};
+use std::io::{Result};
 use std::thread;
 
 use self::bytes::{Decode, Encode};

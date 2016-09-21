@@ -1,7 +1,4 @@
-use timely::Configuration;
 use abomonation::Abomonation;
-
-use executor::ExecutorType;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct QueryId(pub u64);

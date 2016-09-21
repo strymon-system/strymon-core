@@ -1,6 +1,6 @@
 use abomonation::Abomonation;
 
-use query::{QueryId, QueryParams};
+use query::{QueryParams};
 
 use messaging::request::Request;
 

@@ -3,7 +3,7 @@ use std::ops::Range;
 
 use rand;
 
-use query::{QueryId, QueryParams};
+use query::{QueryParams};
 use executor::{ExecutorId, ExecutorType};
 use executor::request::{Spawn, SpawnError};
 use util::Generator;

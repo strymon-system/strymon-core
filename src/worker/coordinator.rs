@@ -7,10 +7,10 @@ use std::fmt::Debug;
 use abomonation::Abomonation;
 
 use messaging;
-use messaging::{Message as NetworkMessage, Receiver, Sender};
+use messaging::{Message as NetworkMessage, Sender};
 use messaging::decoder::Decoder;
 use messaging::request::{self, AsyncResult, Complete, Request};
-use messaging::request::handshake::{Handshake, Response};
+use messaging::request::handshake::{Handshake};
 use messaging::request::handler::{AsyncHandler, AsyncResponse};
 
 use query::QueryId;

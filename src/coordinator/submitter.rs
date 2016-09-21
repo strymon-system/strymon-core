@@ -5,13 +5,13 @@ use messaging::request;
 use messaging::request::handshake::{Handshake, Response};
 
 use super::catalog::{CatalogRef, Message};
-use super::request::{Submission, SubmissionError};
+use super::request::{Submission};
 use super::Connection;
 
 pub struct Submitter {
-    tx: Sender,
-    rx: Receiver,
-    catalog: CatalogRef,
+    _tx: Sender,
+    _rx: Receiver,
+    _catalog: CatalogRef,
 }
 
 impl Submitter {
@@ -25,13 +25,13 @@ impl Submitter {
         tx.send(&resp);
 
         Submitter {
-            tx: tx,
-            rx: rx,
-            catalog: catalog,
+            _tx: tx,
+            _rx: rx,
+            _catalog: catalog,
         }
     }
 
-    pub fn run(mut self) -> Result<()> {
+    pub fn run(self) -> Result<()> {
         Ok(())
     }
 }

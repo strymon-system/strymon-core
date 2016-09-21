@@ -1,14 +1,12 @@
 use std::sync::mpsc;
 use std::io::Result;
 
-use messaging::{Message as NetworkMessage, Receiver, Sender};
+use messaging::{Message as NetworkMessage, Sender};
 use messaging::decoder::Decoder;
 use messaging::request::{self, Complete};
 use messaging::request::handler::{AsyncHandler, AsyncResponse};
 use messaging::request::handshake::{Handshake, Response};
 
-use query::QueryId;
-use executor::{ExecutorId, ExecutorType};
 use executor::request::Spawn;
 
 use super::Connection;
@@ -34,8 +32,7 @@ enum Event {
 
 pub struct Executor {
     tx: Sender,
-    rx: Receiver,
-    catalog: CatalogRef,
+    _catalog: CatalogRef,
     events: mpsc::Receiver<Event>,
 }
 
@@ -51,10 +48,11 @@ impl Executor {
         let resp = Response::<ExecutorReady>::from(ready_rx.await());
         tx.send(&resp);
 
+        rx.detach(move |res| drop(tx_event.send(Event::Network(res))));
+
         Executor {
             tx: tx,
-            rx: rx,
-            catalog: catalog,
+            _catalog: catalog,
             events: rx_event,
         }
     }

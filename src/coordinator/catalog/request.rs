@@ -1,7 +1,5 @@
 use abomonation::Abomonation;
 
-use query::QueryId;
-use worker::WorkerIndex;
 use topic::{Topic, TopicId, TypeId};
 
 use messaging::request::Request;

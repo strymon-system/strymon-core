@@ -1,4 +1,4 @@
-use query::{QueryId, QueryParams};
+use query::{QueryParams};
 use worker::WorkerIndex;
 
 use messaging::request::Complete;

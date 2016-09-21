@@ -5,8 +5,8 @@ use coordinator::request::{Submission as QuerySubmission, SubmissionError};
 use query::QueryId;
 
 use messaging::{self, Receiver, Sender};
-use messaging::decoder::Decoder;
-use messaging::request::handshake::{Handshake, Response};
+
+use messaging::request::handshake::{Handshake};
 
 #[derive(Debug)]
 pub enum SubmitError {

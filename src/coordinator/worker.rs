@@ -1,7 +1,6 @@
 use std::io::Result;
 use std::sync::mpsc;
 
-use worker::WorkerIndex;
 use query::QueryId;
 
 use messaging::{Message as NetworkMessage, Sender};
