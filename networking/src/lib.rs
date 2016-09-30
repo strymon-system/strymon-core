@@ -3,8 +3,9 @@
 extern crate mio;
 #[macro_use]
 extern crate log;
-extern crate slab;
 extern crate abomonation;
+extern crate void;
+extern crate byteorder;
 
 use std::io::{Error, ErrorKind, Result};
 use std::net::{SocketAddr, ToSocketAddrs};
@@ -14,12 +15,11 @@ use mio::{Poll, Token, Ready, PollOpt, Events};
 use mio::channel::{Receiver as MioReceiver, SendError as MioSendError, Sender as MioSender};
 use mio::tcp::{TcpListener, TcpStream};
 
-use slab::Slab;
+use message::MessageBuf;
 
 pub mod event;
 pub mod message;
-
-pub struct Message;
+pub mod abomonate;
 
 pub struct Service {
     poller: Poll,
@@ -94,10 +94,10 @@ struct Reader {
 
 }
 
-type SenderPush = MioSender<Message>;
-type SenderPull = MioReceiver<Message>;
-type ReceiverPush = MioSender<Result<Message>>;
-type ReceiverPull = MioReceiver<Result<Message>>;
+type SenderPush = MioSender<MessageBuf>;
+type SenderPull = MioReceiver<MessageBuf>;
+type ReceiverPush = MioSender<Result<MessageBuf>>;
+type ReceiverPull = MioReceiver<Result<MessageBuf>>;
 type ListenerPush = MioSender<Result<(Sender, Receiver)>>;
 type ListenerPull = MioReceiver<Result<(Sender, Receiver)>>;
 
@@ -173,30 +173,38 @@ impl Remote {
     }
 }
 
-pub struct Receiver {
-    rx: ReceiverPull,
-}
+fn try_recv<T>(rx: &MioReceiver<Result<T>>) -> Option<Result<T>> {
+    use ::std::sync::mpsc::TryRecvError::*;
 
-impl Receiver {
-    pub fn recv(&self) -> Option<Result<Message>> {
-        use ::std::sync::mpsc::TryRecvError::*;
-
-        match self.rx.try_recv() {
-            Ok(res) => Some(res),
-            Err(Empty) => None,
-            Err(Disconnected) => {
-                Some(Err(Error::new(ErrorKind::Other, "network service unreachable")))
-            }
+    match rx.try_recv() {
+        Ok(res) => Some(res),
+        Err(Empty) => None,
+        Err(Disconnected) => {
+            Some(Err(Error::new(ErrorKind::Other, "network service unreachable")))
         }
     }
 }
 
+pub struct Receiver {
+    token: Token,
+    rx: ReceiverPull,
+}
+
+impl Receiver {
+    pub fn recv(&self) -> Option<Result<MessageBuf>> {
+        try_recv(&self.rx)
+    }
+}
+
 pub struct Sender {
+    token: Token,
     tx: SenderPush,
 }
 
 impl Sender {
-    pub fn send<T: Into<Message>>(&self, msg: T) {}
+    pub fn send<T: Into<MessageBuf>>(&self, msg: T) {
+        let _ = self.tx.send(msg.into());
+    }
 }
 
 pub struct Listener {
@@ -211,7 +219,7 @@ impl Listener {
     }
 
     pub fn accept(&self) -> Option<Result<(Sender, Receiver)>> {
-        unimplemented!()
+        try_recv(&self.rx)
     }
 }
 
