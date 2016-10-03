@@ -21,6 +21,7 @@ byteorder = "0.5.3"
 env_logger = "0.3"
 log = "0.3"
 rand = "0.3.14"
+void = "1.0.2"
 
 [dependencies.timely]
 path = "./timely-dataflow"

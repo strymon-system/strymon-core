@@ -4,9 +4,7 @@ use std::mem;
 use abomonation::{Abomonation, encode, decode};
 use void::Void;
 
-use message::{Encode, Decode};
-
-pub enum Never { }
+use network::{Encode, Decode};
 
 #[derive(Debug)]
 pub struct Vault<T>(pub T);

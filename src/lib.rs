@@ -11,8 +11,7 @@ extern crate timely_communication;
 
 extern crate rand;
 extern crate byteorder;
-
-extern crate mio;
+extern crate void;
 
 pub mod query;
 pub mod messaging;
@@ -22,6 +21,7 @@ pub mod submitter;
 
 pub mod model;
 pub mod event;
+pub mod network;
 
 mod worker;
 mod util;

@@ -1,24 +1,14 @@
 use std::sync::Arc;
 use std::collections::VecDeque;
 use std::mem;
+use std::io::{self, Read, Write, Cursor, Error, ErrorKind};
 
-use byteorder::{ByteOrder, NetworkEndian};
-
-pub trait Encode {
-    type Error;
-
-    fn encode(&self, &mut Vec<u8>) -> Result<(), Self::Error>;
-}
-
-pub trait Decode: Sized {
-    type Error;
-
-    fn decode(&mut [u8]) -> Result<Self, Self::Error>;
-}
+use network::{Encode, Decode};
+use byteorder::{NetworkEndian, WriteBytesExt, ReadBytesExt};
 
 #[derive(Clone, Default)]
 pub struct MessageBuf {
-    buf: Arc<Buf>,
+    inner: Arc<Buf>,
 }
 
 impl MessageBuf {
@@ -27,12 +17,68 @@ impl MessageBuf {
     }
         
     pub fn push<T: Encode>(&mut self, payload: &T) -> Result<(), T::Error> {
-        Arc::make_mut(&mut self.buf).push(payload)
+        Arc::make_mut(&mut self.inner).push(payload)
     }
     
     pub fn pop<T: Decode>(&mut self) -> Result<T, T::Error> {
-        Arc::make_mut(&mut self.buf).pop()
+        Arc::make_mut(&mut self.inner).pop()
     }
+}
+
+pub fn read<R: Read>(reader: &mut R) -> io::Result<MessageBuf> {
+    let length = reader.read_u32::<NetworkEndian>()?;
+    let buflen = reader.read_u32::<NetworkEndian>()?;
+
+    if buflen >= length || (length - buflen) % 8 != 0 {
+        return Err(Error::new(ErrorKind::InvalidData, "invalid header"));
+    }
+
+    let mut buf = vec![0u8; length as usize]; // TODO(swicki) optimize this
+    reader.read_exact(&mut buf)?;
+
+    let sections = (length - buflen) / 8;
+    let mut pos = VecDeque::<(u32, u32)>::with_capacity(sections as usize);
+    {
+        let mut reader = Cursor::new(&buf[buflen as usize..]);
+        for _ in 0..sections {
+            let start = reader.read_u32::<NetworkEndian>()?;
+            let end = reader.read_u32::<NetworkEndian>()?;
+            pos.push_back((start, end));
+        }
+    }
+
+    buf.truncate(buflen as usize);
+
+    Ok(MessageBuf {
+        inner: Arc::new(Buf {
+            buf: buf,
+            pos: pos,
+        })
+    })
+}
+
+pub fn write<W: Write>(writer: &mut W, msg: &MessageBuf) -> io::Result<()> {
+    let msg = &*msg.inner;
+    let buflen = msg.buf.len() as u32;
+    let sections = msg.pos.len() as u32;
+
+    // header: (u32, u32) | buflen: [u8] | footer: [(u32, u32)]
+    let length = buflen + (sections * 8);
+
+    // header
+    writer.write_u32::<NetworkEndian>(length)?;
+    writer.write_u32::<NetworkEndian>(buflen)?;
+    
+    // buflen
+    writer.write_all(&msg.buf)?;
+
+    // footer
+    for &(start, end) in &msg.pos {
+        writer.write_u32::<NetworkEndian>(start)?;
+        writer.write_u32::<NetworkEndian>(end)?;
+    }
+
+    Ok(())
 }
 
 
@@ -87,7 +133,7 @@ impl<T: Encode<Error=::void::Void>> From<T> for MessageBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use abomonate::Vault;
+    use network::abomonate::Vault;
 
     #[test]
     fn pop_msg() {
@@ -95,7 +141,7 @@ mod tests {
         let Vault(vec) = buf.pop::<Vault<Vec<&'static str>>>().unwrap();
         assert_eq!(vec, vec!["foo", "bar"]);
     }
-    
+
     #[test]
     fn push_many_msg() {
         let string = String::from("hi");
@@ -103,12 +149,12 @@ mod tests {
         let integer = 42i32;
 
         let mut buf = MessageBuf::empty();
-        buf.push(&Vault(&string));
+        buf.push(&Vault(&string)).unwrap();
 
         assert_eq!(string, buf.pop::<Vault<String>>().unwrap().0);
 
-        buf.push(&Vault(&vector));
-        buf.push(&Vault(&integer));
+        buf.push(&Vault(&vector)).unwrap();
+        buf.push(&Vault(&integer)).unwrap();
         assert_eq!(vector, buf.pop::<Vault<Vec<u8>>>().unwrap().0);
         assert_eq!(integer, buf.pop::<Vault<i32>>().unwrap().0);
     }
@@ -122,9 +168,22 @@ mod tests {
     
     #[test]
     fn type_mismatch() {
-        use ::abomonate::DecodeError::*;
+        use network::abomonate::DecodeError::*;
 
         let mut buf = MessageBuf::from(Vault(&0i32));
         assert_eq!(TypeMismatch, buf.pop::<Vault<String>>().unwrap_err());
+    }
+
+    #[test]
+    fn read_write() {
+        let mut buf = MessageBuf::from(Vault(&"Some Content"));
+        buf.push(&Vault(&3.14f32)).unwrap();
+
+        let mut stream = Vec::<u8>::new();
+        write(&mut stream, &buf).expect("failed to write");
+        let mut out = read(&mut &*stream).expect("failed to read");
+
+        assert_eq!("Some Content", out.pop::<Vault<&'static str>>().unwrap().0);
+        assert_eq!(3.14, out.pop::<Vault<f32>>().unwrap().0);
     }
 }
