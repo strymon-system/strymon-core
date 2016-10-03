@@ -1,14 +1,14 @@
 use abomonation::Abomonation;
 
-use topic::{Topic, TopicId, TypeId};
+use model::{Topic, TopicId, TopicType};
 
 use messaging::request::Request;
 
 #[derive(Clone, Debug)]
 pub struct Publish {
     pub name: String,
-    pub addr: String,
-    pub dtype: TypeId,
+    pub addr: (String, u16),
+    pub kind: TopicType,
 }
 
 unsafe_abomonate!(Publish: name, addr);

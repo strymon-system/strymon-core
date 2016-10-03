@@ -87,9 +87,9 @@ impl Listener {
         self.inner.accept().map(from_tcp)
     }
 
-    pub fn external_addr(&self, host: &str) -> Result<String> {
+    pub fn external_addr(&self, host: &str) -> Result<(String, u16)> {
         let sockaddr = self.inner.local_addr()?;
-        Ok(format!("{}:{}", host, sockaddr.port()))
+        Ok((host.to_string(), sockaddr.port()))
     }
 
     pub fn detach<F>(mut self, mut f: F)

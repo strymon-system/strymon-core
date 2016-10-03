@@ -3,7 +3,7 @@ use std::collections::hash_map::{Entry as HashEntry, HashMap};
 use std::collections::btree_map::{BTreeMap, Entry as BTreeEntry};
 
 use query::QueryId;
-use topic::{Topic as TopicDesc, TopicId, TypeId};
+use model::{Topic as TopicDesc, TopicId, TopicType};
 
 use messaging::request::handler::Handoff;
 
@@ -38,8 +38,8 @@ impl Topics {
     pub fn publish(&mut self,
                    query: QueryId,
                    name: String,
-                   addr: String,
-                   dtype: TypeId)
+                   addr: (String, u16),
+                   kind: TopicType)
                    -> Result<TopicDesc, PublishError> {
         match self.directory.entry(name.clone()) {
             HashEntry::Occupied(_) => Err(PublishError::TopicAlreadyExists),
@@ -49,7 +49,7 @@ impl Topics {
                     id: id,
                     name: name,
                     addr: addr,
-                    dtype: dtype,
+                    kind: kind,
                 };
 
                 // create meta-topic
@@ -118,8 +118,8 @@ impl Topics {
 
     pub fn request(&mut self, req: TopicRequest) {
         match req {
-            TopicRequest::Publish(query, Publish { name, addr, dtype }, promise) => {
-                promise.result(self.publish(query, name, addr, dtype));
+            TopicRequest::Publish(query, Publish { name, addr, kind }, promise) => {
+                promise.result(self.publish(query, name, addr, kind));
             }
             TopicRequest::Subscribe(query, Subscribe { name, blocking }, promise) => {
                 let result = self.subscribe(query, &name);

@@ -15,7 +15,7 @@ use messaging::request::handler::{AsyncHandler, AsyncResponse};
 
 use query::QueryId;
 use worker::WorkerIndex;
-use topic::{Topic, TopicId, TypeId};
+use model::{Topic, TopicId, TopicType};
 
 use coordinator::request::WorkerReady;
 use coordinator::catalog::request::*;
@@ -111,14 +111,14 @@ impl Catalog {
 
     pub fn publish(&self,
                    name: String,
-                   addr: String,
-                   dtype: TypeId)
+                   addr: (String, u16),
+                   kind: TopicType)
                    -> AsyncResult<Topic, PublishError> {
         self.request(Message::Publish,
                      Publish {
                          name: name,
                          addr: addr,
-                         dtype: dtype,
+                         kind: kind,
                      })
     }
 

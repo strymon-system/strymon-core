@@ -8,7 +8,7 @@ use messaging::{self, Message, Sender};
 use messaging::decoder::Decoder;
 
 use worker::coordinator::Catalog;
-use topic::{Topic, TypeId};
+use model::{Topic, TopicType};
 
 #[derive(Debug)]
 pub enum SubscribeError {
@@ -39,9 +39,10 @@ pub struct Subscriber<D> {
 impl<D: Data> Subscriber<D> {
     pub fn from(catalog: &Catalog, name: &str) -> Result<Self, SubscribeError> {
         let topic = catalog.subscribe(name.to_string(), true).await()?;
-        assert_eq!(topic.dtype, TypeId::of::<D>(), "topic has wrong dtype");
+        assert_eq!(topic.kind, TopicType::of::<D>(), "topic has wrong dtype");
 
-        let (net_tx, net_rx) = messaging::connect(&topic.addr)?;
+        let addr = format!("{}:{}", topic.addr.0, topic.addr.1);
+        let (net_tx, net_rx) = messaging::connect(&addr)?;
         let (event_tx, event_rx) = mpsc::channel();
         net_rx.detach(move |res| drop(event_tx.send(res)));
 

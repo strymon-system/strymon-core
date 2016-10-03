@@ -1,4 +1,5 @@
 #![feature(question_mark)]
+#![feature(core_intrinsics)]
 
 #[macro_use]
 extern crate log;
@@ -11,15 +12,19 @@ extern crate timely_communication;
 extern crate rand;
 extern crate byteorder;
 
+extern crate mio;
+
 pub mod query;
 pub mod messaging;
 pub mod coordinator;
 pub mod executor;
 pub mod submitter;
 
+pub mod model;
+pub mod event;
+
 mod worker;
 mod util;
-mod topic;
 mod publisher;
 mod subscriber;
 

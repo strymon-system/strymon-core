@@ -19,7 +19,7 @@ use messaging::{self, Message, Receiver, Sender};
 
 use executor::executable;
 use worker::coordinator::Catalog;
-use topic::{Topic, TypeId};
+use model::{Topic, TopicType};
 
 use util::Generator;
 
@@ -141,7 +141,7 @@ impl<D: Data> PublisherState<D> {
         let listener = messaging::listen(None)?;
         let host = env::var(executable::HOST).expect("unable to get external hostname");
         let addr = listener.external_addr(&host)?;
-        let topic = catalog.publish(name, addr, TypeId::of::<D>()).await()?;
+        let topic = catalog.publish(name, addr, TopicType::of::<D>()).await()?;
 
         let (event_tx, event_rx) = mpsc::channel();
         let accept_tx = event_tx.clone();
