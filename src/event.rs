@@ -1,9 +1,5 @@
 use std::sync::mpsc;
 
-/*pub struct Continuation<T> {
-    f: Box<FnOnce(T)>,
-}*/
-
 pub struct Sender<T> {
     tx: Box<Fn(T) -> Result<(), Disconnected> + Send>,
 }
