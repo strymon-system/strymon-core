@@ -5,6 +5,7 @@ use abomonation::{Abomonation, encode, decode};
 use void::Void;
 
 use network::{Encode, Decode};
+use network::message::MessageBuf;
 
 #[derive(Debug)]
 pub struct Vault<T>(pub T);
@@ -61,5 +62,41 @@ impl<T: Abomonation + Any + Clone> Decode for Vault<T> {
         } else {
             Err(DecodeError::TypeMismatch)
         }
+    }
+}
+
+pub struct VaultMessage(pub MessageBuf);
+
+impl VaultMessage {
+    pub fn new() -> Self {
+        VaultMessage(MessageBuf::empty())
+    }
+
+    pub fn push<T: Abomonation + Any + Clone>(&mut self, payload: &T) {
+        self.0.push(&Vault(payload)).unwrap();
+    }
+    
+    pub fn pop<T: Abomonation + Any + Clone>(&mut self) -> Result<T, DecodeError> {
+        self.0.pop::<Vault<T>>().map(|vault| vault.0)
+    }
+}
+
+impl<'a, T: Abomonation + Any + Clone> From<&'a T> for VaultMessage {
+    fn from(t: &'a T) -> Self {
+        let mut buf = MessageBuf::empty();
+        buf.push(&Vault(t)).unwrap();
+        VaultMessage(buf)
+    }
+}
+
+impl From<MessageBuf> for VaultMessage {
+    fn from(buf: MessageBuf) -> Self {
+        VaultMessage(buf)
+    }
+}
+
+impl Into<MessageBuf> for VaultMessage {
+    fn into(self) -> MessageBuf {
+        self.0
     }
 }

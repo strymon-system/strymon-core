@@ -13,6 +13,8 @@ extern crate rand;
 extern crate byteorder;
 extern crate void;
 
+extern crate futures;
+
 pub mod query;
 pub mod messaging;
 pub mod coordinator;
@@ -23,7 +25,11 @@ pub mod model;
 pub mod event;
 pub mod network;
 
-//pub mod request;
+//pub mod request
+
+pub mod async;
+
+pub mod coordinator2;
 
 mod worker;
 mod util;

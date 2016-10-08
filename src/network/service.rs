@@ -1,12 +1,13 @@
-use std::io::{Result, Error, ErrorKind};
-use std::thread::{self, Builder};
+use std::io::{Result, Error};
+use std::thread;
 use std::sync::mpsc;
-use std::sync::{Arc, Mutex, Condvar};
-use std::net::{TcpListener, TcpStream};
 
-use network::message::MessageBuf;
+use std::net::{TcpListener, TcpStream, Shutdown, ToSocketAddrs};
 
-pub type EventSender<T> = ::event::Sender<Result<T>>;
+use futures::{Future, Poll};
+use futures::stream::{self, Stream};
+
+use network::message::{MessageBuf, read, write};
 
 pub struct Service {
     external: String,
@@ -18,6 +19,14 @@ impl Service {
         Ok(Service {
             external: external,
         })
+    }
+    
+    pub fn connect<E: ToSocketAddrs>(&self, endpoint: E) -> Result<(Sender, Receiver)> {
+        channel(TcpStream::connect(endpoint)?)
+    }
+    
+    pub fn listen<P: Into<Option<u16>>>(&self, port: P) -> Result<Listener> {
+        Listener::new(self.external.clone(), port.into().unwrap_or(0))
     }
 }
 
@@ -32,50 +41,98 @@ impl Sender {
 }
 
 pub struct Receiver {
-    sink: Arc<Slot<EventSender<MessageBuf>>>,
+    rx: stream::Receiver<MessageBuf, Error>,
 }
 
-impl Receiver {
-    pub fn on_recv(&self, tx: EventSender<MessageBuf>) {
+impl Stream for Receiver {
+    type Item = MessageBuf;
+    type Error = Error;
 
+    fn poll(&mut self) -> Poll<Option<MessageBuf>, Error> {
+        self.rx.poll()
     }
 }
 
 pub struct Listener {
     external: String,
     port: u16,
-
+    rx: stream::Receiver<(Sender, Receiver), Error>,
 }
 
 impl Listener {
-    pub fn local_addr(&self) -> (&str, u16) {
+    fn new(external: String, port: u16) -> Result<Self> {
+        let sockaddr = ("::", port);
+        let listener = TcpListener::bind(&sockaddr)?;
+        let port = listener.local_addr()?.port();
+
+        let (tx, rx) = stream::channel();
+        thread::spawn(move || {
+            let mut tx = tx;
+            let mut is_ok = true;
+            while is_ok {
+                let stream = listener.accept();
+                is_ok = stream.is_ok();
+                let pair = stream.and_then(|(s, _)| channel(s));
+                tx = match tx.send(pair).wait() {
+                    Ok(tx) => tx,
+                    Err(_) => break,
+                }
+            }
+        });
+
+        Ok(Listener {
+            external: external,
+            port: port,
+            rx: rx,
+        })
+    }
+
+    pub fn external_addr(&self) -> (&str, u16) {
         (&*self.external, self.port)
     }
+}
 
-    pub fn on_accept(&self, tx: EventSender<(Sender, Receiver)>) {
+impl Stream for Listener {
+    type Item = (Sender, Receiver);
+    type Error = Error;
 
+    fn poll(&mut self) -> Poll<Option<(Sender, Receiver)>, Error> {
+        self.rx.poll()
     }
 }
 
-fn pair(stream: TcpStream) -> Result<(Sender, Receiver)> {
-    let instream = stream.try_clone()?;
+fn channel(stream: TcpStream) -> Result<(Sender, Receiver)> {
+    let mut instream = stream.try_clone()?;
     let mut outstream = stream;
 
-    unimplemented!()
-}
-
-struct Slot<T> {
-    data: Mutex<Option<T>>,
-    some: Condvar,
-}
-
-impl<T> Slot<T> {
-    fn new() -> Self {
-        Slot {
-            data: Mutex::new(None),
-            some: Condvar::new(),
+    let (sender_tx, sender_rx) = mpsc::channel();
+    thread::spawn(move || {
+        while let Ok(msg) = sender_rx.recv() {
+            if let Err(err) = write(&mut outstream, &msg) {
+                info!("unexpected error while writing bytes: {:?}", err);
+                break;
+            }
         }
-    }
+
+        // this will stop the receiving thread
+        drop(outstream.shutdown(Shutdown::Both));
+    });
+
+    let (receiver_tx, receiver_rx) = stream::channel();
+    thread::spawn(move || {
+        let mut tx = receiver_tx;
+        let mut is_ok = true;
+        while is_ok {
+            let message = read(&mut instream);
+            is_ok = message.is_ok();
+            tx = match tx.send(message).wait() {
+                Ok(tx) => tx,
+                Err(_) => break,
+            }
+        }
+    });
+
+    Ok((Sender { tx: sender_tx }, Receiver { rx: receiver_rx }))
 }
 
 fn _assert() {
