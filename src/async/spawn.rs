@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::sync::Mutex;
 use std::mem;
 
 use futures::{self, Future, Poll, Async};
@@ -95,8 +94,8 @@ impl Future for Finish {
                 return Ok(Async::NotReady);
             } else {
                 // no more work to be done
-                assert!(self.running.is_empty());
-                assert!(!self.pending());
+                debug_assert!(self.running.is_empty());
+                debug_assert!(!self.pending());
                 return Ok(Async::Ready(()))
             }
         }
@@ -115,13 +114,20 @@ impl Drop for Reset {
     }
 }
 
-pub fn finish<F: Future<Item=(), Error=()> + 'static>(f: F) {
+pub fn finish<F: Future + 'static>(f: F) -> Result<F::Item, F::Error> {
+    let (tx, rx) = futures::oneshot();
+    let body = Box::new(f.then(move |res| Ok(tx.complete(res))));
+
     // save currently pending queue on stack, will be reset on drop
-    let reset = Reset(PENDING.with(move |pending| {
-        mem::replace(&mut *pending.borrow_mut(), Some(vec![Box::new(f)]))
+    let _reset = Reset(PENDING.with(move |pending| {
+        mem::replace(&mut *pending.borrow_mut(), Some(vec![body]))
     }));
 
-    drop(Finish::new().wait())
+    // start the root future and wait for completion
+    drop(Finish::new().wait());
+
+    // return result
+    rx.wait().expect("finish() result got canceled")
 }
 
 #[cfg(test)]
@@ -146,6 +152,17 @@ mod tests {
                 .and_then(|tx| tx.send(Ok(3)))
                 .map(|_| ())
                 .map_err(|err| panic!("sender failed: {:?}", err))
-        }))
+        })).unwrap()
+    }
+    
+    #[test]
+    fn nested_finish() {
+        let res = finish(futures::lazy(|| {
+            let (tx, rx) = futures::oneshot();
+
+            tx.complete(23);
+            finish(rx)
+        })).unwrap();
+        assert_eq!(res, 23);
     }
 }

@@ -1,27 +1,31 @@
 use std::io::Result;
 
-use futures::Future;
+use futures::{self, Future};
 use futures::stream::Stream;
 
 use network::{Service, Listener};
-use async::queue::{Sender, Receiver};
-use async::select::Select;
+use async;
 
-enum Event {
-
-}
+pub mod catalog;
+use self::catalog::{Catalog, CatalogMut};
 
 pub fn coordinate(port: u16) -> Result<()> {
-    let network = Service::init(None)?;
-    let select = Select::<Event>::new();
+    let catalog = CatalogMut::from(Catalog::new());
 
+    let network = Service::init(None)?;
     let listener = network.listen(port)?;
-    let incoming = listener.and_then(|(tx, rx)| {
-        rx.into_future().and_then(move |(msg, rx)| {
+    let incoming = listener.for_each(|(tx, rx)| {
+        // receive one message (handshake) from the client
+        let client = rx.into_future().and_then(move |(handshake, rx)| {
+            println!("handshake {:?}", handshake.is_some());
             Ok(())
-        }).map_err(|(err, _)| err)
+        }).map_err(|(err, _)| {
+            warn!("error while handling connection: {:?}", err);
+        });
+        
+        // handle client asynchronously
+        Ok(async::spawn(client))
     });
 
-
-    Ok(())
+    async::finish(incoming)
 }

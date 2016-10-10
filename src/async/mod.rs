@@ -1,6 +1,8 @@
 pub mod queue;
 pub mod select;
-pub mod spawn;
+
+mod spawn;
+pub use self::spawn::*;
 
 #[cfg(test)]
 mod tests {

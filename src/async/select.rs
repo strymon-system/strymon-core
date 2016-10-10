@@ -5,8 +5,6 @@ use futures::stream::Stream;
 
 use void::Void;
 
-use async::queue;
-
 enum Source<T> {
     Future(Box<Future<Item=(), Error=()>>),
     Stream(Box<Stream<Item=T, Error=()>>),

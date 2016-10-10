@@ -114,8 +114,7 @@ fn channel(stream: TcpStream) -> Result<(Sender, Receiver)> {
             }
         }
 
-        // this will stop the receiving thread
-        drop(outstream.shutdown(Shutdown::Both));
+        drop(outstream.shutdown(Shutdown::Write));
     });
 
     let (receiver_tx, receiver_rx) = stream::channel();
@@ -130,6 +129,8 @@ fn channel(stream: TcpStream) -> Result<(Sender, Receiver)> {
                 Err(_) => break,
             }
         }
+
+        drop(instream.shutdown(Shutdown::Read));
     });
 
     Ok((Sender { tx: sender_tx }, Receiver { rx: receiver_rx }))
