@@ -1,5 +1,6 @@
 pub mod queue;
 pub mod select;
+pub mod spawn;
 
 #[cfg(test)]
 mod tests {

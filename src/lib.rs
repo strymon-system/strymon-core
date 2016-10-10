@@ -13,6 +13,7 @@ extern crate rand;
 extern crate byteorder;
 extern crate void;
 
+#[macro_use]
 extern crate futures;
 
 pub mod query;
