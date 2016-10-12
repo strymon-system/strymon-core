@@ -7,14 +7,6 @@ version = "0.1.0"
 name = "coordinator"
 path = "src/bin/coordinator.rs"
 
-[[bin]]
-name = "executor"
-path = "src/bin/executor.rs"
-
-[[bin]]
-name = "timely-submit"
-path = "src/bin/timely-submit.rs"
-
 [dependencies]
 abomonation = "^0.4.2"
 byteorder = "0.5.3"
@@ -22,10 +14,5 @@ env_logger = "0.3"
 futures = "0.1.2"
 log = "0.3"
 rand = "0.3.14"
+timely = "0.1.15"
 void = "1.0.2"
-
-[dependencies.timely]
-path = "./timely-dataflow"
-
-[dependencies.timely_communication]
-path = "./timely-dataflow/communication"

@@ -3,7 +3,7 @@ use std::collections::VecDeque;
 use std::mem;
 use std::io::{self, Read, Write, Cursor, Error, ErrorKind};
 
-use network::{Encode, Decode};
+use network::message::{Encode, Decode};
 use byteorder::{NetworkEndian, WriteBytesExt, ReadBytesExt};
 
 #[derive(Clone, Default)]
@@ -16,11 +16,11 @@ impl MessageBuf {
         Default::default()
     }
         
-    pub fn push<T: Encode>(&mut self, payload: &T) -> Result<(), T::Error> {
+    pub fn push<T: Encode>(&mut self, payload: &T) -> Result<(), T::EncodeError> {
         Arc::make_mut(&mut self.inner).push(payload)
     }
     
-    pub fn pop<T: Decode>(&mut self) -> Result<T, T::Error> {
+    pub fn pop<T: Decode>(&mut self) -> Result<T, T::DecodeError> {
         Arc::make_mut(&mut self.inner).pop()
     }
 }
@@ -89,7 +89,7 @@ struct Buf {
 }
 
 impl Buf {
-    pub fn push<T: Encode>(&mut self, payload: &T) -> Result<(), T::Error> {
+    pub fn push<T: Encode>(&mut self, payload: &T) -> Result<(), T::EncodeError> {
         let align = mem::align_of::<T>();
         let start = self.buf.len();
         // we assume the alignment is always a power of two
@@ -108,7 +108,7 @@ impl Buf {
         }
     }
     
-    pub fn pop<T: Decode>(&mut self) -> Result<T, T::Error> {
+    pub fn pop<T: Decode>(&mut self) -> Result<T, T::DecodeError> {
         let (start, end) = self.pos.pop_front().expect("cannot pop from empty buffer");
         match T::decode(&mut self.buf[start as usize..end as usize]) {
             Ok(t) => Ok(t),
@@ -122,7 +122,7 @@ impl Buf {
     }
 }
 
-impl<T: Encode<Error=::void::Void>> From<T> for MessageBuf {
+impl<T: Encode<EncodeError=::void::Void>> From<T> for MessageBuf {
     fn from(t: T) -> Self {
         let mut buf = MessageBuf::empty();
         buf.push(&t).unwrap();

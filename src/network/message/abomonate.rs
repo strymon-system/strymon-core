@@ -4,8 +4,8 @@ use std::mem;
 use abomonation::{Abomonation, encode, decode};
 use void::Void;
 
-use network::{Encode, Decode};
-use network::message::MessageBuf;
+use network::message::{Encode, Decode};
+use network::message::buf::MessageBuf;
 
 #[derive(Debug)]
 pub struct Vault<T>(pub T);
@@ -13,9 +13,9 @@ pub struct Vault<T>(pub T);
 const TYPEID_BYTES: usize = 8;
 
 impl<'a, T: Abomonation + Any + Clone> Encode for Vault<&'a T> {
-    type Error = Void;
+    type EncodeError = Void;
 
-    fn encode(&self, bytes: &mut Vec<u8>) -> Result<(), Self::Error> {
+    fn encode(&self, bytes: &mut Vec<u8>) -> Result<(), Self::EncodeError> {
         unsafe {
             let typeslice: [u8; TYPEID_BYTES];
             typeslice = mem::transmute(TypeId::of::<T>());
@@ -45,9 +45,9 @@ fn is<T: Any>(bytes: &[u8]) -> bool {
 }
 
 impl<T: Abomonation + Any + Clone> Decode for Vault<T> {
-    type Error = DecodeError;
+    type DecodeError = DecodeError;
 
-    fn decode(bytes: &mut [u8]) -> Result<Self, Self::Error> {
+    fn decode(bytes: &mut [u8]) -> Result<Self, Self::DecodeError> {
         if is::<T>(&bytes) {
             let mut bytes = &mut bytes[TYPEID_BYTES..];
             if let Some((t, remaining)) = unsafe { decode::<T>(bytes) } {

@@ -7,7 +7,7 @@ use std::net::{TcpListener, TcpStream, Shutdown, ToSocketAddrs};
 use futures::{Future, Poll};
 use futures::stream::{self, Stream};
 
-use network::message::{MessageBuf, read, write};
+use network::message::buf::{MessageBuf, read, write};
 
 pub struct Service {
     external: String,

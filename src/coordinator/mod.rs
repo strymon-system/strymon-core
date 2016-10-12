@@ -1,74 +1,32 @@
 use std::io::Result;
-use std::thread;
 
-use messaging::{self, Receiver, Sender};
-use messaging::decoder::Decoder;
-use messaging::request::handshake::Handshake;
+use futures::{self, Future};
+use futures::stream::Stream;
 
-use self::catalog::{Catalog, CatalogRef};
-use self::request::{ExecutorReady, Submission, WorkerReady};
-use self::worker::Worker;
-use self::executor::Executor;
-use self::submitter::Submitter;
+use network::service::{Service, Listener};
+use async;
 
-pub mod catalog;
-pub mod request;
+pub mod interface;
 
-mod submitter;
-mod executor;
-mod worker;
+//use self::catalog::{Catalog, CatalogMut};
 
-pub struct Connection {
-    tx: Sender,
-    rx: Receiver,
-    catalog: CatalogRef,
-}
+pub fn coordinate(port: u16) -> Result<()> {
+    //let catalog = CatalogMut::from(Catalog::new());
 
-impl Connection {
-    fn new(tx: Sender, rx: Receiver, catalog: CatalogRef) -> Self {
-        Connection {
-            tx: tx,
-            rx: rx,
-            catalog: catalog,
-        }
-    }
-
-    fn dispatch(self) -> Result<()> {
-        enum Incoming {
-            Worker(Handshake<WorkerReady>),
-            Executor(Handshake<ExecutorReady>),
-            Submission(Handshake<Submission>),
-        }
-
-        // encode the handshake into a enum so Rust knows it is safe to move `self`
-        let incoming = Decoder::from(self.rx.recv())
-            .when::<Handshake<WorkerReady>, _>(Incoming::Worker)
-            .when::<Handshake<ExecutorReady>, _>(Incoming::Executor)
-            .when::<Handshake<Submission>, _>(Incoming::Submission)
-            .expect("failed to dispatch connection");
-
-        match incoming {
-            Incoming::Worker(worker) => Worker::new(worker, self).run(),
-            Incoming::Executor(executor) => Executor::new(executor, self).run(),
-            Incoming::Submission(submission) => Submitter::new(submission, self).run(),
-        }
-    }
-}
-
-pub fn coordinate(addr: &str) -> Result<()> {
-    let (catalog_ref, catalog) = Catalog::new();
-    catalog.detach();
-
-    let mut listener = try!(messaging::listen(Some(addr)));
-    loop {
-        let (tx, rx) = try!(listener.accept());
-        let catalog = catalog_ref.clone();
-        thread::spawn(move || {
-            debug!("accepted new connection");
-            let connection = Connection::new(tx, rx, catalog);
-            if let Err(err) = connection.dispatch() {
-                error!("dispatch failed: {:?}", err);
-            }
+    let network = Service::init(None)?;
+    let listener = network.listen(port)?;
+    let incoming = listener.for_each(|(tx, rx)| {
+        // receive one message (handshake) from the client
+        let client = rx.into_future().and_then(move |(handshake, rx)| {
+            println!("handshake {:?}", handshake.is_some());
+            Ok(())
+        }).map_err(|(err, _)| {
+            warn!("error while handling connection: {:?}", err);
         });
-    }
+        
+        // handle client asynchronously
+        Ok(async::spawn(client))
+    });
+
+    async::finish(incoming)
 }
