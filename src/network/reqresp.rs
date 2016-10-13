@@ -3,12 +3,11 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::io::{Error as IoError, Result as IoResult, ErrorKind};
 use std::str::from_utf8;
 use std::collections::HashMap;
+use std::marker::PhantomData;
 
-use std::mem;
-
-use futures::{self, Future, Async, Oneshot, Complete, Poll};
-use futures::stream::{self, Stream};
-use void::{self, Void};
+use futures::{self, Future, Async, Complete, Poll};
+use futures::stream::{Stream, Fuse};
+use void::Void;
 use byteorder::{NetworkEndian, ByteOrder};
 
 use network::service::{Sender, Receiver};
@@ -16,11 +15,10 @@ use async::queue;
 
 use network::message::{Encode, Decode};
 use network::message::buf::MessageBuf;
-use network::message::abomonate::VaultMessage;
 
-pub trait Request: Encode + Decode {
-    type Success: Encode + Decode;
-    type Error: Encode + Decode;
+pub trait Request: Encode + Decode + 'static {
+    type Success: Encode + Decode + 'static;
+    type Error: Encode + Decode + 'static;
 
     fn name() -> &'static str;
 }
@@ -58,18 +56,22 @@ impl Decode for Token {
     }
 }
 
-#[repr(u32)]
 #[derive(Copy, Clone)]
 enum Type {
-    Request = 0,
-    Response = 1,
+    Request,
+    Response(bool)
 }
 
 impl Encode for Type {
     type EncodeError = Void;
 
     fn encode(&self, bytes: &mut Vec<u8>) -> Result<(), Self::EncodeError> {
-        Ok(encode_u32(*self as u32, bytes))
+        let num = match *self {
+            Type::Request => 0,
+            Type::Response(true) => 1,
+            Type::Response(false) => 2,
+        };
+        Ok(encode_u32(num, bytes))
     }
 }
 
@@ -80,7 +82,8 @@ impl Decode for Type {
         let ty = decode_u32(bytes)?;
         match ty {
             0 => Ok(Type::Request),
-            1 => Ok(Type::Response),
+            1 => Ok(Type::Response(true)),
+            2 => Ok(Type::Response(false)),
             _ => Err(IoError::new(ErrorKind::InvalidData, "invalid req/resp type"))
         }
     }
@@ -119,198 +122,223 @@ impl RequestBuf {
         &self.name.0
     }
     
-    pub fn decode<R: Request>(mut self) -> (R, Responder<R>) {
-        unimplemented!()
+    pub fn decode<R: Request>(mut self) -> Result<(R, Responder<R>), R::DecodeError> {
+        let payload = self.msg.pop::<R>()?;
+        let responder = Responder {
+            token: self.token,
+            origin: self.origin,
+            marker: PhantomData,
+        };
+        
+        Ok((payload, responder))
     }
 }
 
 pub struct Responder<R: Request> {
-    r: R,
+    token: Token,
+    origin: Sender,
+    marker: PhantomData<R>,
 }
 
-type Pending = Complete<Result<MessageBuf, IoError>>;
+impl<R: Request> Responder<R> {
+    pub fn success(self, s: R::Success) -> Result<(), <R::Success as Encode>::EncodeError> {
+        let mut msg = MessageBuf::empty();
+        msg.push(&Type::Response(true)).unwrap();
+        msg.push(&self.token).unwrap();
+        msg.push(&s)?;
+        Ok(self.origin.send(msg))
+    }
 
-struct MuxState {
+    pub fn error(self, e: R::Error) -> Result<(), <R::Error as Encode>::EncodeError> {
+        let mut msg = MessageBuf::empty();
+        msg.push(&Type::Response(false)).unwrap();
+        msg.push(&self.token).unwrap();
+        msg.push(&e)?;
+        Ok(self.origin.send(msg))
+    }
+    
+    pub fn respond<E>(self, res: Result<R::Success, R::Error>) -> Result<(), E>
+        where R::Success: Encode<EncodeError=E>,
+              R::Error: Encode<EncodeError=E>
+    {
+        match res {
+            Ok(s) => self.success(s),
+            Err(e) => self.error(e),
+        }
+    }
+}
+
+pub fn multiplex((tx, rx): (Sender, Receiver)) -> (Outgoing, Incoming) {
+    let (outgoing_tx, outgoing_rx) = queue::channel();
+
+    let outgoing = Outgoing {
+        token: Default::default(),
+        tx: outgoing_tx,
+    };
+
+    let incoming = Incoming {
+        pending: HashMap::new(),
+        outgoing: outgoing_rx.fuse(),
+        sender: tx,
+        receiver: rx,
+    };
+    
+    (outgoing, incoming)
+}
+
+type Pending = Complete<(MessageBuf, bool)>;
+
+pub struct Incoming {
     pending: HashMap<Token, Pending>,
-    requests: queue::Sender<RequestBuf, IoError>,
-    network: Sender,    
+    outgoing: Fuse<queue::Receiver<(MessageBuf, Token, Pending), Void>>,
+    sender: Sender,
+    receiver: Receiver,
 }
 
-impl MuxState {   
-    fn resolve_pending(&mut self, token: Token, msg: MessageBuf) -> IoResult<()> {
-        if let Some(pending) = self.pending.remove(&token) {
-            Ok(pending.complete(Ok(msg)))
-        } else {
-            Err(IoError::new(ErrorKind::Other, "got unexpected response token"))
+impl Incoming {
+    fn do_outgoing(&mut self) {
+        loop {
+            match self.outgoing.poll().unwrap() {
+                Async::Ready(Some((msg, token, pending))) => {
+                    // send out outgoing request, register pending response
+                    if let Some(_) = self.pending.insert(token, pending) {
+                        panic!("invalid token reuse: {:?}", token);
+                    }
+                    self.sender.send(msg);
+                },
+                Async::Ready(None) => {
+                    // all sender dropped, no more outgoing
+                    break;
+                },
+                Async::NotReady => {
+                    // currently nothing to do, try again later
+                    break;
+                },
+            }
         }
     }
 
-    fn handle_network(&mut self, mut msg: MessageBuf) -> IoResult<()> {
+    fn do_incoming(&mut self, mut msg: MessageBuf) -> IoResult<Option<RequestBuf>> {
         let ty = msg.pop::<Type>()?;
         let token = msg.pop::<Token>()?;
         match ty {
-            Type::Response => {
-                self.resolve_pending(token, msg);
-                Ok(())
-            },
             Type::Request => {
+                // yield current request
                 let name = msg.pop::<Name>()?;
-                let origin = self.network.clone();
-                let req = RequestBuf {
+                let buf = RequestBuf {
                     token: token,
                     name: name,
-                    origin: origin,
+                    origin: self.sender.clone(),
                     msg: msg,
                 };
-                Ok(())
+
+                Ok(Some(buf))
+            },
+            Type::Response(success) => {
+                // resolve one response, continue loop
+                if let Some(pending) = self.pending.remove(&token) {
+                    pending.complete((msg, success));
+                } else {
+                    info!("dropping canceled response for {:?}", token)
+                }
+
+                Ok(None)
             }
         }
     }
     
-    fn handle_pending(&mut self, p: Result<(MessageBuf, Token, Pending), Token>) -> IoResult<()> {
-        match p {
-            Ok((msg, token, pending)) => {
-                let old = self.pending.insert(token, pending);
-                self.network.send(msg);
-                assert!(old.is_none(), "invalid token reuse");
-            },
-            Err(token) => {
-                self.pending.remove(&token);
-            }
-        };
-        Ok(())
+    fn garbage_collect_canceled(&mut self) {
+        // TODO(swicki) poll_cancel
     }
-}
-
-/*
-
-    errors:
-        - unable to parse message
-        - invalid incoming request token
-        - invalid incoming response token (!)
-        
-
-*/
-
-pub struct Mux {
-    inner: Box<Stream<Item=(), Error=IoError>>,
-}
-
-impl Mux {
-    pub fn from((tx, mut rx): (Sender, Receiver)) -> (Self, (Outgoing, Incoming)) {
-        let (incoming_tx, incoming_rx) = queue::channel();
-        let (outgoing_tx, outgoing_rx) = queue::channel();
-
-        let mut state = MuxState {
-            pending: HashMap::new(),
-            requests: incoming_tx,
-            network: tx,
-        };
-
-        // pending is a stream of Ok(new_pending) or Err(canceled);
-        let pending = outgoing_rx.map(Ok).or_else(|e| Ok(Err(e)));
-        let inner = rx.merge(pending).and_then(move |event| {
-            use ::futures::stream::MergedItem::*;
-            match event {
-                First(m) => state.handle_network(m),
-                Second(p) => state.handle_pending(p),
-                Both(m, p) => {
-                    let m = state.handle_network(m);
-                    let p = state.handle_pending(p);
-                    // TODO(swicki): if m and p are an error, we ignore p here
-                    m.and(p)
-                }
-            }
-        });
-
-        let outgoing = Outgoing { tx: outgoing_tx, token: Default::default() };
-        let incoming = Incoming { rx: incoming_rx };
-        let mux = Mux { inner: Box::new(inner) };
-        (mux, (outgoing, incoming))         
-    }
-}
-
-impl Stream for Mux {
-    type Item = ();
-    type Error = IoError;
-
-    fn poll(&mut self) -> Poll<Option<()>, Self::Error> {
-        self.inner.poll()
-    }
-}
-
-
-pub struct Incoming {
-    rx: queue::Receiver<RequestBuf, IoError>,
 }
 
 impl Stream for Incoming {
     type Item = RequestBuf;
     type Error = IoError;
 
-    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        self.rx.poll()
-    }
-}
-
-/*pub fn from(){
-    let mut pending: HashMap<Token, Complete<MessageBuf>> = HashMap::new();
-    let rx: MsgReceiver = unimplemented!();
-    rx.and_then(|mut msg| {
-        let ty = msg.pop::<Type>()?;
-        let token = msg.pop::<Token>()?;
-        match ty {
-            Type::Request => {
-                let name = msg.pop::<Name>()?;
-                // send to request handler
-                Ok(())
-            },
-            Type::Response => {
-                match pending.remove(&token) {
-                    Some(c) => Ok(c.complete(msg)),
-                    None => {
-                        Err(Error::new(ErrorKind::Other, "invalid response token"))
+    fn poll(&mut self) -> Poll<Option<RequestBuf>, IoError> {    
+        loop {
+            if !self.outgoing.is_done() {
+                self.do_outgoing();
+            }
+        
+            match self.receiver.poll()? {
+                Async::Ready(Some(msg)) => {
+                    if let Some(req) = self.do_incoming(msg)? {
+                        return Ok(Async::Ready(Some(req)))
                     }
+                },
+                Async::Ready(None) => {
+                    // network closed, nothing to be resolved anymore
+                    return Ok(Async::Ready(None));
+                },
+                Async::NotReady => {
+                    // do a garbage collection cycle on canceled pending requests
+                    self.garbage_collect_canceled();
+                    return Ok(Async::NotReady);
                 }
             }
         }
-    });
-}*/
+    }
+}
 
 #[derive(Clone)]
 pub struct Outgoing {
     token: Arc<AtomicUsize>,
-    tx: queue::Sender<(MessageBuf, Token, Pending), Token>,
+    tx: queue::Sender<(MessageBuf, Token, Pending), Void>,
 }
 
 impl Outgoing {
-    pub fn send<R: Request>(r: R) -> Response<R> {
-        unimplemented!()
+    fn next_token(&self) -> Token {
+        Token(self.token.fetch_add(1, Ordering::SeqCst) as u32)
+    }
+
+    pub fn send<R: Request>(&self, r: R) -> Result<Response<R>, R::EncodeError> {
+        let token = self.next_token();
+        let (tx, rx) = futures::oneshot();
+        let mut msg = MessageBuf::empty();
+        msg.push(&Type::Request).unwrap();
+        msg.push(&token).unwrap();
+        msg.push(&r)?;
+
+        // if send fails, the response will signal this
+        drop(self.tx.send(Ok((msg, token, tx))));
+        
+        fn other(msg: &'static str) -> IoError {
+            IoError::new(ErrorKind::Other, msg)
+        }
+        
+
+        let rx = rx.map_err(|_| Err(other("request canceled")));
+        let rx = rx.and_then(|(mut msg, success)| {
+            if success {
+                msg.pop::<R::Success>()
+                   .map_err(|_| Err(other("unable to decode response")))
+            } else {
+                let err = msg.pop::<R::Error>()
+                            .map_err(|_| other("unable to decode response"));
+                Err(err)
+            }
+        });
+
+        Ok(Response {
+            rx: Box::new(rx),
+        })
     }
 }
 
-
 pub struct Response<R: Request> {
-    rx: Oneshot<Result<R::Success, Result<<R as Request>::Error, IoError>>>,
+    rx: Box<Future<Item=R::Success, Error=Result<<R as Request>::Error, IoError>>>,
 }
-
-// TODO on drop remove from hashmap
 
 impl<R: Request> Future for Response<R> {
     type Item = R::Success;
     type Error = Result<<R as Request>::Error, IoError>;
 
     fn poll(&mut self) -> Result<Async<Self::Item>, Self::Error> {
-        match self.rx.poll() {
-            Ok(Async::Ready(Ok(i))) => Ok(Async::Ready(i)),
-            Ok(Async::Ready(Err(e))) => Err(e),
-            Ok(Async::NotReady) => Ok(Async::NotReady),
-            Err(_) => Err(Err(IoError::new(ErrorKind::Other, "request canceled")))
-        }
+        self.rx.poll()
     }
 }
-
-
 
 /*
 
