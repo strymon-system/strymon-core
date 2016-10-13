@@ -340,43 +340,4 @@ impl<R: Request> Future for Response<R> {
     }
 }
 
-/*
 
-let (mux, rx) = ReqResp::from((tx, rx));
-let tx = mux.sender();
-let tx = mux.sender();
-async::spawn(mux)
-
-
-
-and_then(|msg| {
-    rr.feed(msg)
-})
-
-
-(tx, rx) 
-
-let (client, server) = 
-
-let (rx, tx, driver) = ReqResp::from((tx, rx));
-
-let foo = tx.send(Foo());
-
-
-rx.and_then(move |req| {
-    match req.name {
-        Foo::name() => {
-            coord.add_worker(
-        }
-    }
-})
-
-rr.request<R>(method, args) -> Response<Succ, Result<Err, Io>>
-rr.incoming() -> Stream<Request, Io>
-
-rr.request(Subscribe(foo, bar, c));
-
-
-
-request.respond(result)
-request.*/
