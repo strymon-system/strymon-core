@@ -20,10 +20,18 @@ pub fn channel<T, E>() -> (Sender<T, E>, Receiver<T, E>) {
     (tx, rx)
 }
 
-#[derive(Clone)]
 pub struct Sender<T, E> {
     task: Arc<Mutex<Option<Task>>>,
     tx: mpsc::Sender<Result<T, E>>,
+}
+
+impl<T, E> Clone for Sender<T, E> {
+    fn clone(&self) -> Self {
+        Sender {
+            task: self.task.clone(),
+            tx: self.tx.clone(),
+        }
+    }
 }
 
 #[derive(Debug)]

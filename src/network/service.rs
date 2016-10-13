@@ -30,6 +30,7 @@ impl Service {
     }
 }
 
+#[derive(Clone)]
 pub struct Sender {
     tx: mpsc::Sender<MessageBuf>,
 }

@@ -24,6 +24,8 @@ fn main() {
             input
         });
 
+        
+
         for round in 0..1000 {
             input.send(round as i32);
             input.advance_to(round + 1);
