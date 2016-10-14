@@ -7,7 +7,7 @@ mod tests {
     use std::io::Result;
     use network::service::*;
     use network::message::MessageBuf;
-    use network::message::abomonate::Crypt;
+    use network::message::abomonate::Abomonate;
 
     use futures::stream::Stream;
 
@@ -22,21 +22,24 @@ mod tests {
             let listener = service.listen(None)?;
             let (tx, rx) = service.connect(listener.external_addr())?;
 
-            let ping = MessageBuf::from(Crypt(&"Ping"));           
+            
+            let mut ping = MessageBuf::empty();     
+            ping.push::<Abomonate, _>(&String::from("Ping")).unwrap();
             tx.send(ping);
 
             // process one single client
             listener.and_then(|(tx, rx)| {
                 let mut ping = rx.wait().next().unwrap()?;
-                assert_eq!("Ping", ping.pop::<Crypt<&str>>().unwrap().0);
+                assert_eq!("Ping", ping.pop::<Abomonate, String>().unwrap());
 
-                let pong = MessageBuf::from(Crypt(&"Pong"));
+                let mut pong = MessageBuf::empty();     
+                pong.push::<Abomonate, _>(&String::from("Pong")).unwrap();
                 tx.send(pong);
                 Ok(())
             }).wait().next().unwrap()?;
 
             let mut pong = rx.wait().next().unwrap()?;
-            assert_eq!("Pong", pong.pop::<Crypt<&str>>().unwrap().0);
+            assert_eq!("Pong", pong.pop::<Abomonate, String>().unwrap());
 
             Ok(())
         });

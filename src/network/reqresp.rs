@@ -4,21 +4,24 @@ use std::io::{Error as IoError, Result as IoResult, ErrorKind};
 use std::str::from_utf8;
 use std::collections::HashMap;
 use std::marker::PhantomData;
+use std::any::Any;
 
 use futures::{self, Future, Async, Complete, Poll};
 use futures::stream::{Stream, Fuse};
 use void::Void;
 use byteorder::{NetworkEndian, ByteOrder};
+use abomonation::Abomonation;
 
 use network::service::{Sender, Receiver};
 use async::queue;
 
 use network::message::{Encode, Decode};
 use network::message::buf::MessageBuf;
+use network::message::abomonate::{Abomonate, Owner, DecodeError};
 
-pub trait Request: Encode + Decode + 'static {
-    type Success: Encode + Decode + 'static;
-    type Error: Encode + Decode + 'static;
+pub trait Request: Abomonation + Any + Clone + Owner {
+    type Success: Abomonation + Any + Clone + Owner;
+    type Error: Abomonation + Any + Clone + Owner;
 
     fn name() -> &'static str;
 }
@@ -40,15 +43,15 @@ fn decode_u32(bytes: &[u8]) -> Result<u32, IoError> {
     }
 }
 
-impl Encode for Token {
+impl Encode<Token> for Token {
     type EncodeError = Void;
 
-    fn encode(&self, bytes: &mut Vec<u8>) -> Result<(), Self::EncodeError> {
-        Ok(encode_u32(self.0, bytes))
+    fn encode(token: &Token, bytes: &mut Vec<u8>) -> Result<(), Self::EncodeError> {
+        Ok(encode_u32(token.0, bytes))
     }
 }
 
-impl Decode for Token {
+impl Decode<Token> for Token {
     type DecodeError = IoError;
 
     fn decode(bytes: &mut [u8]) -> Result<Self, Self::DecodeError> {
@@ -57,54 +60,49 @@ impl Decode for Token {
 }
 
 #[derive(Copy, Clone)]
+#[repr(u32)]
 enum Type {
-    Request,
-    Response(bool)
+    Request = 0,
+    Response = 1,
 }
 
-impl Encode for Type {
+impl Encode<Type> for Type {
     type EncodeError = Void;
 
-    fn encode(&self, bytes: &mut Vec<u8>) -> Result<(), Self::EncodeError> {
-        let num = match *self {
-            Type::Request => 0,
-            Type::Response(true) => 1,
-            Type::Response(false) => 2,
-        };
-        Ok(encode_u32(num, bytes))
+    fn encode(ty: &Type, bytes: &mut Vec<u8>) -> Result<(), Self::EncodeError> {
+        Ok(encode_u32(*ty as u32, bytes))
     }
 }
 
-impl Decode for Type {
+impl Decode<Type> for Type {
     type DecodeError = IoError;
 
     fn decode(bytes: &mut [u8]) -> Result<Self, Self::DecodeError> {
         let ty = decode_u32(bytes)?;
         match ty {
             0 => Ok(Type::Request),
-            1 => Ok(Type::Response(true)),
-            2 => Ok(Type::Response(false)),
+            1 => Ok(Type::Response),
             _ => Err(IoError::new(ErrorKind::InvalidData, "invalid req/resp type"))
         }
     }
 }
 
-struct Name(String);
+struct Name;
 
-impl Encode for Name {
+impl Encode<&'static str> for Name {
     type EncodeError = Void;
 
-    fn encode(&self, bytes: &mut Vec<u8>) -> Result<(), Self::EncodeError> {
-        Ok(bytes.extend_from_slice(self.0.as_bytes()))
+    fn encode(s: &&'static str, bytes: &mut Vec<u8>) -> Result<(), Self::EncodeError> {
+        Ok(bytes.extend_from_slice(s.as_bytes()))
     }
 }
 
-impl Decode for Name {
+impl Decode<String> for Name {
     type DecodeError = IoError;
 
-    fn decode(bytes: &mut [u8]) -> Result<Self, Self::DecodeError> {
+    fn decode(bytes: &mut [u8]) -> Result<String, Self::DecodeError> {
         match from_utf8(bytes) {
-            Ok(s) => Ok(Name(String::from(s))),
+            Ok(s) => Ok(String::from(s)),
             Err(e) => Err(IoError::new(ErrorKind::InvalidData, e))
         }
     }
@@ -112,18 +110,18 @@ impl Decode for Name {
 
 pub struct RequestBuf {
     token: Token,
-    name: Name,
+    name: String,
     origin: Sender,
     msg: MessageBuf,
 }
 
 impl RequestBuf {
     pub fn name(&self) -> &str {
-        &self.name.0
+        &self.name
     }
     
-    pub fn decode<R: Request>(mut self) -> Result<(R, Responder<R>), R::DecodeError> {
-        let payload = self.msg.pop::<R>()?;
+    pub fn decode<R: Request>(mut self) -> Result<(R, Responder<R>), DecodeError> {
+        let payload = self.msg.pop::<Abomonate, R>()?;
         let responder = Responder {
             token: self.token,
             origin: self.origin,
@@ -140,31 +138,13 @@ pub struct Responder<R: Request> {
     marker: PhantomData<R>,
 }
 
-impl<R: Request> Responder<R> {
-    pub fn success(self, s: R::Success) -> Result<(), <R::Success as Encode>::EncodeError> {
+impl<R: Request> Responder<R> {   
+    pub fn respond(self, res: Result<R::Success, R::Error>) {
         let mut msg = MessageBuf::empty();
-        msg.push(&Type::Response(true)).unwrap();
-        msg.push(&self.token).unwrap();
-        msg.push(&s)?;
-        Ok(self.origin.send(msg))
-    }
-
-    pub fn error(self, e: R::Error) -> Result<(), <R::Error as Encode>::EncodeError> {
-        let mut msg = MessageBuf::empty();
-        msg.push(&Type::Response(false)).unwrap();
-        msg.push(&self.token).unwrap();
-        msg.push(&e)?;
-        Ok(self.origin.send(msg))
-    }
-    
-    pub fn respond<E>(self, res: Result<R::Success, R::Error>) -> Result<(), E>
-        where R::Success: Encode<EncodeError=E>,
-              R::Error: Encode<EncodeError=E>
-    {
-        match res {
-            Ok(s) => self.success(s),
-            Err(e) => self.error(e),
-        }
+        msg.push::<Type, _>(&Type::Response).unwrap();
+        msg.push::<Token, _>(&self.token).unwrap();
+        msg.push::<Abomonate, _>(&res).unwrap();
+        self.origin.send(msg)
     }
 }
 
@@ -186,7 +166,7 @@ pub fn multiplex((tx, rx): (Sender, Receiver)) -> (Outgoing, Incoming) {
     (outgoing, incoming)
 }
 
-type Pending = Complete<(MessageBuf, bool)>;
+type Pending = Complete<MessageBuf>;
 
 #[must_use = "streams do nothing unless polled"]
 pub struct Incoming {
@@ -220,12 +200,12 @@ impl Incoming {
     }
 
     fn do_incoming(&mut self, mut msg: MessageBuf) -> IoResult<Option<RequestBuf>> {
-        let ty = msg.pop::<Type>()?;
-        let token = msg.pop::<Token>()?;
+        let ty = msg.pop::<Type, Type>()?;
+        let token = msg.pop::<Token, Token>()?;
         match ty {
             Type::Request => {
                 // yield current request
-                let name = msg.pop::<Name>()?;
+                let name = msg.pop::<Name, String>()?;
                 let buf = RequestBuf {
                     token: token,
                     name: name,
@@ -235,10 +215,10 @@ impl Incoming {
 
                 Ok(Some(buf))
             },
-            Type::Response(success) => {
+            Type::Response => {
                 // resolve one response, continue loop
                 if let Some(pending) = self.pending.remove(&token) {
-                    pending.complete((msg, success));
+                    pending.complete(msg);
                 } else {
                     info!("dropping canceled response for {:?}", token)
                 }
@@ -294,37 +274,32 @@ impl Outgoing {
         Token(self.token.fetch_add(1, Ordering::SeqCst) as u32)
     }
 
-    pub fn send<R: Request>(&self, r: R) -> Result<Response<R>, R::EncodeError> {
+    pub fn send<R: Request>(&self, r: R) -> Response<R> {
         let token = self.next_token();
         let (tx, rx) = futures::oneshot();
         let mut msg = MessageBuf::empty();
-        msg.push(&Type::Request).unwrap();
-        msg.push(&token).unwrap();
-        msg.push(&Name(String::from(R::name()))).unwrap();
-        msg.push(&r)?;
+        msg.push::<Type, _>(&Type::Request).unwrap();
+        msg.push::<Token, _>(&token).unwrap();
+        msg.push::<Name, &'static str>(&R::name()).unwrap();
+        msg.push::<Abomonate, R>(&r).unwrap();
 
         // if send fails, the response will signal this
         drop(self.tx.send(Ok((msg, token, tx))));
-        
-        fn other(msg: &'static str) -> IoError {
-            IoError::new(ErrorKind::Other, msg)
-        }
 
-        let rx = rx.map_err(|_| Err(other("request canceled")));
-        let rx = rx.and_then(|(mut msg, success)| {
-            if success {
-                msg.pop::<R::Success>()
-                   .map_err(|_| Err(other("unable to decode response")))
-            } else {
-                let err = msg.pop::<R::Error>()
-                            .map_err(|_| other("unable to decode response"));
-                Err(err)
+        let rx = rx.map_err(|_| Err(IoError::new(ErrorKind::Other, "request canceled")));
+        let rx = rx.and_then(|mut msg| {
+            let res = msg.pop::<Abomonate, Result<R::Success, R::Error>>()
+                        .map_err(|_| IoError::new(ErrorKind::Other, "unable to decode response"));
+            match res {
+                Ok(Ok(o)) => Ok(o),
+                Ok(Err(e)) => Err(Ok(e)),
+                Err(e) => Err(Err(e)),
             }
         });
 
-        Ok(Response {
+        Response {
             rx: Box::new(rx),
-        })
+        }
     }
 }
 
@@ -349,8 +324,7 @@ mod tests {
     use futures::{self, Future};
     use futures::stream::Stream;
     use abomonation::Abomonation;
-    use network::reqresp::{multiplex, Request, Incoming, Outgoing};
-    use network::message::abomonate::{Crypt, CryptSerialize};
+    use network::reqresp::{multiplex, Request};
     use network::service::Service;
 
     fn assert_io<F: FnOnce() -> ::std::io::Result<()>>(f: F) {
@@ -361,11 +335,9 @@ mod tests {
     #[derive(Clone)] struct Pong(i32);
     unsafe_abomonate!(Ping);
     unsafe_abomonate!(Pong);
-    impl CryptSerialize for Ping {}
-    impl CryptSerialize for Pong {}
     impl Request for Ping {
         type Success = Pong;
-        type Error = Pong;
+        type Error = ();
 
         fn name() -> &'static str { "Ping" }
     }
@@ -378,11 +350,11 @@ mod tests {
             let listener = service.listen(None)?;
 
             let conn = service.connect(listener.external_addr())?;
-            let server = listener.map(multiplex).do_while(|(tx, rx)| {
+            let server = listener.map(multiplex).do_while(|(_, rx)| {
                 let handler = rx.do_while(move |req| {
                     assert_eq!(req.name(), "Ping");
                     let (req, resp) = req.decode::<Ping>().unwrap();
-                    resp.respond(Ok(Pong(req.0))).unwrap();
+                    resp.respond(Ok(Pong(req.0 + 1)));
 
                     Err(Stop::Terminate)
                 }).map_err(|e| Err(e).unwrap() );
@@ -394,15 +366,15 @@ mod tests {
 
             let (tx, rx) = multiplex(conn);
             let client = rx
-                .for_each(|req| panic!("request on client"))
+                .for_each(|_| panic!("request on client"))
                 .map_err(|err| println!("client finished with error: {:?}", err));
 
             let done = futures::lazy(move || {
                 async::spawn(server);
                 async::spawn(client);
 
-                tx.send(Ping(5)).unwrap().and_then(move |pong| {
-                    assert_eq!(pong.0, 5);
+                tx.send(Ping(5)).and_then(move |pong| {
+                    assert_eq!(pong.0, 6);
                     Ok(())
                 }).map_err(|_| panic!("got ping error"))
             });

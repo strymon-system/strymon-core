@@ -8,7 +8,7 @@ name = "coordinator"
 path = "src/bin/coordinator.rs"
 
 [dependencies]
-abomonation = "^0.4.2"
+abomonation = "0.4.4"
 byteorder = "0.5.3"
 env_logger = "0.3"
 futures = "0.1.2"
@@ -16,3 +16,6 @@ log = "0.3"
 rand = "0.3.14"
 timely = "0.1.15"
 void = "1.0.2"
+
+[replace]
+"abomonation:0.4.4" = { git = 'https://github.com/frankmcsherry/abomonation' }

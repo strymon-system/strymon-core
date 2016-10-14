@@ -16,12 +16,12 @@ impl MessageBuf {
         Default::default()
     }
         
-    pub fn push<T: Encode>(&mut self, payload: &T) -> Result<(), T::EncodeError> {
-        Arc::make_mut(&mut self.inner).push(payload)
+    pub fn push<E, T>(&mut self, payload: &T) -> Result<(), E::EncodeError> where E: Encode<T> {
+        Arc::make_mut(&mut self.inner).push::<E, T>(payload)
     }
-    
-    pub fn pop<T: Decode>(&mut self) -> Result<T, T::DecodeError> {
-        Arc::make_mut(&mut self.inner).pop()
+
+    pub fn pop<D, T>(&mut self) -> Result<T, D::DecodeError> where D: Decode<T> {
+        Arc::make_mut(&mut self.inner).pop::<D, T>()
     }
 }
 
@@ -89,14 +89,14 @@ struct Buf {
 }
 
 impl Buf {
-    pub fn push<T: Encode>(&mut self, payload: &T) -> Result<(), T::EncodeError> {
+    pub fn push<E, T>(&mut self, payload: &T) -> Result<(), E::EncodeError> where E: Encode<T> {
         let align = mem::align_of::<T>();
         let start = self.buf.len();
         // we assume the alignment is always a power of two
         let aligned = (start + align - 1) & !(align - 1);
         self.buf.resize(aligned, 0);
 
-        match payload.encode(&mut self.buf) {
+        match E::encode(payload, &mut self.buf) {
             Ok(()) => {
                 self.pos.push_back((aligned as u32, self.buf.len() as u32));
                 Ok(())
@@ -107,10 +107,10 @@ impl Buf {
             }
         }
     }
-    
-    pub fn pop<T: Decode>(&mut self) -> Result<T, T::DecodeError> {
+
+    pub fn pop<D, T>(&mut self) -> Result<T, D::DecodeError> where D: Decode<T> {
         let (start, end) = self.pos.pop_front().expect("cannot pop from empty buffer");
-        match T::decode(&mut self.buf[start as usize..end as usize]) {
+        match D::decode(&mut self.buf[start as usize..end as usize]) {
             Ok(t) => Ok(t),
             Err(err) => {
                 // put offset back            
@@ -118,28 +118,22 @@ impl Buf {
                 Err(err)
             }
         }
-     
-    }
-}
-
-impl<T: Encode<EncodeError=::void::Void>> From<T> for MessageBuf {
-    fn from(t: T) -> Self {
-        let mut buf = MessageBuf::empty();
-        buf.push(&t).unwrap();
-        buf
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use network::message::abomonate::Crypt;
+    use network::message::abomonate::Abomonate;
 
     #[test]
     fn pop_msg() {
-        let mut buf = MessageBuf::from(Crypt(&vec!["foo", "bar"]));
-        let Crypt(vec) = buf.pop::<Crypt<Vec<&'static str>>>().unwrap();
-        assert_eq!(vec, vec!["foo", "bar"]);
+        let mut buf = MessageBuf::empty();
+        let orig = vec![String::from("foo"), String::from("bar")];
+        buf.push::<Abomonate, _>(&orig).unwrap();
+        let vec = buf.pop::<Abomonate, Vec<String>>().unwrap();
+
+        assert_eq!(vec, orig);
     }
 
     #[test]
@@ -149,41 +143,44 @@ mod tests {
         let integer = 42i32;
 
         let mut buf = MessageBuf::empty();
-        buf.push(&Crypt(&string)).unwrap();
+        buf.push::<Abomonate, _>(&string).unwrap();
 
-        assert_eq!(string, buf.pop::<Crypt<String>>().unwrap().0);
+        assert_eq!(string, buf.pop::<Abomonate, String>().unwrap());
 
-        buf.push(&Crypt(&vector)).unwrap();
-        buf.push(&Crypt(&integer)).unwrap();
-        assert_eq!(vector, buf.pop::<Crypt<Vec<u8>>>().unwrap().0);
-        assert_eq!(integer, buf.pop::<Crypt<i32>>().unwrap().0);
+        buf.push::<Abomonate, _>(&vector).unwrap();
+        buf.push::<Abomonate, _>(&integer).unwrap();
+        assert_eq!(vector, buf.pop::<Abomonate, Vec<u8>>().unwrap());
+        assert_eq!(integer, buf.pop::<Abomonate, i32>().unwrap());
     }
 
     #[test]
     #[should_panic]
     fn pop_empty() {
         let mut buf = MessageBuf::empty();
-        buf.pop::<Crypt<i32>>().unwrap();
+        buf.pop::<Abomonate, i32>().unwrap();
     }
-    
+
     #[test]
     fn type_mismatch() {
         use network::message::abomonate::DecodeError::*;
 
-        let mut buf = MessageBuf::from(Crypt(&0i32));
-        assert_eq!(TypeMismatch, buf.pop::<Crypt<String>>().unwrap_err());
+        let mut buf = MessageBuf::empty();
+        buf.push::<Abomonate, i32>(&5).unwrap();
+        assert_eq!(TypeMismatch, buf.pop::<Abomonate, String>().unwrap_err());
     }
 
     #[test]
     fn read_write() {
-        let mut buf = MessageBuf::from(Crypt(&"Some Content"));
-        buf.push(&Crypt(&3.14f32)).unwrap();
+        let mut buf = MessageBuf::empty();
+        buf.push::<Abomonate, _>(&String::from("Some Content")).unwrap();
+        buf.push::<Abomonate, f32>(&3.14f32).unwrap();
 
         let mut stream = Vec::<u8>::new();
         write(&mut stream, &buf).expect("failed to write");
         let mut out = read(&mut &*stream).expect("failed to read");
 
-        assert_eq!("Some Content", out.pop::<Crypt<&'static str>>().unwrap().0);
-        assert_eq!(3.14, out.pop::<Crypt<f32>>().unwrap().0);
+        assert_eq!("Some Content", out.pop::<Abomonate, String>().unwrap());
+        assert_eq!(3.14, out.pop::<Abomonate, f32>().unwrap());
     }
+
 }

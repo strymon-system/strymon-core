@@ -1,5 +1,6 @@
 #![feature(question_mark)]
 #![feature(core_intrinsics)]
+#![feature(optin_builtin_traits)]
 
 #[macro_use]
 extern crate log;
