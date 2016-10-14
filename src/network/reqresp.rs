@@ -188,6 +188,7 @@ pub fn multiplex((tx, rx): (Sender, Receiver)) -> (Outgoing, Incoming) {
 
 type Pending = Complete<(MessageBuf, bool)>;
 
+#[must_use = "streams do nothing unless polled"]
 pub struct Incoming {
     pending: HashMap<Token, Pending>,
     outgoing: Fuse<queue::Receiver<(MessageBuf, Token, Pending), Void>>,
@@ -299,6 +300,7 @@ impl Outgoing {
         let mut msg = MessageBuf::empty();
         msg.push(&Type::Request).unwrap();
         msg.push(&token).unwrap();
+        msg.push(&Name(String::from(R::name()))).unwrap();
         msg.push(&r)?;
 
         // if send fails, the response will signal this
@@ -307,7 +309,6 @@ impl Outgoing {
         fn other(msg: &'static str) -> IoError {
             IoError::new(ErrorKind::Other, msg)
         }
-        
 
         let rx = rx.map_err(|_| Err(other("request canceled")));
         let rx = rx.and_then(|(mut msg, success)| {
@@ -327,6 +328,7 @@ impl Outgoing {
     }
 }
 
+#[must_use = "futures do nothing unless polled"]
 pub struct Response<R: Request> {
     rx: Box<Future<Item=R::Success, Error=Result<<R as Request>::Error, IoError>>>,
 }
@@ -340,4 +342,72 @@ impl<R: Request> Future for Response<R> {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use async;
+    use async::dowhile::*;
+    use futures::{self, Future};
+    use futures::stream::Stream;
+    use abomonation::Abomonation;
+    use network::reqresp::{multiplex, Request, Incoming, Outgoing};
+    use network::message::abomonate::{Crypt, CryptSerialize};
+    use network::service::Service;
 
+    fn assert_io<F: FnOnce() -> ::std::io::Result<()>>(f: F) {
+        f().expect("I/O test failed")
+    }
+
+    #[derive(Clone)] struct Ping(i32);
+    #[derive(Clone)] struct Pong(i32);
+    unsafe_abomonate!(Ping);
+    unsafe_abomonate!(Pong);
+    impl CryptSerialize for Ping {}
+    impl CryptSerialize for Pong {}
+    impl Request for Ping {
+        type Success = Pong;
+        type Error = Pong;
+
+        fn name() -> &'static str { "Ping" }
+    }
+
+    #[test]
+    fn simple_ping() {
+
+        assert_io(|| {
+            let service = Service::init(None)?;
+            let listener = service.listen(None)?;
+
+            let conn = service.connect(listener.external_addr())?;
+            let server = listener.map(multiplex).do_while(|(tx, rx)| {
+                let handler = rx.do_while(move |req| {
+                    assert_eq!(req.name(), "Ping");
+                    let (req, resp) = req.decode::<Ping>().unwrap();
+                    resp.respond(Ok(Pong(req.0))).unwrap();
+
+                    Err(Stop::Terminate)
+                }).map_err(|e| Err(e).unwrap() );
+
+                async::spawn(handler);
+
+                Err(Stop::Terminate)
+            }).map_err(|e| Err(e).unwrap() );
+
+            let (tx, rx) = multiplex(conn);
+            let client = rx
+                .for_each(|req| panic!("request on client"))
+                .map_err(|err| println!("client finished with error: {:?}", err));
+
+            let done = futures::lazy(move || {
+                async::spawn(server);
+                async::spawn(client);
+
+                tx.send(Ping(5)).unwrap().and_then(move |pong| {
+                    assert_eq!(pong.0, 5);
+                    Ok(())
+                }).map_err(|_| panic!("got ping error"))
+            });
+
+            async::finish(done)
+        });
+    }
+}

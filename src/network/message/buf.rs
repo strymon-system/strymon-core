@@ -133,12 +133,12 @@ impl<T: Encode<EncodeError=::void::Void>> From<T> for MessageBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use network::abomonate::Vault;
+    use network::message::abomonate::Crypt;
 
     #[test]
     fn pop_msg() {
-        let mut buf = MessageBuf::from(Vault(&vec!["foo", "bar"]));
-        let Vault(vec) = buf.pop::<Vault<Vec<&'static str>>>().unwrap();
+        let mut buf = MessageBuf::from(Crypt(&vec!["foo", "bar"]));
+        let Crypt(vec) = buf.pop::<Crypt<Vec<&'static str>>>().unwrap();
         assert_eq!(vec, vec!["foo", "bar"]);
     }
 
@@ -149,41 +149,41 @@ mod tests {
         let integer = 42i32;
 
         let mut buf = MessageBuf::empty();
-        buf.push(&Vault(&string)).unwrap();
+        buf.push(&Crypt(&string)).unwrap();
 
-        assert_eq!(string, buf.pop::<Vault<String>>().unwrap().0);
+        assert_eq!(string, buf.pop::<Crypt<String>>().unwrap().0);
 
-        buf.push(&Vault(&vector)).unwrap();
-        buf.push(&Vault(&integer)).unwrap();
-        assert_eq!(vector, buf.pop::<Vault<Vec<u8>>>().unwrap().0);
-        assert_eq!(integer, buf.pop::<Vault<i32>>().unwrap().0);
+        buf.push(&Crypt(&vector)).unwrap();
+        buf.push(&Crypt(&integer)).unwrap();
+        assert_eq!(vector, buf.pop::<Crypt<Vec<u8>>>().unwrap().0);
+        assert_eq!(integer, buf.pop::<Crypt<i32>>().unwrap().0);
     }
 
     #[test]
     #[should_panic]
     fn pop_empty() {
         let mut buf = MessageBuf::empty();
-        buf.pop::<Vault<i32>>().unwrap();
+        buf.pop::<Crypt<i32>>().unwrap();
     }
     
     #[test]
     fn type_mismatch() {
-        use network::abomonate::DecodeError::*;
+        use network::message::abomonate::DecodeError::*;
 
-        let mut buf = MessageBuf::from(Vault(&0i32));
-        assert_eq!(TypeMismatch, buf.pop::<Vault<String>>().unwrap_err());
+        let mut buf = MessageBuf::from(Crypt(&0i32));
+        assert_eq!(TypeMismatch, buf.pop::<Crypt<String>>().unwrap_err());
     }
 
     #[test]
     fn read_write() {
-        let mut buf = MessageBuf::from(Vault(&"Some Content"));
-        buf.push(&Vault(&3.14f32)).unwrap();
+        let mut buf = MessageBuf::from(Crypt(&"Some Content"));
+        buf.push(&Crypt(&3.14f32)).unwrap();
 
         let mut stream = Vec::<u8>::new();
         write(&mut stream, &buf).expect("failed to write");
         let mut out = read(&mut &*stream).expect("failed to read");
 
-        assert_eq!("Some Content", out.pop::<Vault<&'static str>>().unwrap().0);
-        assert_eq!(3.14, out.pop::<Vault<f32>>().unwrap().0);
+        assert_eq!("Some Content", out.pop::<Crypt<&'static str>>().unwrap().0);
+        assert_eq!(3.14, out.pop::<Crypt<f32>>().unwrap().0);
     }
 }

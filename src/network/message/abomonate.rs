@@ -1,18 +1,27 @@
 use std::any::{Any, TypeId};
+use std::ops::Deref;
 use std::mem;
 
 use abomonation::{Abomonation, encode, decode};
 use void::Void;
 
 use network::message::{Encode, Decode};
-use network::message::buf::MessageBuf;
 
 #[derive(Debug)]
-pub struct Vault<T>(pub T);
+pub struct Crypt<T>(pub T);
+
+impl<T> Deref for Crypt<T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        &self.0
+    }
+}
+    
 
 const TYPEID_BYTES: usize = 8;
 
-impl<'a, T: Abomonation + Any + Clone> Encode for Vault<&'a T> {
+impl<'a, T: Abomonation + Any + Clone> Encode for Crypt<&'a T> {
     type EncodeError = Void;
 
     fn encode(&self, bytes: &mut Vec<u8>) -> Result<(), Self::EncodeError> {
@@ -44,7 +53,7 @@ fn is<T: Any>(bytes: &[u8]) -> bool {
     }
 }
 
-impl<T: Abomonation + Any + Clone> Decode for Vault<T> {
+impl<T: Abomonation + Any + Clone> Decode for Crypt<T> {
     type DecodeError = DecodeError;
 
     fn decode(bytes: &mut [u8]) -> Result<Self, Self::DecodeError> {
@@ -52,7 +61,7 @@ impl<T: Abomonation + Any + Clone> Decode for Vault<T> {
             let mut bytes = &mut bytes[TYPEID_BYTES..];
             if let Some((t, remaining)) = unsafe { decode::<T>(bytes) } {
                 if remaining.is_empty() {
-                    Ok(Vault(t.clone()))
+                    Ok(Crypt(t.clone()))
                 } else {
                     Err(DecodeError::UnexpectedRemains)
                 }
@@ -65,38 +74,20 @@ impl<T: Abomonation + Any + Clone> Decode for Vault<T> {
     }
 }
 
-pub struct VaultMessage(pub MessageBuf);
+pub trait CryptSerialize: Abomonation + Any + Clone { }
 
-impl VaultMessage {
-    pub fn new() -> Self {
-        VaultMessage(MessageBuf::empty())
-    }
+impl<T: CryptSerialize> Encode for T {
+    type EncodeError = Void;
 
-    pub fn push<T: Abomonation + Any + Clone>(&mut self, payload: &T) {
-        self.0.push(&Vault(payload)).unwrap();
-    }
-    
-    pub fn pop<T: Abomonation + Any + Clone>(&mut self) -> Result<T, DecodeError> {
-        self.0.pop::<Vault<T>>().map(|vault| vault.0)
+    fn encode(&self, bytes: &mut Vec<u8>) -> Result<(), Self::EncodeError> {
+        Crypt(self).encode(bytes)
     }
 }
 
-impl<'a, T: Abomonation + Any + Clone> From<&'a T> for VaultMessage {
-    fn from(t: &'a T) -> Self {
-        let mut buf = MessageBuf::empty();
-        buf.push(&Vault(t)).unwrap();
-        VaultMessage(buf)
-    }
-}
+impl<T: CryptSerialize> Decode for T {
+    type DecodeError = DecodeError;
 
-impl From<MessageBuf> for VaultMessage {
-    fn from(buf: MessageBuf) -> Self {
-        VaultMessage(buf)
-    }
-}
-
-impl Into<MessageBuf> for VaultMessage {
-    fn into(self) -> MessageBuf {
-        self.0
+    fn decode(bytes: &mut [u8]) -> Result<Self, Self::DecodeError> {
+        Crypt::<Self>::decode(bytes).map(|crypt| crypt.0)
     }
 }

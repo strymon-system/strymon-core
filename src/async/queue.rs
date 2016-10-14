@@ -60,6 +60,7 @@ impl<T, E> Drop for Sender<T, E> {
     }
 }
 
+#[must_use = "streams do nothing unless polled"]
 pub struct Receiver<T, E> {
     task: Arc<Mutex<Option<Task>>>,
     rx: mpsc::Receiver<Result<T, E>>,

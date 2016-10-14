@@ -115,7 +115,7 @@ fn channel(stream: TcpStream) -> Result<(Sender, Receiver)> {
             }
         }
 
-        drop(outstream.shutdown(Shutdown::Write));
+        drop(outstream.shutdown(Shutdown::Both));
     });
 
     let (receiver_tx, receiver_rx) = stream::channel();
@@ -131,7 +131,7 @@ fn channel(stream: TcpStream) -> Result<(Sender, Receiver)> {
             }
         }
 
-        drop(instream.shutdown(Shutdown::Read));
+        drop(instream.shutdown(Shutdown::Both));
     });
 
     Ok((Sender { tx: sender_tx }, Receiver { rx: receiver_rx }))
