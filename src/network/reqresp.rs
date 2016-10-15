@@ -1,23 +1,23 @@
-use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::io::{Error as IoError, Result as IoResult, ErrorKind};
-use std::str::from_utf8;
-use std::collections::HashMap;
-use std::marker::PhantomData;
-use std::any::Any;
+use abomonation::Abomonation;
+use async::queue;
+use byteorder::{NetworkEndian, ByteOrder};
 
 use futures::{self, Future, Async, Complete, Poll};
 use futures::stream::{Stream, Fuse};
-use void::Void;
-use byteorder::{NetworkEndian, ByteOrder};
-use abomonation::Abomonation;
-
-use network::service::{Sender, Receiver};
-use async::queue;
 
 use network::message::{Encode, Decode};
+use network::message::abomonate::{Abomonate, Owner};
 use network::message::buf::MessageBuf;
-use network::message::abomonate::{Abomonate, Owner, DecodeError};
+
+use network::service::{Sender, Receiver};
+use std::any::Any;
+use std::collections::HashMap;
+use std::io::{Error as IoError, Result as IoResult, ErrorKind};
+use std::marker::PhantomData;
+use std::str::from_utf8;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use void::Void;
 
 pub trait Request: Abomonation + Any + Clone + Owner {
     type Success: Abomonation + Any + Clone + Owner;
@@ -46,7 +46,9 @@ fn decode_u32(bytes: &[u8]) -> Result<u32, IoError> {
 impl Encode<Token> for Token {
     type EncodeError = Void;
 
-    fn encode(token: &Token, bytes: &mut Vec<u8>) -> Result<(), Self::EncodeError> {
+    fn encode(token: &Token,
+              bytes: &mut Vec<u8>)
+              -> Result<(), Self::EncodeError> {
         Ok(encode_u32(token.0, bytes))
     }
 }
@@ -82,7 +84,10 @@ impl Decode<Type> for Type {
         match ty {
             0 => Ok(Type::Request),
             1 => Ok(Type::Response),
-            _ => Err(IoError::new(ErrorKind::InvalidData, "invalid req/resp type"))
+            _ => {
+                Err(IoError::new(ErrorKind::InvalidData,
+                                 "invalid req/resp type"))
+            }
         }
     }
 }
@@ -92,7 +97,9 @@ struct Name;
 impl Encode<&'static str> for Name {
     type EncodeError = Void;
 
-    fn encode(s: &&'static str, bytes: &mut Vec<u8>) -> Result<(), Self::EncodeError> {
+    fn encode(s: &&'static str,
+              bytes: &mut Vec<u8>)
+              -> Result<(), Self::EncodeError> {
         Ok(bytes.extend_from_slice(s.as_bytes()))
     }
 }
@@ -103,7 +110,7 @@ impl Decode<String> for Name {
     fn decode(bytes: &mut [u8]) -> Result<String, Self::DecodeError> {
         match from_utf8(bytes) {
             Ok(s) => Ok(String::from(s)),
-            Err(e) => Err(IoError::new(ErrorKind::InvalidData, e))
+            Err(e) => Err(IoError::new(ErrorKind::InvalidData, e)),
         }
     }
 }
@@ -119,15 +126,19 @@ impl RequestBuf {
     pub fn name(&self) -> &str {
         &self.name
     }
-    
-    pub fn decode<R: Request>(mut self) -> Result<(R, Responder<R>), DecodeError> {
-        let payload = self.msg.pop::<Abomonate, R>()?;
+
+    pub fn decode<R: Request>(mut self)
+                              -> Result<(R, Responder<R>), IoError> {
+        let payload = self.msg.pop::<Abomonate, R>().map_err(|err| {
+            IoError::new(ErrorKind::InvalidData, 
+                format!("unable to decode request: {:?}", err))
+        })?;
         let responder = Responder {
             token: self.token,
             origin: self.origin,
             marker: PhantomData,
         };
-        
+
         Ok((payload, responder))
     }
 }
@@ -138,7 +149,7 @@ pub struct Responder<R: Request> {
     marker: PhantomData<R>,
 }
 
-impl<R: Request> Responder<R> {   
+impl<R: Request> Responder<R> {
     pub fn respond(self, res: Result<R::Success, R::Error>) {
         let mut msg = MessageBuf::empty();
         msg.push::<Type, _>(&Type::Response).unwrap();
@@ -162,7 +173,7 @@ pub fn multiplex((tx, rx): (Sender, Receiver)) -> (Outgoing, Incoming) {
         sender: tx,
         receiver: rx,
     };
-    
+
     (outgoing, incoming)
 }
 
@@ -186,20 +197,22 @@ impl Incoming {
                         panic!("invalid token reuse: {:?}", token);
                     }
                     self.sender.send(msg);
-                },
+                }
                 Async::Ready(None) => {
                     // all sender dropped, no more outgoing
                     break;
-                },
+                }
                 Async::NotReady => {
                     // currently nothing to do, try again later
                     break;
-                },
+                }
             }
         }
     }
 
-    fn do_incoming(&mut self, mut msg: MessageBuf) -> IoResult<Option<RequestBuf>> {
+    fn do_incoming(&mut self,
+                   mut msg: MessageBuf)
+                   -> IoResult<Option<RequestBuf>> {
         let ty = msg.pop::<Type, Type>()?;
         let token = msg.pop::<Token, Token>()?;
         match ty {
@@ -214,7 +227,7 @@ impl Incoming {
                 };
 
                 Ok(Some(buf))
-            },
+            }
             Type::Response => {
                 // resolve one response, continue loop
                 if let Some(pending) = self.pending.remove(&token) {
@@ -227,7 +240,7 @@ impl Incoming {
             }
         }
     }
-    
+
     fn garbage_collect_canceled(&mut self) {
         // TODO(swicki) poll_cancel
     }
@@ -237,22 +250,22 @@ impl Stream for Incoming {
     type Item = RequestBuf;
     type Error = IoError;
 
-    fn poll(&mut self) -> Poll<Option<RequestBuf>, IoError> {    
+    fn poll(&mut self) -> Poll<Option<RequestBuf>, IoError> {
         loop {
             if !self.outgoing.is_done() {
                 self.do_outgoing();
             }
-        
+
             match self.receiver.poll()? {
                 Async::Ready(Some(msg)) => {
                     if let Some(req) = self.do_incoming(msg)? {
-                        return Ok(Async::Ready(Some(req)))
+                        return Ok(Async::Ready(Some(req)));
                     }
-                },
+                }
                 Async::Ready(None) => {
                     // network closed, nothing to be resolved anymore
                     return Ok(Async::Ready(None));
-                },
+                }
                 Async::NotReady => {
                     // do a garbage collection cycle on canceled pending requests
                     self.garbage_collect_canceled();
@@ -286,10 +299,15 @@ impl Outgoing {
         // if send fails, the response will signal this
         drop(self.tx.send(Ok((msg, token, tx))));
 
-        let rx = rx.map_err(|_| Err(IoError::new(ErrorKind::Other, "request canceled")));
+        let rx =
+            rx.map_err(|_| {
+                Err(IoError::new(ErrorKind::Other, "request canceled"))
+            });
         let rx = rx.and_then(|mut msg| {
             let res = msg.pop::<Abomonate, Result<R::Success, R::Error>>()
-                        .map_err(|_| IoError::new(ErrorKind::Other, "unable to decode response"));
+                .map_err(|_| {
+                    IoError::new(ErrorKind::Other, "unable to decode response")
+                });
             match res {
                 Ok(Ok(o)) => Ok(o),
                 Ok(Err(e)) => Err(Ok(e)),
@@ -297,15 +315,14 @@ impl Outgoing {
             }
         });
 
-        Response {
-            rx: Box::new(rx),
-        }
+        Response { rx: Box::new(rx) }
     }
 }
 
 #[must_use = "futures do nothing unless polled"]
 pub struct Response<R: Request> {
-    rx: Box<Future<Item=R::Success, Error=Result<<R as Request>::Error, IoError>>>,
+    rx: Box<Future<Item = R::Success,
+                   Error = Result<<R as Request>::Error, IoError>>>,
 }
 
 impl<R: Request> Future for Response<R> {
@@ -319,11 +336,11 @@ impl<R: Request> Future for Response<R> {
 
 #[cfg(test)]
 mod tests {
+    use abomonation::Abomonation;
     use async;
     use async::do_while::*;
     use futures::{self, Future};
     use futures::stream::Stream;
-    use abomonation::Abomonation;
     use network::reqresp::{multiplex, Request};
     use network::service::Service;
 
@@ -331,15 +348,19 @@ mod tests {
         f().expect("I/O test failed")
     }
 
-    #[derive(Clone)] struct Ping(i32);
-    #[derive(Clone)] struct Pong(i32);
+    #[derive(Clone)]
+    struct Ping(i32);
+    #[derive(Clone)]
+    struct Pong(i32);
     unsafe_abomonate!(Ping);
     unsafe_abomonate!(Pong);
     impl Request for Ping {
         type Success = Pong;
         type Error = ();
 
-        fn name() -> &'static str { "Ping" }
+        fn name() -> &'static str {
+            "Ping"
+        }
     }
 
     #[test]
@@ -350,33 +371,40 @@ mod tests {
             let listener = service.listen(None)?;
 
             let conn = service.connect(listener.external_addr())?;
-            let server = listener.map(multiplex).do_while(|(_, rx)| {
-                let handler = rx.do_while(move |req| {
-                    assert_eq!(req.name(), "Ping");
-                    let (req, resp) = req.decode::<Ping>().unwrap();
-                    resp.respond(Ok(Pong(req.0 + 1)));
+            let server = listener.map(multiplex)
+                .do_while(|(_, rx)| {
+                    let handler = rx.do_while(move |req| {
+                            assert_eq!(req.name(), "Ping");
+                            let (req, resp) = req.decode::<Ping>().unwrap();
+                            resp.respond(Ok(Pong(req.0 + 1)));
+
+                            Err(Stop::Terminate)
+                        })
+                        .map_err(|e| Err(e).unwrap());
+
+                    async::spawn(handler);
 
                     Err(Stop::Terminate)
-                }).map_err(|e| Err(e).unwrap() );
-
-                async::spawn(handler);
-
-                Err(Stop::Terminate)
-            }).map_err(|e| Err(e).unwrap() );
+                })
+                .map_err(|e| Err(e).unwrap());
 
             let (tx, rx) = multiplex(conn);
-            let client = rx
-                .for_each(|_| panic!("request on client"))
-                .map_err(|err| println!("client finished with error: {:?}", err));
+            let client =
+                rx.for_each(|_| panic!("request on client"))
+                    .map_err(|err| {
+                        println!("client finished with error: {:?}", err)
+                    });
 
             let done = futures::lazy(move || {
                 async::spawn(server);
                 async::spawn(client);
 
-                tx.send(Ping(5)).and_then(move |pong| {
-                    assert_eq!(pong.0, 6);
-                    Ok(())
-                }).map_err(|_| panic!("got ping error"))
+                tx.send(Ping(5))
+                    .and_then(move |pong| {
+                        assert_eq!(pong.0, 6);
+                        Ok(())
+                    })
+                    .map_err(|_| panic!("got ping error"))
             });
 
             async::finish(done)

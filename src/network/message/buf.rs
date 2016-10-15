@@ -1,10 +1,10 @@
-use std::sync::Arc;
-use std::collections::VecDeque;
-use std::mem;
-use std::io::{self, Read, Write, Cursor, Error, ErrorKind};
+use byteorder::{NetworkEndian, WriteBytesExt, ReadBytesExt};
 
 use network::message::{Encode, Decode};
-use byteorder::{NetworkEndian, WriteBytesExt, ReadBytesExt};
+use std::collections::VecDeque;
+use std::io::{self, Read, Write, Cursor, Error, ErrorKind};
+use std::mem;
+use std::sync::Arc;
 
 #[derive(Clone, Default)]
 pub struct MessageBuf {
@@ -15,12 +15,16 @@ impl MessageBuf {
     pub fn empty() -> Self {
         Default::default()
     }
-        
-    pub fn push<E, T>(&mut self, payload: &T) -> Result<(), E::EncodeError> where E: Encode<T> {
+
+    pub fn push<E, T>(&mut self, payload: &T) -> Result<(), E::EncodeError>
+        where E: Encode<T>
+    {
         Arc::make_mut(&mut self.inner).push::<E, T>(payload)
     }
 
-    pub fn pop<D, T>(&mut self) -> Result<T, D::DecodeError> where D: Decode<T> {
+    pub fn pop<D, T>(&mut self) -> Result<T, D::DecodeError>
+        where D: Decode<T>
+    {
         Arc::make_mut(&mut self.inner).pop::<D, T>()
     }
 }
@@ -53,7 +57,7 @@ pub fn read<R: Read>(reader: &mut R) -> io::Result<MessageBuf> {
         inner: Arc::new(Buf {
             buf: buf,
             pos: pos,
-        })
+        }),
     })
 }
 
@@ -68,7 +72,7 @@ pub fn write<W: Write>(writer: &mut W, msg: &MessageBuf) -> io::Result<()> {
     // header
     writer.write_u32::<NetworkEndian>(length)?;
     writer.write_u32::<NetworkEndian>(buflen)?;
-    
+
     // buflen
     writer.write_all(&msg.buf)?;
 
@@ -89,7 +93,9 @@ struct Buf {
 }
 
 impl Buf {
-    pub fn push<E, T>(&mut self, payload: &T) -> Result<(), E::EncodeError> where E: Encode<T> {
+    pub fn push<E, T>(&mut self, payload: &T) -> Result<(), E::EncodeError>
+        where E: Encode<T>
+    {
         let align = mem::align_of::<T>();
         let start = self.buf.len();
         // we assume the alignment is always a power of two
@@ -108,12 +114,15 @@ impl Buf {
         }
     }
 
-    pub fn pop<D, T>(&mut self) -> Result<T, D::DecodeError> where D: Decode<T> {
-        let (start, end) = self.pos.pop_front().expect("cannot pop from empty buffer");
+    pub fn pop<D, T>(&mut self) -> Result<T, D::DecodeError>
+        where D: Decode<T>
+    {
+        let (start, end) =
+            self.pos.pop_front().expect("cannot pop from empty buffer");
         match D::decode(&mut self.buf[start as usize..end as usize]) {
             Ok(t) => Ok(t),
             Err(err) => {
-                // put offset back            
+                // put offset back
                 self.pos.push_front((start, end));
                 Err(err)
             }
@@ -123,8 +132,8 @@ impl Buf {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use network::message::abomonate::Abomonate;
+    use super::*;
 
     #[test]
     fn pop_msg() {
@@ -139,7 +148,7 @@ mod tests {
     #[test]
     fn push_many_msg() {
         let string = String::from("hi");
-        let vector = vec![1u8,2,3];
+        let vector = vec![1u8, 2, 3];
         let integer = 42i32;
 
         let mut buf = MessageBuf::empty();

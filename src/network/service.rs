@@ -1,13 +1,14 @@
-use std::io::{Result, Error};
-use std::thread;
-use std::sync::mpsc;
 
-use std::net::{TcpListener, TcpStream, Shutdown, ToSocketAddrs};
 
 use futures::{Future, Poll};
 use futures::stream::{self, Stream};
 
 use network::message::buf::{MessageBuf, read, write};
+use std::io::{Result, Error};
+
+use std::net::{TcpListener, TcpStream, Shutdown, ToSocketAddrs};
+use std::sync::mpsc;
+use std::thread;
 
 pub struct Service {
     external: String,
@@ -15,16 +16,17 @@ pub struct Service {
 
 impl Service {
     pub fn init<T: Into<Option<String>>>(external: T) -> Result<Self> {
-        let external =  external.into().unwrap_or_else(|| String::from("localhost"));
-        Ok(Service {
-            external: external,
-        })
+        let external = external.into()
+            .unwrap_or_else(|| String::from("localhost"));
+        Ok(Service { external: external })
     }
-    
-    pub fn connect<E: ToSocketAddrs>(&self, endpoint: E) -> Result<(Sender, Receiver)> {
+
+    pub fn connect<E: ToSocketAddrs>(&self,
+                                     endpoint: E)
+                                     -> Result<(Sender, Receiver)> {
         channel(TcpStream::connect(endpoint)?)
     }
-    
+
     pub fn listen<P: Into<Option<u16>>>(&self, port: P) -> Result<Listener> {
         Listener::new(self.external.clone(), port.into().unwrap_or(0))
     }

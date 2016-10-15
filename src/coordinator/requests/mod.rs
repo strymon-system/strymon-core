@@ -26,6 +26,8 @@ pub enum SubmissionError {
 impl Request for Submission {
     type Success = QueryId;
     type Error = SubmissionError;
-    
-    fn name() -> &'static str { "Submission" }
+
+    fn name() -> &'static str {
+        "Submission"
+    }
 }

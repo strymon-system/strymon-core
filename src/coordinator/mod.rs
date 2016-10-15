@@ -1,19 +1,22 @@
-use std::io::{Result as IoResult, Error, ErrorKind};
-use futures::{self, Future};
-use futures::stream::Stream;
+
 
 use async::{self, TaskFuture};
 use async::queue::{Sender, Receiver};
-use network::service::{Service};
+use futures::{self, Future};
+use futures::stream::Stream;
 use network::reqresp::{self, RequestBuf, Incoming, Outgoing};
-use network::message::abomonate::DecodeError;
+use network::service::Service;
 
 use self::requests::*;
+use std::io::{Result, Error, ErrorKind};
+
+use self::coord::{Coordinator, CoordinatorRef, Event};
 
 pub mod requests;
 
 mod coord;
-use self::coord::{Coordinator, CoordinatorRef};
+mod catalog;
+mod util;
 
 struct Connection {
     coord: CoordinatorRef,
@@ -30,18 +33,27 @@ impl Connection {
         }
     }
 
-    fn dispatch(self, initial: RequestBuf) -> Result<TaskFuture, DecodeError> {
-        unimplemented!()
+    fn dispatch(self, initial: RequestBuf) -> Result<()> {
+        match initial.name() {
+            "Submission" => {
+                let (req, resp) = initial.decode::<Submission>()?;
+                self.coord.send(Event::Submission(req, resp));
+            },
+            "WorkerGroup" => {
+
+            },
+            "AddExecutor" => {
+
+            }
+            _ => return Err(Error::new(ErrorKind::InvalidData, "invalid initial request"))
+        }
+        
+        Ok(())
     }
 }
 
-struct SubmissionState {
-    conn: Connection,
-}
 
-
-
-pub fn coordinate(port: u16) -> IoResult<()> {
+pub fn coordinate(port: u16) -> Result<()> {
     let service = Service::init(None)?;
     let listener = service.listen(port)?;
 
@@ -57,15 +69,11 @@ pub fn coordinate(port: u16) -> IoResult<()> {
             .map_err(|(err, _)| err)
             .and_then(move |(initial, rx)| {
                 let conn = Connection::new(coord, tx, rx);
-                conn.dispatch(initial.unwrap()).map_err(|err| {
-                    Error::new(ErrorKind::Other, "unable to decode initial request")
-                })
+                conn.dispatch(initial.unwrap())
             })
             .map_err(|err| {
                 error!("failed to dispatch incoming client: {:?}", err);
-            })
-            .and_then(|task| task);
-            
+            });
 
         // handle client asynchronously
         async::spawn(client);

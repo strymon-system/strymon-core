@@ -1,11 +1,12 @@
-use std::io::{Error, ErrorKind};
-use std::any::{Any, TypeId};
-use std::mem;
+
 
 use abomonation::{Abomonation, encode, decode};
-use void::Void;
 
 use network::message::{Encode, Decode};
+use std::any::{Any, TypeId};
+use std::io::{Error, ErrorKind};
+use std::mem;
+use void::Void;
 
 // this is needed, because &'static refs cannot be safely abomonated
 pub trait Owner {}
@@ -38,7 +39,8 @@ pub enum DecodeError {
 
 impl Into<Error> for DecodeError {
     fn into(self) -> Error {
-        Error::new(ErrorKind::Other, format!("abomonate decode error: {:?}", self))
+        Error::new(ErrorKind::Other,
+                   format!("abomonate decode error: {:?}", self))
     }
 }
 

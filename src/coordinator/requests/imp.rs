@@ -18,7 +18,9 @@ impl Abomonation for Placement {
         }
     }
     #[inline]
-    unsafe fn exhume<'a, 'b>(&'a mut self, bytes: &'b mut [u8]) -> Option<&'b mut [u8]> {
+    unsafe fn exhume<'a, 'b>(&'a mut self,
+                             bytes: &'b mut [u8])
+                             -> Option<&'b mut [u8]> {
         match *self {
             Placement::Random(_, _) => Some(bytes),
             Placement::Fixed(ref mut e, _) => e.exhume(bytes),
