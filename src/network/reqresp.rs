@@ -320,7 +320,7 @@ impl<R: Request> Future for Response<R> {
 #[cfg(test)]
 mod tests {
     use async;
-    use async::dowhile::*;
+    use async::do_while::*;
     use futures::{self, Future};
     use futures::stream::Stream;
     use abomonation::Abomonation;

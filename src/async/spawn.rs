@@ -3,10 +3,10 @@ use std::mem;
 
 use futures::{self, Future, Poll, Async};
 
-type LeafFuture = Box<Future<Item=(), Error=()>>;
+pub type TaskFuture = Box<Future<Item=(), Error=()>>;
 
 thread_local! {
-    static PENDING: RefCell<Option<Vec<LeafFuture>>> = RefCell::new(None)
+    static PENDING: RefCell<Option<Vec<TaskFuture>>> = RefCell::new(None)
 }
 
 pub fn spawn<F: Future<Item=(), Error=()> + 'static>(f: F) {
@@ -41,7 +41,7 @@ fn retain<T, F>(vec: &mut Vec<T>, mut f: F) where F: FnMut(&mut T) -> bool
 }
 
 struct Finish {
-    running: Vec<LeafFuture>,
+    running: Vec<TaskFuture>,
 }
 
 impl Finish {
@@ -104,7 +104,7 @@ impl Future for Finish {
     }
 }
 
-struct Reset(Option<Vec<LeafFuture>>);
+struct Reset(Option<Vec<TaskFuture>>);
 
 impl Drop for Reset {
     fn drop(&mut self) {

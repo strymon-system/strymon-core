@@ -40,7 +40,7 @@ pub struct QueryProgram {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ExecutionFormat {
-    NativeExecutable { architecture: String },
+    NativeExecutable,
     Other,
 }
 

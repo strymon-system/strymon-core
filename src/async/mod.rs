@@ -1,5 +1,5 @@
 pub mod queue;
-pub mod dowhile;
+pub mod do_while;
 
 mod spawn;
 pub use self::spawn::*;

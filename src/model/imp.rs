@@ -23,3 +23,11 @@ impl TopicType {
         }
     }
 }
+
+unsafe_abomonate!(QueryId);
+unsafe_abomonate!(Query: id, name, program, workers, executors);
+unsafe_abomonate!(QueryProgram: format, source, args);
+
+unsafe_abomonate!(ExecutorId);
+unsafe_abomonate!(Executor: id, host, format);
+unsafe_abomonate!(ExecutionFormat);

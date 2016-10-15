@@ -1,18 +1,36 @@
-use std::cell::RefCell;
-use std::rc::Rc;
+use futures::stream::Stream;
 
-use async::queue::Receiver;
+use async::{self, TaskFuture};
+use async::queue::{channel, Sender, Receiver};
+
+use network::reqresp::Response;
+
+use super::requests::*;
+
+pub enum Event {
+    Submission(Submission, Response<Submission>),
+}
+
+#[derive(Clone)]
+pub struct CoordinatorRef {
+    coord: Sender<Event, ()>,
+}
 
 pub struct Coordinator {
-    events: Receiver<Event, ()>,
+    
 }
 
 impl Coordinator {
-    pub fn new() ->  {
-        Catalog {
-            
-        }
+    pub fn new() -> (TaskFuture, CoordinatorRef) {
+        let (tx, rx) = channel();
+        let task = Box::new(rx.for_each(|event| {
+            Ok(())
+        }));
+        // handle for connections to use
+        let handle = CoordinatorRef {
+            coord: tx,
+        };
+        
+        (task, handle)
     }
-    
-    pub fn 
 }

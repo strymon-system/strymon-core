@@ -1,3 +1,4 @@
+use std::io::{Error, ErrorKind};
 use std::any::{Any, TypeId};
 use std::mem;
 
@@ -33,6 +34,12 @@ pub enum DecodeError {
     TypeMismatch,
     ExhumationFailure,
     UnexpectedRemains,
+}
+
+impl Into<Error> for DecodeError {
+    fn into(self) -> Error {
+        Error::new(ErrorKind::Other, format!("abomonate decode error: {:?}", self))
+    }
 }
 
 fn is<T: Any>(bytes: &[u8]) -> bool {
