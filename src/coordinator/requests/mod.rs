@@ -1,7 +1,7 @@
-mod imp;
-
 use model::*;
 use network::reqresp::Request;
+
+mod imp;
 
 #[derive(Debug, Clone)]
 pub enum Placement {
@@ -18,9 +18,8 @@ pub struct Submission {
 
 #[derive(Clone, Debug)]
 pub enum SubmissionError {
-    NoExecutorsForType,
-    NotEnoughExecutors,
-    InvalidExecutorId,
+    ExecutorsNotFound,
+    SpawnError,
 }
 
 impl Request for Submission {
@@ -29,5 +28,24 @@ impl Request for Submission {
 
     fn name() -> &'static str {
         "Submission"
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct AddExecutor {
+    pub host: String,
+    pub ports: (u16, u16),
+    pub format: ExecutionFormat,
+}
+
+#[derive(Clone, Debug)]
+pub struct ExecutorError;
+
+impl Request for AddExecutor {
+    type Success = ExecutorId;
+    type Error = ExecutorError;
+
+    fn name() -> &'static str {
+        "AddExecutor"
     }
 }

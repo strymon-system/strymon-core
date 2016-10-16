@@ -43,7 +43,8 @@ impl Connection {
 
             },
             "AddExecutor" => {
-
+                let (req, resp) = initial.decode::<AddExecutor>()?;
+                // TODO 1. get executor id, 2. wait for drop on rx, remove executor
             }
             _ => return Err(Error::new(ErrorKind::InvalidData, "invalid initial request"))
         }

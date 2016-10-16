@@ -30,3 +30,6 @@ impl Abomonation for Placement {
 
 unsafe_abomonate!(Submission: query, name, placement);
 unsafe_abomonate!(SubmissionError);
+
+unsafe_abomonate!(AddExecutor: host, ports, format);
+unsafe_abomonate!(ExecutorError);

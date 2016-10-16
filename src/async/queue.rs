@@ -1,10 +1,9 @@
-
+use std::sync::{Arc, Mutex};
+use std::sync::mpsc;
 
 use futures::{Async, Poll};
 use futures::stream::Stream;
 use futures::task::{self, Task};
-use std::sync::{Arc, Mutex};
-use std::sync::mpsc;
 
 pub fn channel<T, E>() -> (Sender<T, E>, Receiver<T, E>) {
     let (tx, rx) = mpsc::channel();

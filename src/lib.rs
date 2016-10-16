@@ -18,6 +18,7 @@ extern crate futures;
 
 pub mod model;
 pub mod coordinator;
+pub mod executor;
 
 pub mod network;
 pub mod async;

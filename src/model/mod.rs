@@ -27,7 +27,7 @@ pub struct Query {
     pub id: QueryId,
     pub name: Option<String>,
     pub program: QueryProgram,
-    pub workers: usize, // total
+    pub workers: usize, // in total
     pub executors: Vec<ExecutorId>,
 }
 

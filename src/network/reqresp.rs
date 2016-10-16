@@ -287,14 +287,14 @@ impl Outgoing {
         Token(self.token.fetch_add(1, Ordering::SeqCst) as u32)
     }
 
-    pub fn send<R: Request>(&self, r: R) -> Response<R> {
+    pub fn request<R: Request>(&self, r: &R) -> Response<R> {
         let token = self.next_token();
         let (tx, rx) = futures::oneshot();
         let mut msg = MessageBuf::empty();
         msg.push::<Type, _>(&Type::Request).unwrap();
         msg.push::<Token, _>(&token).unwrap();
         msg.push::<Name, &'static str>(&R::name()).unwrap();
-        msg.push::<Abomonate, R>(&r).unwrap();
+        msg.push::<Abomonate, R>(r).unwrap();
 
         // if send fails, the response will signal this
         drop(self.tx.send(Ok((msg, token, tx))));
@@ -399,7 +399,7 @@ mod tests {
                 async::spawn(server);
                 async::spawn(client);
 
-                tx.send(Ping(5))
+                tx.request(&Ping(5))
                     .and_then(move |pong| {
                         assert_eq!(pong.0, 6);
                         Ok(())
