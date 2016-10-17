@@ -30,8 +30,7 @@ mod tests {
             // process one single client
             listener.and_then(|(tx, rx)| {
                     let mut ping = rx.wait().next().unwrap()?;
-                    assert_eq!("Ping",
-                               ping.pop::<Abomonate, String>().unwrap());
+                    assert_eq!("Ping", ping.pop::<Abomonate, String>().unwrap());
 
                     let mut pong = MessageBuf::empty();
                     pong.push::<Abomonate, _>(&String::from("Pong")).unwrap();

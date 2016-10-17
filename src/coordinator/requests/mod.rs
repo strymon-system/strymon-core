@@ -49,3 +49,28 @@ impl Request for AddExecutor {
         "AddExecutor"
     }
 }
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct QueryToken(pub u64);
+
+#[derive(Clone, Debug)]
+pub struct AddWorkerGroup {
+    pub query: QueryId,
+    pub group: usize,
+}
+
+#[derive(Clone, Debug)]
+pub enum WorkerGroupError {
+    InvalidQueryId,
+    InvalidWorkerGroup,
+    FailedPeer,
+}
+
+impl Request for AddWorkerGroup {
+    type Success = QueryToken;
+    type Error = WorkerGroupError;
+
+    fn name() -> &'static str {
+        "AddWorkerGroup"
+    }
+}

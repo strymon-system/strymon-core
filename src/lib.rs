@@ -8,13 +8,13 @@ extern crate log;
 extern crate abomonation;
 
 extern crate timely;
+#[macro_use]
+extern crate futures;
 
 extern crate rand;
 extern crate byteorder;
 extern crate void;
-
-#[macro_use]
-extern crate futures;
+extern crate bit_set;
 
 pub mod model;
 pub mod coordinator;

@@ -53,3 +53,9 @@ pub struct Executor {
     pub host: String,
     pub format: ExecutionFormat,
 }
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Publication(QueryId, TopicId);
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Subscription(QueryId, TopicId);

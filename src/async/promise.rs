@@ -4,12 +4,8 @@ use std::sync::{Arc, Mutex};
 pub fn promise<T, E>() -> (Complete<T, E>, Promise<T, E>) {
     let (tx, rx) = futures::oneshot();
 
-    let rx = Promise {
-        inner: rx
-    };
-    let tx = Complete {
-        inner: Arc::new(Mutex::new(Some(tx))),
-    };
+    let rx = Promise { inner: rx };
+    let tx = Complete { inner: Arc::new(Mutex::new(Some(tx))) };
 
     (tx, rx)
 }
@@ -24,7 +20,7 @@ pub struct Promise<T, E> {
 impl<T, E> Future for Promise<T, E> {
     type Item = T;
     type Error = Result<E, Canceled>;
-    
+
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         match self.inner.poll() {
             Ok(Async::Ready(Ok(t))) => Ok(Async::Ready(t)),
@@ -47,9 +43,10 @@ impl<T, E> Complete<T, E> {
         let complete = inner.take().expect("tried to complete twice?!");
         complete.complete(res)
     }
-    
-    pub fn cancellation(&self) -> Cancellation 
-        where T: 'static, E: 'static
+
+    pub fn cancellation(&self) -> Cancellation
+        where T: 'static,
+              E: 'static
     {
         Cancellation { inner: Box::new(self.inner.clone()) }
     }
@@ -89,7 +86,7 @@ pub struct Cancellation {
 impl Future for Cancellation {
     type Item = ();
     type Error = ();
-    
+
     fn poll(&mut self) -> Poll<(), ()> {
         self.inner.poll_cancel()
     }
@@ -119,14 +116,14 @@ mod tests {
         });
         assert_eq!(Ok(3.2), rx.wait().unwrap_err());
     }
-    
+
     #[test]
     fn cancel_tx() {
         let (tx, rx) = promise::<i32, f32>();
         drop(tx);
         assert_eq!(Err(Canceled), rx.wait().unwrap_err());
     }
-    
+
     #[test]
     fn cancel_rx() {
         let (tx, rx) = promise::<i32, f32>();
@@ -141,7 +138,7 @@ mod tests {
         drop(tx);
         assert_eq!(Err(()), c.wait())
     }
-    
+
     #[test]
     fn cancel_complete_tx() {
         let (tx, rx) = promise::<i32, f32>();

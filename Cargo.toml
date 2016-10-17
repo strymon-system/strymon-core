@@ -7,8 +7,13 @@ version = "0.1.0"
 name = "coordinator"
 path = "src/bin/coordinator.rs"
 
+[[bin]]
+name = "executor"
+path = "src/bin/executor.rs"
+
 [dependencies]
 abomonation = "0.4.4"
+bit-set = "0.4.0"
 byteorder = "0.5.3"
 env_logger = "0.3"
 futures = "0.1.2"
@@ -18,4 +23,6 @@ timely = "0.1.15"
 void = "1.0.2"
 
 [replace]
-"abomonation:0.4.4" = { git = 'https://github.com/frankmcsherry/abomonation' }
+
+[replace."abomonation:0.4.4"]
+git = "https://github.com/frankmcsherry/abomonation"

@@ -44,3 +44,6 @@ impl From<u64> for ExecutorId {
         ExecutorId(id)
     }
 }
+
+unsafe_abomonate!(Publication);
+unsafe_abomonate!(Subscription);

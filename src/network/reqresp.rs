@@ -46,9 +46,7 @@ fn decode_u32(bytes: &[u8]) -> Result<u32, IoError> {
 impl Encode<Token> for Token {
     type EncodeError = Void;
 
-    fn encode(token: &Token,
-              bytes: &mut Vec<u8>)
-              -> Result<(), Self::EncodeError> {
+    fn encode(token: &Token, bytes: &mut Vec<u8>) -> Result<(), Self::EncodeError> {
         Ok(encode_u32(token.0, bytes))
     }
 }
@@ -84,10 +82,7 @@ impl Decode<Type> for Type {
         match ty {
             0 => Ok(Type::Request),
             1 => Ok(Type::Response),
-            _ => {
-                Err(IoError::new(ErrorKind::InvalidData,
-                                 "invalid req/resp type"))
-            }
+            _ => Err(IoError::new(ErrorKind::InvalidData, "invalid req/resp type")),
         }
     }
 }
@@ -97,9 +92,7 @@ struct Name;
 impl Encode<&'static str> for Name {
     type EncodeError = Void;
 
-    fn encode(s: &&'static str,
-              bytes: &mut Vec<u8>)
-              -> Result<(), Self::EncodeError> {
+    fn encode(s: &&'static str, bytes: &mut Vec<u8>) -> Result<(), Self::EncodeError> {
         Ok(bytes.extend_from_slice(s.as_bytes()))
     }
 }
@@ -127,12 +120,13 @@ impl RequestBuf {
         &self.name
     }
 
-    pub fn decode<R: Request>(mut self)
-                              -> Result<(R, Responder<R>), IoError> {
-        let payload = self.msg.pop::<Abomonate, R>().map_err(|err| {
-            IoError::new(ErrorKind::InvalidData, 
-                format!("unable to decode request: {:?}", err))
-        })?;
+    pub fn decode<R: Request>(mut self) -> Result<(R, Responder<R>), IoError> {
+        let payload = self.msg
+            .pop::<Abomonate, R>()
+            .map_err(|err| {
+                IoError::new(ErrorKind::InvalidData,
+                             format!("unable to decode request: {:?}", err))
+            })?;
         let responder = Responder {
             token: self.token,
             origin: self.origin,
@@ -210,9 +204,7 @@ impl Incoming {
         }
     }
 
-    fn do_incoming(&mut self,
-                   mut msg: MessageBuf)
-                   -> IoResult<Option<RequestBuf>> {
+    fn do_incoming(&mut self, mut msg: MessageBuf) -> IoResult<Option<RequestBuf>> {
         let ty = msg.pop::<Type, Type>()?;
         let token = msg.pop::<Token, Token>()?;
         match ty {
@@ -299,15 +291,10 @@ impl Outgoing {
         // if send fails, the response will signal this
         drop(self.tx.send(Ok((msg, token, tx))));
 
-        let rx =
-            rx.map_err(|_| {
-                Err(IoError::new(ErrorKind::Other, "request canceled"))
-            });
+        let rx = rx.map_err(|_| Err(IoError::new(ErrorKind::Other, "request canceled")));
         let rx = rx.and_then(|mut msg| {
             let res = msg.pop::<Abomonate, Result<R::Success, R::Error>>()
-                .map_err(|_| {
-                    IoError::new(ErrorKind::Other, "unable to decode response")
-                });
+                .map_err(|_| IoError::new(ErrorKind::Other, "unable to decode response"));
             match res {
                 Ok(Ok(o)) => Ok(o),
                 Ok(Err(e)) => Err(Ok(e)),
@@ -321,8 +308,7 @@ impl Outgoing {
 
 #[must_use = "futures do nothing unless polled"]
 pub struct Response<R: Request> {
-    rx: Box<Future<Item = R::Success,
-                   Error = Result<<R as Request>::Error, IoError>>>,
+    rx: Box<Future<Item = R::Success, Error = Result<<R as Request>::Error, IoError>>>,
 }
 
 impl<R: Request> Future for Response<R> {
@@ -389,11 +375,8 @@ mod tests {
                 .map_err(|e| Err(e).unwrap());
 
             let (tx, rx) = multiplex(conn);
-            let client =
-                rx.for_each(|_| panic!("request on client"))
-                    .map_err(|err| {
-                        println!("client finished with error: {:?}", err)
-                    });
+            let client = rx.for_each(|_| panic!("request on client"))
+                .map_err(|err| println!("client finished with error: {:?}", err));
 
             let done = futures::lazy(move || {
                 async::spawn(server);

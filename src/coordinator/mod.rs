@@ -1,79 +1,33 @@
+use std::io::Result;
 
-
-use async::{self, TaskFuture};
-use async::queue::{Sender, Receiver};
-use futures::{self, Future};
+use futures::Future;
 use futures::stream::Stream;
-use network::reqresp::{self, RequestBuf, Incoming, Outgoing};
+
+use async;
+use async::do_while::DoWhileExt;
 use network::service::Service;
+use network::reqresp;
 
-use self::requests::*;
-use std::io::{Result, Error, ErrorKind};
-
-use self::coord::{Coordinator, CoordinatorRef, Event};
+use self::resources::Coordinator;
+use self::dispatch::Dispatch;
 
 pub mod requests;
 
-mod coord;
-mod catalog;
-mod util;
-
-struct Connection {
-    coord: CoordinatorRef,
-    tx: Outgoing,
-    rx: Incoming,
-}
-
-impl Connection {
-    fn new(coord: CoordinatorRef, tx: Outgoing, rx: Incoming) -> Self {
-        Connection {
-            coord: coord,
-            tx: tx,
-            rx: rx,
-        }
-    }
-
-    fn dispatch(self, initial: RequestBuf) -> Result<()> {
-        match initial.name() {
-            "Submission" => {
-                let (req, resp) = initial.decode::<Submission>()?;
-                self.coord.send(Event::Submission(req, resp));
-            },
-            "WorkerGroup" => {
-
-            },
-            "AddExecutor" => {
-                let (req, resp) = initial.decode::<AddExecutor>()?;
-                // TODO 1. get executor id, 2. wait for drop on rx, remove executor
-            }
-            _ => return Err(Error::new(ErrorKind::InvalidData, "invalid initial request"))
-        }
-        
-        Ok(())
-    }
-}
-
+pub mod resources;
+pub mod catalog;
+pub mod dispatch;
 
 pub fn coordinate(port: u16) -> Result<()> {
     let service = Service::init(None)?;
     let listener = service.listen(port)?;
 
-    let (coord_task, coord) = Coordinator::new();
-
+    let coord = Coordinator::new();
     let server = listener.map(reqresp::multiplex).for_each(move |(tx, rx)| {
         // every connection gets its own handle
-        let coord = coord.clone();
-
-        // receive one initial request from the client,
-        // then create and spawn a task based on this initial request
-        let client = rx.into_future()
-            .map_err(|(err, _)| err)
-            .and_then(move |(initial, rx)| {
-                let conn = Connection::new(coord, tx, rx);
-                conn.dispatch(initial.unwrap())
-            })
+        let mut disp = Dispatch::new(coord.clone(), tx);
+        let client = rx.do_while(move |req| disp.dispatch(req))
             .map_err(|err| {
-                error!("failed to dispatch incoming client: {:?}", err);
+                error!("failed to dispatch client: {:?}", err);
             });
 
         // handle client asynchronously
@@ -81,9 +35,5 @@ pub fn coordinate(port: u16) -> Result<()> {
         Ok(())
     });
 
-    async::finish(futures::lazy(move || {
-        async::spawn(coord_task);
-
-        server
-    }))
+    async::finish(server)
 }

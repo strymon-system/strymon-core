@@ -1,14 +1,12 @@
-
+use std::io::{Result, Error};
+use std::net::{TcpListener, TcpStream, Shutdown, ToSocketAddrs};
+use std::sync::mpsc;
+use std::thread;
 
 use futures::{Future, Poll};
 use futures::stream::{self, Stream};
 
 use network::message::buf::{MessageBuf, read, write};
-use std::io::{Result, Error};
-
-use std::net::{TcpListener, TcpStream, Shutdown, ToSocketAddrs};
-use std::sync::mpsc;
-use std::thread;
 
 pub struct Service {
     external: String,
@@ -21,9 +19,7 @@ impl Service {
         Ok(Service { external: external })
     }
 
-    pub fn connect<E: ToSocketAddrs>(&self,
-                                     endpoint: E)
-                                     -> Result<(Sender, Receiver)> {
+    pub fn connect<E: ToSocketAddrs>(&self, endpoint: E) -> Result<(Sender, Receiver)> {
         channel(TcpStream::connect(endpoint)?)
     }
 

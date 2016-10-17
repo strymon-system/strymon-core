@@ -117,8 +117,7 @@ impl Buf {
     pub fn pop<D, T>(&mut self) -> Result<T, D::DecodeError>
         where D: Decode<T>
     {
-        let (start, end) =
-            self.pos.pop_front().expect("cannot pop from empty buffer");
+        let (start, end) = self.pos.pop_front().expect("cannot pop from empty buffer");
         match D::decode(&mut self.buf[start as usize..end as usize]) {
             Ok(t) => Ok(t),
             Err(err) => {

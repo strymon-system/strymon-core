@@ -8,23 +8,19 @@ pub struct Catalog {
 
 impl Catalog {
     pub fn new() -> Self {
-        Catalog {
-            executors: BTreeMap::new(),
-        }
+        Catalog { executors: BTreeMap::new() }
     }
 
     pub fn add_executor(&mut self, executor: Executor) {
         self.executors.insert(executor.id, executor);
     }
-    
+
     pub fn remove_executor(&mut self, id: ExecutorId) {
         self.executors.remove(&id);
     }
-    
+
     pub fn executors<'a>(&'a self) -> Executors<'a> {
-        Executors {
-            values: self.executors.values()
-        }
+        Executors { values: self.executors.values() }
     }
 }
 

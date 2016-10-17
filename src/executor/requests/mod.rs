@@ -11,6 +11,7 @@ pub struct SpawnQuery {
 
 #[derive(Debug, Clone)]
 pub enum SpawnError {
+    InvalidRequest,
     FetchFailed,
     ExecFailed,
 }
@@ -19,7 +20,9 @@ impl Request for SpawnQuery {
     type Success = ();
     type Error = SpawnError;
 
-    fn name() -> &'static str { "SpawnQuery" }
+    fn name() -> &'static str {
+        "SpawnQuery"
+    }
 }
 
 unsafe_abomonate!(SpawnQuery: query, hostlist);
