@@ -5,7 +5,7 @@ use futures::stream::Stream;
 
 use async;
 use async::do_while::DoWhileExt;
-use network::service::Service;
+use network::Network;
 use network::reqresp;
 
 use self::resources::Coordinator;
@@ -18,8 +18,8 @@ pub mod catalog;
 pub mod dispatch;
 
 pub fn coordinate(port: u16) -> Result<()> {
-    let service = Service::init(None)?;
-    let listener = service.listen(port)?;
+    let network = Network::init(None)?;
+    let listener = network.listen(port)?;
 
     let coord = Coordinator::new();
     let server = listener.map(reqresp::multiplex).for_each(move |(tx, rx)| {

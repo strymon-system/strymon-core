@@ -2,6 +2,7 @@ use async::promise::{promise, Complete, Promise};
 use network::reqresp::Outgoing;
 
 use model::{QueryId, Query};
+use coordinator::resources::query::QueryState;
 use coordinator::requests::*;
 
 pub struct SubmissionState {
@@ -13,7 +14,7 @@ pub struct SubmissionState {
 impl SubmissionState {
     pub fn new(query: Query) -> (Self, Promise<QueryId, SubmissionError>) {
         let (tx, rx) = promise();
-        let worker_groups = query.workers / query.executors.len();
+        let worker_groups = query.executors.len();
         let state = SubmissionState {
             template: query,
             response: tx,
@@ -23,10 +24,10 @@ impl SubmissionState {
         (state, rx)
     }
 
-    pub fn add_worker_group(mut self,
+    pub fn add_worker_group(&mut self,
                             group: usize,
                             out: Outgoing)
-                            -> Promise<QueryToken, WorkerGroupError> {
+                            -> (bool, Promise<QueryToken, WorkerGroupError>) {
         let (tx, rx) = promise();
         if group >= self.worker.len() {
             tx.complete(Err(WorkerGroupError::InvalidWorkerGroup));
@@ -34,6 +35,22 @@ impl SubmissionState {
             self.worker[group] = Some((out, tx));
         }
 
-        rx
+        debug!("added worker group {} ({} total)", group, self.worker.len());
+
+        (self.worker.iter().all(Option::is_some), rx)
+    }
+    
+    pub fn promote(mut self) -> Result<QueryState, Self> {
+        if self.worker.iter().any(Option::is_none) {
+            return Err(self);
+        }
+
+        let state = QueryState::new();
+        let worker = self.worker.into_iter().map(Option::unwrap);
+        for (_, complete) in worker {
+            complete.complete(Ok(state.token()))
+        }
+        self.response.complete(Ok(self.template.id));
+        Ok(state)
     }
 }

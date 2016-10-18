@@ -6,10 +6,10 @@ use futures::{self, Future, Async, Complete, Poll};
 use futures::stream::{Stream, Fuse};
 
 use network::message::{Encode, Decode};
-use network::message::abomonate::{Abomonate, Owner};
+use network::message::abomonate::{Abomonate, NonStatic};
 use network::message::buf::MessageBuf;
 
-use network::service::{Sender, Receiver};
+use network::{Sender, Receiver};
 use std::any::Any;
 use std::collections::HashMap;
 use std::io::{Error as IoError, Result as IoResult, ErrorKind};
@@ -19,9 +19,9 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use void::Void;
 
-pub trait Request: Abomonation + Any + Clone + Owner {
-    type Success: Abomonation + Any + Clone + Owner;
-    type Error: Abomonation + Any + Clone + Owner;
+pub trait Request: Abomonation + Any + Clone + NonStatic {
+    type Success: Abomonation + Any + Clone + NonStatic;
+    type Error: Abomonation + Any + Clone + NonStatic;
 
     fn name() -> &'static str;
 }
@@ -328,7 +328,7 @@ mod tests {
     use futures::{self, Future};
     use futures::stream::Stream;
     use network::reqresp::{multiplex, Request};
-    use network::service::Service;
+    use network::Network;
 
     fn assert_io<F: FnOnce() -> ::std::io::Result<()>>(f: F) {
         f().expect("I/O test failed")
@@ -353,10 +353,10 @@ mod tests {
     fn simple_ping() {
 
         assert_io(|| {
-            let service = Service::init(None)?;
-            let listener = service.listen(None)?;
+            let network = Network::init(None)?;
+            let listener = network.listen(None)?;
 
-            let conn = service.connect(listener.external_addr())?;
+            let conn = network.connect(listener.external_addr())?;
             let server = listener.map(multiplex)
                 .do_while(|(_, rx)| {
                     let handler = rx.do_while(move |req| {

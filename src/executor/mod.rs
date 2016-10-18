@@ -7,7 +7,7 @@ use async;
 use async::do_while::{DoWhileExt, Stop};
 use async::queue;
 
-use network::service::Service;
+use network::Network;
 use network::reqresp::{self, RequestBuf};
 
 use model::*;
@@ -58,6 +58,7 @@ impl ExecutorService {
         match req.name() {
             "SpawnQuery" => {
                 let (SpawnQuery { query, hostlist }, resp) = req.decode::<SpawnQuery>()?;
+                debug!("got spawn request for {:?}", query);
                 resp.respond(self.spawn(query, hostlist));
                 Ok(())
             }
@@ -88,11 +89,12 @@ impl Default for Builder {
 impl Builder {
     pub fn start(self) -> Result<(), Error> {
         let Builder { host, ports, coord } = self;
-        let service = Service::init(host.clone())?;
-        let (tx, rx) = service.connect(&*coord).map(reqresp::multiplex)?;
+        let network = Network::init(host.clone())?;
+        let (tx, rx) = network.connect(&*coord).map(reqresp::multiplex)?;
 
         async::finish(futures::lazy(move || {
-            // we need to poll on `rx` in order to make progress
+            // TODO(swicki): this is not so nice currently,
+            // but we need to poll on `rx` in order to make progress
             let (buf_tx, buf_rx) = queue::channel();
             async::spawn(rx.then(Ok)
                 .do_while(move |res| buf_tx.send(res).map_err(|_| Stop::Terminate)));

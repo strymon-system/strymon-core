@@ -24,6 +24,7 @@ pub struct Dispatch {
 
 impl Dispatch {
     pub fn new(coord: CoordinatorRef, tx: Outgoing) -> Self {
+        debug!("new connection");
         Dispatch {
             coord: coord,
             associated: BTreeSet::new(),
@@ -42,8 +43,13 @@ impl Dispatch {
 
                 async::spawn(submission);
             }
-            "WorkerGroup" => {
-                let (req, resp) = req.decode::<AddWorkerGroup>()?;
+            "AddWorkerGroup" => {
+                let (AddWorkerGroup { query, group }, resp) = req.decode::<AddWorkerGroup>()?;
+                let response = self.coord
+                    .add_worker_group(query, group, self.tx.clone())
+                    .map_err(|e| e.expect("worker group promise canceled?!"))
+                    .then(|res| Ok(resp.respond(res)));
+                async::spawn(response)
             }
             "AddExecutor" => {
                 let (req, resp) = req.decode::<AddExecutor>()?;

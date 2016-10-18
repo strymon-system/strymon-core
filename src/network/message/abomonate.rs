@@ -9,15 +9,15 @@ use std::mem;
 use void::Void;
 
 // this is needed, because &'static refs cannot be safely abomonated
-pub trait Owner {}
-impl Owner for .. {}
-impl<T> !Owner for &'static T {}
+pub trait NonStatic {}
+impl NonStatic for .. {}
+impl<T> !NonStatic for &'static T {}
 
 pub struct Abomonate;
 
 const TYPEID_BYTES: usize = 8;
 
-impl<T: Abomonation + Any + Clone + Owner> Encode<T> for Abomonate {
+impl<T: Abomonation + Any + Clone + NonStatic> Encode<T> for Abomonate {
     type EncodeError = Void;
 
     fn encode(input: &T, bytes: &mut Vec<u8>) -> Result<(), Void> {
@@ -56,7 +56,7 @@ fn is<T: Any>(bytes: &[u8]) -> bool {
     }
 }
 
-impl<T: Abomonation + Any + Clone + Owner> Decode<T> for Abomonate {
+impl<T: Abomonation + Any + Clone + NonStatic> Decode<T> for Abomonate {
     type DecodeError = DecodeError;
 
     fn decode(bytes: &mut [u8]) -> Result<T, Self::DecodeError> {

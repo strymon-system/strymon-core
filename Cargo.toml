@@ -11,6 +11,10 @@ path = "src/bin/coordinator.rs"
 name = "executor"
 path = "src/bin/executor.rs"
 
+[[bin]]
+name = "submit"
+path = "src/bin/submit.rs"
+
 [dependencies]
 abomonation = "0.4.4"
 bit-set = "0.4.0"
@@ -20,6 +24,7 @@ futures = "0.1.2"
 log = "0.3"
 rand = "0.3.14"
 timely = "0.1.15"
+timely_communication = "0.1.5"
 void = "1.0.2"
 
 [replace]

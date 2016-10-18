@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::collections::btree_map::Entry;
 use std::rc::{Rc, Weak};
 use std::cell::RefCell;
 
@@ -17,10 +18,12 @@ use coordinator::catalog::Catalog;
 
 use self::executor::ExecutorState;
 use self::submission::SubmissionState;
+use self::query::QueryState;
 use self::util::Generator;
 
 pub mod executor;
 pub mod submission;
+pub mod query;
 
 mod util;
 
@@ -32,7 +35,9 @@ pub struct Coordinator {
     executorid: Generator<ExecutorId>,
 
     executors: BTreeMap<ExecutorId, ExecutorState>,
+    // TODO use enum here..?
     submissions: BTreeMap<QueryId, SubmissionState>,
+    queries: BTreeMap<QueryId, QueryState>,
 }
 
 impl Coordinator {
@@ -44,6 +49,7 @@ impl Coordinator {
             executorid: Generator::new(),
             executors: BTreeMap::new(),
             submissions: BTreeMap::new(),
+            queries: BTreeMap::new(),
         };
 
         // we use weak references to avoid cycles
@@ -73,7 +79,7 @@ impl Coordinator {
             let executors = self.catalog
                 .executors()
                 .filter(|e| e.format == *format)
-                .filter(|e| !executor_res[&e.id].has_ports());
+                .filter(|e| executor_res[&e.id].has_ports());
 
             // step 2.2: select executors according to user placment
             let (executors, num_executors, num_workers) = match req.placement {
@@ -122,9 +128,10 @@ impl Coordinator {
             query: query.clone(),
             hostlist: hostlist,
         };
-
+   
         // step 4: send requests to the selected coordinators
-        let spawn = executors.iter().map(|executor| {
+        debug!("selected executors for {:?}:{:?}", query.id, executors);
+        for executor in &executors {
             let handle = handle.clone();
             let executor = &executor_res[&executor.id];
             let response = executor.spawn(&spawnquery)
@@ -136,9 +143,11 @@ impl Coordinator {
                 });
 
             async::spawn(response);
-        });
+        }
 
         // TODO(swicki) add a timeout that triggers SpawnFailed here
+        
+        debug!("add pending submission for {:?}", query.id);
         let (submission, rx) = SubmissionState::new(query);
         self.submissions.insert(queryid, submission);
 
@@ -147,15 +156,53 @@ impl Coordinator {
 
     pub fn add_executor(&mut self, req: AddExecutor, tx: Outgoing) -> ExecutorId {
         let id = self.executorid.generate();
-        let executor = ExecutorState::new(tx, req.ports);
         debug!("adding executor {:?} to pool", id);
-        self.executors.insert(id, executor);
+
+        let state = ExecutorState::new(tx, req.ports);
+        let executor = Executor {
+            id: id,
+            host: req.host,
+            format: req.format,
+        };
+
+        self.executors.insert(id, state);
+        self.catalog.add_executor(executor);
         id
     }
 
     pub fn remove_executor(&mut self, id: ExecutorId) {
         debug!("removing executor {:?} from pool", id);
         self.executors.remove(&id);
+        self.catalog.remove_executor(id);
+    }
+    
+    pub fn add_worker_group(&mut self, id: QueryId, group: usize, out: Outgoing)
+        -> Promise<QueryToken, WorkerGroupError>
+    {
+        debug!("adding worker {:?} of {:?}", group, id);
+        match self.submissions.entry(id) {
+            Entry::Occupied(mut submission) => {
+                // add worker to wait list
+                let (ready, rx) = submission.get_mut().add_worker_group(group, out);
+
+                if ready {
+                // if it was the last worker, we move the query to the ready list
+                    let query = match submission.remove().promote() {
+                        Ok(query) => query,
+                        Err(_) => panic!("failed to promote submission"),
+                    };
+                    self.queries.insert(id, query);
+                }
+                
+                rx
+            }
+            Entry::Vacant(_) => {
+                // TODO(swicki): use futures::failed
+                let (tx, rx) = promise();
+                tx.complete(Err(WorkerGroupError::InvalidQueryId));
+                rx
+            }
+        }
     }
 }
 
@@ -175,6 +222,12 @@ impl CoordinatorRef {
 
     pub fn remove_executor(&mut self, id: ExecutorId) {
         self.coord.borrow_mut().remove_executor(id)
+    }
+
+    pub fn add_worker_group(&mut self, id: QueryId, group: usize, out: Outgoing)
+        -> Promise<QueryToken, WorkerGroupError>
+    {
+        self.coord.borrow_mut().add_worker_group(id, group, out)
     }
 
     fn cancel_submission(&self, id: QueryId, err: SubmissionError) {

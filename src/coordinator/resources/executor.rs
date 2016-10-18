@@ -25,6 +25,7 @@ impl ExecutorState {
     }
 
     pub fn spawn(&self, req: &SpawnQuery) -> Response<SpawnQuery> {
+        debug!("issue spawn request for {:?}", req.query.id);
         self.tx.request(req)
     }
 }

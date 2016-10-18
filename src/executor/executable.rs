@@ -14,7 +14,7 @@ pub const COORD: &'static str = "TIMELY_EXEC_CONF_COORD";
 pub const HOST: &'static str = "TIMELY_EXEC_CONF_HOST";
 
 #[derive(Debug)]
-pub struct ExecutableConfig {
+pub struct NativeExecutable {
     pub query_id: QueryId,
     pub threads: usize,
     pub process: usize,
@@ -41,9 +41,9 @@ impl From<num::ParseIntError> for ParseError {
     }
 }
 
-impl ExecutableConfig {
+impl NativeExecutable {
     pub fn from_env() -> Result<Self, ParseError> {
-        Ok(ExecutableConfig {
+        Ok(NativeExecutable {
             query_id: QueryId::from(env::var(QUERY_ID)?.parse::<u64>()?),
             threads: env::var(THREADS)?.parse::<usize>()?,
             process: env::var(PROCESS)?.parse::<usize>()?,
@@ -65,6 +65,7 @@ pub fn spawn<S: AsRef<OsStr>>(executable: S,
                               -> Result<Child, SpawnError> {
     Command::new(executable)
         .args(args)
+        .env("RUST_LOG", "debug") // TODO(swicki): this is only for debugging
         .env(QUERY_ID, id.0.to_string())
         .env(THREADS, threads.to_string())
         .env(PROCESS, process.to_string())
