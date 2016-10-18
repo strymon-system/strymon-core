@@ -1,16 +1,14 @@
 use std::io::{Error as IoError, ErrorKind};
 use std::sync::Mutex;
-use std::sync::mpsc;
 use std::thread;
 
 use timely_communication::{Allocator, WorkerGuards};
 use timely::{self, Configuration};
 use timely::dataflow::scopes::Root;
 
-use futures::{self, Future};
+use futures::Future;
 use futures::stream::Stream;
 
-use async;
 use network::{Network, reqresp};
 
 use executor::executable::NativeExecutable;

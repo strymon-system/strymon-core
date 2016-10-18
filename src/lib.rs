@@ -21,6 +21,7 @@ pub mod model;
 pub mod coordinator;
 pub mod executor;
 pub mod query;
+pub mod pubsub;
 
 pub mod network;
 pub mod async;

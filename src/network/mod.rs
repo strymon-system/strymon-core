@@ -11,6 +11,7 @@ use network::message::buf::{MessageBuf, read, write};
 pub mod message;
 pub mod reqresp;
 
+#[derive(Clone)]
 pub struct Network {
     external: String,
 }

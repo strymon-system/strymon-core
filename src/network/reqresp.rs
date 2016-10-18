@@ -1,15 +1,3 @@
-use abomonation::Abomonation;
-use async::queue;
-use byteorder::{NetworkEndian, ByteOrder};
-
-use futures::{self, Future, Async, Complete, Poll};
-use futures::stream::{Stream, Fuse};
-
-use network::message::{Encode, Decode};
-use network::message::abomonate::{Abomonate, NonStatic};
-use network::message::buf::MessageBuf;
-
-use network::{Sender, Receiver};
 use std::any::Any;
 use std::collections::HashMap;
 use std::io::{Error as IoError, Result as IoResult, ErrorKind};
@@ -17,6 +5,20 @@ use std::marker::PhantomData;
 use std::str::from_utf8;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+
+use abomonation::Abomonation;
+
+use byteorder::{NetworkEndian, ByteOrder};
+
+use futures::{self, Future, Async, Complete, Poll};
+use futures::stream::{Stream, Fuse};
+
+use async::queue;
+use network::message::{Encode, Decode};
+use network::message::abomonate::{Abomonate, NonStatic};
+use network::message::buf::MessageBuf;
+use network::{Sender, Receiver};
+
 use void::Void;
 
 pub trait Request: Abomonation + Any + Clone + NonStatic {
@@ -121,12 +123,7 @@ impl RequestBuf {
     }
 
     pub fn decode<R: Request>(mut self) -> Result<(R, Responder<R>), IoError> {
-        let payload = self.msg
-            .pop::<Abomonate, R>()
-            .map_err(|err| {
-                IoError::new(ErrorKind::InvalidData,
-                             format!("unable to decode request: {:?}", err))
-            })?;
+        let payload = self.msg.pop::<Abomonate, R>().map_err(Into::<IoError>::into)?;
         let responder = Responder {
             token: self.token,
             origin: self.origin,
