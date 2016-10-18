@@ -12,6 +12,7 @@ use abomonation::Abomonation;
 
 use network::{Network, Listener, Receiver, Sender};
 use network::message::abomonate::{Abomonate, NonStatic};
+use network::message::MessageBuf;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SubscriberId(pub u32);
@@ -137,13 +138,18 @@ pub struct StreamPublisher<D> {
 }
 
 impl<D: Abomonation + Any + Clone + NonStatic> StreamPublisher<D> {
-    pub fn new(network: &Network) -> Result<Self> {
+    pub fn new(network: &Network) -> Result<((String, u16), Self)> {
         let server = PublisherServer::new(network)?;
-        Ok(StreamPublisher {
+        let addr = {
+            let (host, port) = server.external_addr();
+            (host.to_string(), port)
+        };
+
+        Ok((addr, StreamPublisher {
             server: task::spawn(server),
             subscribers: BTreeMap::new(),
             marker: PhantomData,
-        })
+        }))
     }
 
     fn server_events(&mut self) -> Result<Vec<SubscriberEvent>> {
@@ -164,6 +170,12 @@ impl<D: Abomonation + Any + Clone + NonStatic> StreamPublisher<D> {
                     self.subscribers.remove(&id);
                 }
             }
+        }
+
+        let mut buf = MessageBuf::empty();
+        buf.push::<Abomonate, Vec<D>>(item).unwrap();
+        for sub in self.subscribers.values() {
+            sub.send(buf.clone())
         }
 
         Ok(())

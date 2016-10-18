@@ -24,7 +24,7 @@ pub struct Dispatch {
 
 impl Dispatch {
     pub fn new(coord: CoordinatorRef, tx: Outgoing) -> Self {
-        debug!("new connection");
+        debug!("dispatching on new incoming connection");
         Dispatch {
             coord: coord,
             associated: BTreeSet::new(),
@@ -56,7 +56,19 @@ impl Dispatch {
                 let id = self.coord.add_executor(req, self.tx.clone());
                 self.associated.insert(State::Executor(id));
                 resp.respond(Ok((id)));
-            }
+            },
+            "Publish" => {
+                let (req, resp) = req.decode::<Publish>()?;
+                resp.respond(self.coord.publish(req));
+            },
+            "Subscribe" => {
+                let (req, resp) = req.decode::<Subscribe>()?;
+                let subscribe = self.coord.subscribe(req)
+                    // TODO(swicki): turn panic into not found error
+                    .map_err(|e| e.expect("subscription promise canceled?!"))
+                    .then(|res| Ok(resp.respond(res)));
+                async::spawn(subscribe);
+            },
             _ => {
                 let err = Error::new(ErrorKind::InvalidData, "invalid request");
                 return Err(Stop::Fail(err));

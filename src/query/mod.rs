@@ -9,25 +9,31 @@ use timely::dataflow::scopes::Root;
 use futures::Future;
 use futures::stream::Stream;
 
-use network::{Network, reqresp};
+use network::{Network};
+use network::reqresp::{self, Outgoing};
 
 use executor::executable::NativeExecutable;
 use model::QueryId;
-use coordinator::requests::AddWorkerGroup;
+use coordinator::requests::{AddWorkerGroup, QueryToken};
 
-pub use self::coordinator::Coordinator;
+pub mod subscribe;
+pub mod publish;
 
-mod coordinator;
+#[derive(Clone)]
+pub struct Coordinator {
+    token: QueryToken,
+    network: Network,
+    tx: Outgoing,
+}
 
 fn initialize(id: QueryId, process: usize, coord: String, host: String) -> Result<Coordinator, IoError> {
     println!("initialze");
     let network = Network::init(host)?;
     let (tx, rx) = network.connect(&*coord).map(reqresp::multiplex)?;
 
-    println!("starting thread");
     // TODO(swicki) get rid of this
     thread::spawn(move || rx.for_each(|_| Ok(())).wait().expect("coordinator connection dropped"));
-    println!("announing myself");
+
     let announce = tx.request(&AddWorkerGroup {
         query: id,
         group: process,
@@ -40,7 +46,11 @@ fn initialize(id: QueryId, process: usize, coord: String, host: String) -> Resul
         }))
         .map_err(Result::unwrap_err)?;
     
-    Ok(coordinator::new(tx, token))
+    Ok(Coordinator {
+        tx: tx,
+        network: network,
+        token: token,
+    })
 }
 
 pub fn execute<T, F>(func: F) -> Result<WorkerGuards<T>, String>
@@ -50,8 +60,6 @@ pub fn execute<T, F>(func: F) -> Result<WorkerGuards<T>, String>
 {
     let config = NativeExecutable::from_env()
         .map_err(|err| format!("unable to parse executor data: {:?}", err))?;
-
-    println!("timely_query::execute in {:?}", config.query_id);
 
     // create timely configuration
     let timely_conf = if config.hostlist.len() > 1 {
@@ -64,8 +72,6 @@ pub fn execute<T, F>(func: F) -> Result<WorkerGuards<T>, String>
 
     let coord = initialize(config.query_id, config.process, config.coord, config.host)
         .map_err(|err| format!("failed to connect to coordinator: {:?}", err))?;
-
-    println!("initialzed");
 
     // wrap in mutex because timely requires `Sync` for some reason
     let coord = Mutex::new(coord);

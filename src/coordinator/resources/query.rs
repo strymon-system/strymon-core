@@ -12,9 +12,9 @@ pub struct QueryState {
 
 
 impl QueryState {
-    pub fn new() -> Self {
+    pub fn new(id: QueryId) -> Self {
         QueryState {
-            token: QueryToken(rand::random::<u64>())
+            token: QueryToken(id, rand::random::<u64>())
         }
     }
     

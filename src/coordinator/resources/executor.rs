@@ -17,10 +17,12 @@ impl ExecutorState {
     }
 
     pub fn has_ports(&self) -> bool {
+        // TODO(swicki): Do actual port allocation
         true
     }
 
     pub fn allocate_port(&mut self) -> u16 {
+        // TODO(swicki): Do actual port allocation
         self.port_min
     }
 

@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::collections::btree_map::Entry;
 use std::rc::{Rc, Weak};
 use std::cell::RefCell;
@@ -19,13 +19,11 @@ use coordinator::catalog::Catalog;
 use self::executor::ExecutorState;
 use self::submission::SubmissionState;
 use self::query::QueryState;
-use self::util::Generator;
+use super::util::Generator;
 
 pub mod executor;
 pub mod submission;
 pub mod query;
-
-mod util;
 
 pub struct Coordinator {
     handle: Weak<RefCell<Coordinator>>,
@@ -38,6 +36,7 @@ pub struct Coordinator {
     // TODO use enum here..?
     submissions: BTreeMap<QueryId, SubmissionState>,
     queries: BTreeMap<QueryId, QueryState>,
+    lookups: HashMap<String, Vec<Complete<Topic, SubscribeError>>>,
 }
 
 impl Coordinator {
@@ -50,6 +49,7 @@ impl Coordinator {
             executors: BTreeMap::new(),
             submissions: BTreeMap::new(),
             queries: BTreeMap::new(),
+            lookups: HashMap::new(),
         };
 
         // we use weak references to avoid cycles
@@ -154,7 +154,7 @@ impl Coordinator {
         return rx;
     }
 
-    pub fn add_executor(&mut self, req: AddExecutor, tx: Outgoing) -> ExecutorId {
+    fn add_executor(&mut self, req: AddExecutor, tx: Outgoing) -> ExecutorId {
         let id = self.executorid.generate();
         debug!("adding executor {:?} to pool", id);
 
@@ -170,13 +170,13 @@ impl Coordinator {
         id
     }
 
-    pub fn remove_executor(&mut self, id: ExecutorId) {
+    fn remove_executor(&mut self, id: ExecutorId) {
         debug!("removing executor {:?} from pool", id);
         self.executors.remove(&id);
         self.catalog.remove_executor(id);
     }
     
-    pub fn add_worker_group(&mut self, id: QueryId, group: usize, out: Outgoing)
+    fn add_worker_group(&mut self, id: QueryId, group: usize, out: Outgoing)
         -> Promise<QueryToken, WorkerGroupError>
     {
         debug!("adding worker {:?} of {:?}", group, id);
@@ -204,6 +204,51 @@ impl Coordinator {
             }
         }
     }
+
+    fn check_token(&self, token: &QueryToken) -> bool {
+        if let Some(ref reference) = self.queries.get(&token.0) {
+            *token == reference.token()
+        } else {
+            false
+        }
+    }
+
+    fn publish(&mut self, req: Publish) -> Result<Topic, PublishError> {
+        if !self.check_token(&req.token) {
+            Err(PublishError::AuthenticationFailure)
+        } else {
+            let query = req.token.0;
+            let result = self.catalog.publish(query, req.name, req.addr, req.kind);
+            if let Ok(ref topic) = result {
+                if let Some(pending) = self.lookups.remove(&topic.name) {
+                    for tx in pending {
+                        tx.complete(Ok(topic.clone()));
+                    }
+                }
+            }
+            result
+        }
+    }
+
+    fn subscribe(&mut self, req: Subscribe) -> Promise<Topic, SubscribeError> {
+        let (tx, rx) = promise();
+        if !self.check_token(&req.token) {
+            tx.complete(Err(SubscribeError::AuthenticationFailure));
+        } else {
+            let query = req.token.0;
+
+            if let Some(topic) = self.catalog.lookup(&req.name) {
+                self.catalog.subscribe(query, topic.id);
+                tx.complete(Ok(topic));
+            } else if req.blocking {
+                self.lookups.entry(req.name).or_insert(Vec::new()).push(tx);
+            } else {
+                tx.complete(Err(SubscribeError::TopicNotFound));
+            }
+        }
+        
+        rx
+    }
 }
 
 #[derive(Clone)]
@@ -228,6 +273,14 @@ impl CoordinatorRef {
         -> Promise<QueryToken, WorkerGroupError>
     {
         self.coord.borrow_mut().add_worker_group(id, group, out)
+    }
+
+    pub fn publish(&mut self, req: Publish) -> Result<Topic, PublishError> {
+        self.coord.borrow_mut().publish(req)
+    }
+    
+    pub fn subscribe(&mut self, req: Subscribe) -> Promise<Topic, SubscribeError> {
+        self.coord.borrow_mut().subscribe(req)
     }
 
     fn cancel_submission(&self, id: QueryId, err: SubmissionError) {

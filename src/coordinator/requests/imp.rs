@@ -2,6 +2,28 @@ use abomonation::Abomonation;
 
 use super::*;
 
+unsafe_abomonate!(Submission: query, name, placement);
+unsafe_abomonate!(SubmissionError);
+
+unsafe_abomonate!(AddExecutor: host, ports, format);
+unsafe_abomonate!(ExecutorError);
+
+unsafe_abomonate!(AddWorkerGroup: query, group);
+unsafe_abomonate!(QueryToken);
+unsafe_abomonate!(WorkerGroupError);
+
+unsafe_abomonate!(Subscribe: name, blocking, token);
+unsafe_abomonate!(SubscribeError);
+
+unsafe_abomonate!(Unsubscribe: topic, token);
+unsafe_abomonate!(UnsubscribeError);
+
+unsafe_abomonate!(Publish: name, addr, kind, token);
+unsafe_abomonate!(PublishError);
+
+unsafe_abomonate!(Unpublish: topic, token);
+unsafe_abomonate!(UnpublishError);
+
 impl Abomonation for Placement {
     #[inline]
     unsafe fn embalm(&mut self) {
@@ -25,13 +47,3 @@ impl Abomonation for Placement {
         }
     }
 }
-
-unsafe_abomonate!(Submission: query, name, placement);
-unsafe_abomonate!(SubmissionError);
-
-unsafe_abomonate!(AddExecutor: host, ports, format);
-unsafe_abomonate!(ExecutorError);
-
-unsafe_abomonate!(AddWorkerGroup: query, group);
-unsafe_abomonate!(QueryToken);
-unsafe_abomonate!(WorkerGroupError);

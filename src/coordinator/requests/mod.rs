@@ -51,7 +51,7 @@ impl Request for AddExecutor {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct QueryToken(pub u64);
+pub struct QueryToken(pub QueryId, pub u64);
 
 #[derive(Clone, Debug)]
 pub struct AddWorkerGroup {
@@ -72,5 +72,92 @@ impl Request for AddWorkerGroup {
 
     fn name() -> &'static str {
         "AddWorkerGroup"
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Subscribe {
+    pub name: String,
+    pub blocking: bool,
+    pub token: QueryToken,
+}
+
+#[derive(Clone, Debug)]
+pub enum SubscribeError {
+    TopicNotFound,
+    AuthenticationFailure,
+}
+
+impl Request for Subscribe {
+    type Success = Topic;
+    type Error = SubscribeError;
+
+    fn name() -> &'static str {
+        "Subscribe"
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Unsubscribe {
+    pub topic: TopicId,
+    pub token: QueryToken,
+}
+
+#[derive(Clone, Debug)]
+pub enum UnsubscribeError {
+    InvalidTopicId,
+    AuthenticationFailure,
+}
+
+impl Request for Unsubscribe {
+    type Success = ();
+    type Error = UnsubscribeError;
+    
+    fn name() -> &'static str {
+        "Unsubscribe"
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Publish {
+    pub name: String,
+    pub addr: (String, u16),
+    pub kind: TopicType,
+    pub token: QueryToken,
+}
+
+#[derive(Clone, Debug)]
+pub enum PublishError {
+    TopicAlreadyExists,
+    AuthenticationFailure,
+}
+
+impl Request for Publish {
+    type Success = Topic;
+    type Error = PublishError;
+    
+    fn name() -> &'static str {
+        "Publish"
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Unpublish {
+    pub topic: TopicId,
+    pub token: QueryToken,
+}
+
+#[derive(Clone, Debug)]
+pub enum UnpublishError {
+    InvalidTopicId,
+    AuthenticationFailure,
+}
+
+impl Request for Unpublish {
+    type Success = ();
+    type Error = UnpublishError;
+    
+    fn name() -> &'static str {
+        "Unpublish"
     }
 }

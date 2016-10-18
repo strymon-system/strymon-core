@@ -55,7 +55,7 @@ pub struct Executor {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Publication(QueryId, TopicId);
+pub struct Publication(pub QueryId, pub TopicId);
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Subscription(QueryId, TopicId);
+pub struct Subscription(pub QueryId, pub TopicId);

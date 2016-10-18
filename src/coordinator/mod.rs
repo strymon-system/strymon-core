@@ -17,6 +17,8 @@ pub mod resources;
 pub mod catalog;
 pub mod dispatch;
 
+mod util;
+
 pub fn coordinate(port: u16) -> Result<()> {
     let network = Network::init(None)?;
     let listener = network.listen(port)?;

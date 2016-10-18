@@ -39,13 +39,13 @@ impl SubmissionState {
 
         (self.worker.iter().all(Option::is_some), rx)
     }
-    
+
     pub fn promote(mut self) -> Result<QueryState, Self> {
         if self.worker.iter().any(Option::is_none) {
             return Err(self);
         }
 
-        let state = QueryState::new();
+        let state = QueryState::new(self.template.id);
         let worker = self.worker.into_iter().map(Option::unwrap);
         for (_, complete) in worker {
             complete.complete(Ok(state.token()))

@@ -10,17 +10,17 @@ use abomonation::Abomonation;
 use network::{Network, Receiver, Sender};
 use network::message::abomonate::{Abomonate, NonStatic};
 
-pub struct SubscriberClient<D> {
+pub struct Subscriber<D> {
     rx: Receiver,
     _tx: Sender,
     marker: PhantomData<D>,
 }
 
-impl<D> SubscriberClient<D> {
+impl<D> Subscriber<D> {
     pub fn connect<A: ToSocketAddrs>(addr: A, network: &Network) -> Result<Self> {
         let (tx, rx) = network.connect(addr)?;
 
-        Ok(SubscriberClient {
+        Ok(Subscriber {
             rx: rx,
             _tx: tx,
             marker: PhantomData,
@@ -28,7 +28,7 @@ impl<D> SubscriberClient<D> {
     }
 }
 
-impl<D: Abomonation + Any + Clone + NonStatic> Stream for SubscriberClient<D> {
+impl<D: Abomonation + Any + Clone + NonStatic> Stream for Subscriber<D> {
     type Item = Vec<D>;
     type Error = Error;
 
