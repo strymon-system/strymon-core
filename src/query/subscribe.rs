@@ -71,7 +71,7 @@ impl From<IoError> for SubscriptionError {
 type AsyncResult<T, E> = Box<Future<Item=T, Error=E>>;
 
 impl Coordinator {
-    fn do_subscribe<D>(&self, name: String, blocking: bool) -> AsyncResult<Subscription<D>, SubscriptionError>
+    fn do_subscribe<D>(&self, name: String, blocking: bool) -> Result<Subscription<D>, SubscriptionError>
         where D: Data + NonStatic {
 
         let coord = self.clone();
@@ -99,16 +99,16 @@ impl Coordinator {
                 })
             }
         });
-
-        Box::new(future)
+        
+        future.wait()
     }
 
-    pub fn subscribe<D, N>(&self, name: N) -> AsyncResult<Subscription<D>, SubscriptionError>
+    pub fn subscribe<D, N>(&self, name: N) -> Result<Subscription<D>, SubscriptionError>
         where N: Into<String>, D: Data + NonStatic {
         self.do_subscribe(name.into(), false)
     }
 
-    pub fn blocking_subscribe<D, N>(&self, name: N) -> AsyncResult<Subscription<D>, SubscriptionError>
+    pub fn blocking_subscribe<D, N>(&self, name: N) -> Result<Subscription<D>, SubscriptionError>
         where N: Into<String>, D: Data + NonStatic {
         self.do_subscribe(name.into(), true)
     }

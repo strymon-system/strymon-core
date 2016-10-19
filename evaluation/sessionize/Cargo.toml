@@ -6,4 +6,6 @@ authors = ["Sebastian Wicki <swicki@student.ethz.ch>"]
 [dependencies]
 sessionize = { path = "../trace-analyzer/amadeus/sessionize" }
 timely-query = { path = "../.." }
+timely-contrib = { path = "../trace-analyzer/timely-contrib" }
 timely = "0.1"
+abomonation = "0.4"

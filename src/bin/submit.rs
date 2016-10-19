@@ -20,7 +20,7 @@ fn main() {
     drop(env_logger::init());
 
     let binary = env::args().nth(1).expect("missing binary path");
-    let coord = env::args().nth(2).unwrap_or("localhost:9189".to_string());
+    let coord = "localhost:9189".to_string();
 
     let source = fs::canonicalize(binary)
         .and_then(|path| {
@@ -33,7 +33,7 @@ fn main() {
     let query = QueryProgram {
         source: source,
         format: ExecutionFormat::NativeExecutable,
-        args: vec![],
+        args: env::args().skip(2).collect(),
     };
     
     let submission = Submission {

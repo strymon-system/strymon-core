@@ -59,7 +59,7 @@ pub fn execute<T, F>(func: F) -> Result<WorkerGuards<T>, String>
           F: Send + Sync + 'static
 {
     let config = NativeExecutable::from_env()
-        .map_err(|err| format!("unable to parse executor data: {:?}", err))?;
+        .map_err(|err| format!("parse failure. not running on an executor?"))?;
 
     // create timely configuration
     let timely_conf = if config.hostlist.len() > 1 {

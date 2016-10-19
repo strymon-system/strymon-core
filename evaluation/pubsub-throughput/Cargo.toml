@@ -1,0 +1,15 @@
+[package]
+name = "pubsub-throughput"
+version = "0.1.0"
+authors = ["Sebastian Wicki <gandro@gmx.net>"]
+
+[features]
+default = []
+pubsub = []
+caprep = []
+native = []
+
+[dependencies]
+timely-query = { path = "../.." }
+timely = "0.1"
+time = "0.1"

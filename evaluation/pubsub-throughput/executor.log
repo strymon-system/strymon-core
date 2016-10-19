@@ -1,0 +1,5 @@
+DEBUG:timely_query::executor: got spawn request for Query { id: QueryId(0), name: None, program: QueryProgram { format: NativeExecutable, source: "/home/gandro/ETH/Masterarbeit/repos/timely-query/target/release/consumer", args: ["1000", "10"] }, workers: 1, executors: [ExecutorId(0)] }
+initialze
+DEBUG:timely_query::executor: got spawn request for Query { id: QueryId(1), name: None, program: QueryProgram { format: NativeExecutable, source: "/home/gandro/ETH/Masterarbeit/repos/timely-query/target/release/producer", args: ["1000", "10"] }, workers: 1, executors: [ExecutorId(0)] }
+initialze
+total time: 87830

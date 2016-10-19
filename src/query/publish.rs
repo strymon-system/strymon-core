@@ -39,13 +39,10 @@ type AsyncResult<T, E> = Box<Future<Item=T, Error=E>>;
 
 impl Coordinator {
     // TODO(swicki): Merge contract
-    pub fn publish<D, S, N>(&self, name: N, stream: &Stream<S, D>) -> AsyncResult<Topic, PublicationError>
+    pub fn publish<D, S, N>(&self, name: N, stream: &Stream<S, D>) -> Result<Topic, PublicationError>
         where D: Data + NonStatic, N: Into<String>, S: Scope
     {
-        let (addr, publisher) = match StreamPublisher::<D>::new(&self.network) {
-            Ok(ok) => ok,
-            Err(err) => return Box::new(futures::failed(err.into())),
-        };
+        let (addr, publisher) = StreamPublisher::<D>::new(&self.network)?;
 
         let mut publisher = Some(publisher);
 
@@ -59,7 +56,7 @@ impl Coordinator {
             });
         });
 
-        let future = self.tx.request(&Publish {
+        self.tx.request(&Publish {
             name: name.into(),
             token: self.token,
             kind: TopicType::of::<D>(),
@@ -69,8 +66,6 @@ impl Coordinator {
                 Ok(err) => PublicationError::from(err),
                 Err(err) => PublicationError::from(err),
             }
-        });
-
-        Box::new(future)
+        }).wait()
     }
 }

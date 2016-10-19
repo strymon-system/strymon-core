@@ -4,7 +4,7 @@ name = "timely-query"
 version = "0.1.0"
 
 [workspace]
-members = ["evaluation/sessionize"]
+members = ["evaluation/sessionize", "evaluation/pubsub-throughput"]
 
 [[bin]]
 name = "coordinator"
