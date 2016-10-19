@@ -1,0 +1,3 @@
+[submodule "evaluation/trace-analyzer"]
+	path = evaluation/trace-analyzer
+	url = ssh://vcs-user@code.systems.ethz.ch:8006/diffusion/TRC/trace-analyzer.git

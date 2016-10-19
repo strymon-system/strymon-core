@@ -1,0 +1,9 @@
+[package]
+name = "sessionize-query"
+version = "0.1.0"
+authors = ["Sebastian Wicki <swicki@student.ethz.ch>"]
+
+[dependencies]
+sessionize = { path = "../trace-analyzer/amadeus/sessionize" }
+timely-query = { path = "../.." }
+timely = "0.1"

@@ -15,7 +15,6 @@ extern crate timely_communication;
 extern crate rand;
 extern crate byteorder;
 extern crate void;
-extern crate bit_set;
 
 pub mod model;
 pub mod coordinator;
