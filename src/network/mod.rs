@@ -1,7 +1,7 @@
 use std::io::{Result, Error};
 use std::net::{TcpListener, TcpStream, Shutdown, ToSocketAddrs};
-use std::sync::mpsc;
-use std::thread;
+use std::sync::{mpsc, Arc, Mutex};
+use std::thread::{self, JoinHandle};
 
 use futures::{Future, Poll};
 use futures::stream::{self, Stream};
@@ -13,22 +13,90 @@ pub mod reqresp;
 
 #[derive(Clone)]
 pub struct Network {
-    external: String,
+    external: Arc<String>,
+    threads: Arc<ThreadPool>,
 }
 
 impl Network {
     pub fn init<T: Into<Option<String>>>(external: T) -> Result<Self> {
         let external = external.into()
             .unwrap_or_else(|| String::from("localhost"));
-        Ok(Network { external: external })
+        Ok(Network {
+            external: Arc::new(external),
+            threads: Arc::new(ThreadPool::new()),
+        })
     }
 
     pub fn connect<E: ToSocketAddrs>(&self, endpoint: E) -> Result<(Sender, Receiver)> {
-        channel(TcpStream::connect(endpoint)?)
+        self.channel(TcpStream::connect(endpoint)?)
     }
 
     pub fn listen<P: Into<Option<u16>>>(&self, port: P) -> Result<Listener> {
-        Listener::new(self.external.clone(), port.into().unwrap_or(0))
+        Listener::new(self.clone(), port.into().unwrap_or(0))
+    }
+
+    fn channel(&self, stream: TcpStream) -> Result<(Sender, Receiver)> {
+        let mut instream = stream.try_clone()?;
+        let mut outstream = stream;
+
+        let (sender_tx, sender_rx) = mpsc::channel();
+        self.threads.spawn(move || {
+            while let Ok(msg) = sender_rx.recv() {
+                if let Err(err) = write(&mut outstream, &msg) {
+                    info!("unexpected error while writing bytes: {:?}", err);
+                    break;
+                }
+            }
+
+            drop(outstream.shutdown(Shutdown::Both));
+        });
+
+        let (receiver_tx, receiver_rx) = stream::channel();
+        self.threads.spawn(move || {
+            let mut tx = receiver_tx;
+            let mut is_ok = true;
+            while is_ok {
+                let message = read(&mut instream);
+                is_ok = message.is_ok();
+                tx = match tx.send(message).wait() {
+                    Ok(tx) => tx,
+                    Err(_) => break,
+                }
+            }
+
+            drop(instream.shutdown(Shutdown::Both));
+        });
+
+        Ok((Sender { tx: sender_tx }, Receiver { rx: receiver_rx }))
+    }
+}
+
+struct ThreadPool {
+    threads: Mutex<Vec<JoinHandle<()>>>,
+}
+
+impl ThreadPool {
+    fn new() -> Self {
+        ThreadPool {
+            threads: Mutex::new(Vec::new()),
+        }
+    }
+
+    fn spawn<F: FnOnce() + Send +'static>(&self, f: F) {
+        let handle = thread::spawn(f);
+        self.threads.lock().unwrap().push(handle);
+    }
+}
+
+impl Drop for ThreadPool {
+    fn drop(&mut self) {
+        debug!("waiting for all network threads to finish");
+        let threads = self.threads.get_mut().unwrap();
+        for thread in threads.drain(..) {
+            if let Err(err) = thread.join() {
+                error!("network thread panicked: {:?}", err);
+            }
+        }
     }
 }
 
@@ -57,15 +125,16 @@ impl Stream for Receiver {
 }
 
 pub struct Listener {
-    external: String,
+    external: Arc<String>,
     port: u16,
     rx: stream::Receiver<(Sender, Receiver), Error>,
 }
 
 impl Listener {
-    fn new(external: String, port: u16) -> Result<Self> {
+    fn new(network: Network, port: u16) -> Result<Self> {
         let sockaddr = ("::", port);
         let listener = TcpListener::bind(&sockaddr)?;
+        let external = network.external.clone();
         let port = listener.local_addr()?.port();
 
         let (tx, rx) = stream::channel();
@@ -75,12 +144,13 @@ impl Listener {
             while is_ok {
                 let stream = listener.accept();
                 is_ok = stream.is_ok();
-                let pair = stream.and_then(|(s, _)| channel(s));
+                let pair = stream.and_then(|(s, _)| network.channel(s));
                 tx = match tx.send(pair).wait() {
                     Ok(tx) => tx,
                     Err(_) => break,
                 }
             }
+            debug!("listener thread is exiting");
         });
 
         Ok(Listener {
@@ -104,40 +174,6 @@ impl Stream for Listener {
     }
 }
 
-fn channel(stream: TcpStream) -> Result<(Sender, Receiver)> {
-    let mut instream = stream.try_clone()?;
-    let mut outstream = stream;
-
-    let (sender_tx, sender_rx) = mpsc::channel();
-    thread::spawn(move || {
-        while let Ok(msg) = sender_rx.recv() {
-            if let Err(err) = write(&mut outstream, &msg) {
-                info!("unexpected error while writing bytes: {:?}", err);
-                break;
-            }
-        }
-
-        drop(outstream.shutdown(Shutdown::Both));
-    });
-
-    let (receiver_tx, receiver_rx) = stream::channel();
-    thread::spawn(move || {
-        let mut tx = receiver_tx;
-        let mut is_ok = true;
-        while is_ok {
-            let message = read(&mut instream);
-            is_ok = message.is_ok();
-            tx = match tx.send(message).wait() {
-                Ok(tx) => tx,
-                Err(_) => break,
-            }
-        }
-
-        drop(instream.shutdown(Shutdown::Both));
-    });
-
-    Ok((Sender { tx: sender_tx }, Receiver { rx: receiver_rx }))
-}
 
 fn _assert() {
     fn _is_send<T: Send>() {}

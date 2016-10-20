@@ -1,15 +1,19 @@
 [package]
+authors = ["Sebastian Wicki <gandro@gmx.net>"]
 name = "pubsub-throughput"
 version = "0.1.0"
-authors = ["Sebastian Wicki <gandro@gmx.net>"]
-
-[features]
-default = []
-pubsub = []
-caprep = []
-native = []
 
 [dependencies]
-timely-query = { path = "../.." }
-timely = "0.1"
+env_logger = "0.3.5"
+log = "0.3.6"
 time = "0.1"
+timely = "0.1"
+
+[dependencies.timely-query]
+path = "../.."
+
+[features]
+caprep = []
+default = []
+native = []
+pubsub = []

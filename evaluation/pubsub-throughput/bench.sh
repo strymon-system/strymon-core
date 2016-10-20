@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -eou
+set -euo pipefail
 
 FEATURES="pubsub"
 MSGSIZES="10 100 1000"
@@ -32,12 +32,8 @@ for feature in $FEATURES ; do
         spawn executor
 
         submit `which consumer` $MSGCOUNT $msgsize
-        consumer=$!
-        sleep 1
         submit `which producer` $MSGCOUNT $msgsize
-        producer=$!
 
-        sleep 10h
-        kill $coordinator
+        wait $coordinator
     done
 done

@@ -21,7 +21,7 @@ fn main() {
                 .map(move |i| (worker_id, i))
                 .inspect(move |x| println!("pub({:?}): {:?}", worker_id, x));
             
-            coord.publish::<(i32, i32), _, _>("foo", &stream).wait().unwrap();
+            coord.publish::<(i32, i32), _, _>("foo", &stream).unwrap();
 
             input
         });

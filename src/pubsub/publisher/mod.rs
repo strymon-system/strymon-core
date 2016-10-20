@@ -130,9 +130,33 @@ impl Unpark for Nop {
     fn unpark(&self) { }
 }
 
+struct PollServer {
+    server: Spawn<PublisherServer>,
+    unpark: Arc<Unpark>,
+}
+
+impl PollServer {
+    fn poll_events(&mut self) -> Result<Vec<SubscriberEvent>> {
+        match self.server.poll_stream(self.unpark.clone())? {
+            Async::Ready(Some(events)) => Ok(events),
+            Async::NotReady => Ok(Vec::new()),
+            Async::Ready(None) => Err(Error::new(ErrorKind::NotConnected, "disconnected")),
+        }
+    }
+}
+
+impl From<PublisherServer> for PollServer {
+    fn from(server: PublisherServer) -> Self {
+        PollServer {
+            server: task::spawn(server),
+            unpark: Arc::new(Nop),
+        }
+    }
+}
+
 
 pub struct StreamPublisher<D> {
-    server: Spawn<PublisherServer>,
+    server: PollServer,
     subscribers: BTreeMap<SubscriberId, Sender>,
     marker: PhantomData<D>,
 }
@@ -146,22 +170,14 @@ impl<D: Abomonation + Any + Clone + NonStatic> StreamPublisher<D> {
         };
 
         Ok((addr, StreamPublisher {
-            server: task::spawn(server),
+            server: PollServer::from(server),
             subscribers: BTreeMap::new(),
             marker: PhantomData,
         }))
     }
 
-    fn server_events(&mut self) -> Result<Vec<SubscriberEvent>> {
-        match self.server.poll_stream(Arc::new(Nop))? {
-            Async::Ready(Some(events)) => Ok(events),
-            Async::NotReady => Ok(Vec::new()),
-            Async::Ready(None) => Err(Error::new(ErrorKind::NotConnected, "disconnected")),
-        }
-    }
-
     pub fn publish(&mut self, item: &Vec<D>) -> Result<()> {
-        for event in self.server_events()? {
+        for event in self.server.poll_events()? {
             match event {
                 SubscriberEvent::Accepted(id, tx) => {
                     self.subscribers.insert(id, tx);
@@ -181,3 +197,5 @@ impl<D: Abomonation + Any + Clone + NonStatic> StreamPublisher<D> {
         Ok(())
     }
 }
+
+

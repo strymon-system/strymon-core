@@ -68,14 +68,12 @@ impl From<IoError> for SubscriptionError {
     }
 }
 
-type AsyncResult<T, E> = Box<Future<Item=T, Error=E>>;
-
 impl Coordinator {
     fn do_subscribe<D>(&self, name: String, blocking: bool) -> Result<Subscription<D>, SubscriptionError>
         where D: Data + NonStatic {
 
         let coord = self.clone();
-        let future = self.tx.request(&Subscribe {
+        self.tx.request(&Subscribe {
             name: name,
             token: self.token,
             blocking: blocking,
@@ -98,9 +96,7 @@ impl Coordinator {
                     coord: coord,
                 })
             }
-        });
-        
-        future.wait()
+        }).wait()
     }
 
     pub fn subscribe<D, N>(&self, name: N) -> Result<Subscription<D>, SubscriptionError>

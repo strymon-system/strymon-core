@@ -27,7 +27,6 @@ pub struct Coordinator {
 }
 
 fn initialize(id: QueryId, process: usize, coord: String, host: String) -> Result<Coordinator, IoError> {
-    println!("initialze");
     let network = Network::init(host)?;
     let (tx, rx) = network.connect(&*coord).map(reqresp::multiplex)?;
 
@@ -63,10 +62,13 @@ pub fn execute<T, F>(func: F) -> Result<WorkerGuards<T>, String>
 
     // create timely configuration
     let timely_conf = if config.hostlist.len() > 1 {
+        println!("Configuration:Cluster({}, {}/{})", config.threads, config.process, config.hostlist.len());
         Configuration::Cluster(config.threads, config.process, config.hostlist, true)
     } else if config.threads > 1 {
+        println!("Configuration:Process({})", config.threads);
         Configuration::Process(config.threads)
     } else {
+        println!("Configuration:Thread");
         Configuration::Thread
     };
 

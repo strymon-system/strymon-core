@@ -4,7 +4,8 @@ Evaluate the overhead of pub/sub in terms of throughput.
 
     - live capture/replay
     - raw tcp writes
-    
+    - two worker on different nodes?
+
 Variables:
 
     Experiment (3): pub/sub, capture/replay, raw tcp

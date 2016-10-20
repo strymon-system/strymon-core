@@ -35,8 +35,6 @@ impl From<IoError> for PublicationError {
     }
 }
 
-type AsyncResult<T, E> = Box<Future<Item=T, Error=E>>;
-
 impl Coordinator {
     // TODO(swicki): Merge contract
     pub fn publish<D, S, N>(&self, name: N, stream: &Stream<S, D>) -> Result<Topic, PublicationError>

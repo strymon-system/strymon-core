@@ -220,6 +220,7 @@ impl Coordinator {
             let query = req.token.0;
             let result = self.catalog.publish(query, req.name, req.addr, req.kind);
             if let Ok(ref topic) = result {
+                debug!("resolving lookup for topic: {:?}", &topic.name);
                 if let Some(pending) = self.lookups.remove(&topic.name) {
                     for tx in pending {
                         tx.complete(Ok(topic.clone()));
@@ -241,6 +242,7 @@ impl Coordinator {
                 self.catalog.subscribe(query, topic.id);
                 tx.complete(Ok(topic));
             } else if req.blocking {
+                debug!("inserting blocking lookup for topic: {:?}", &req.name);
                 self.lookups.entry(req.name).or_insert(Vec::new()).push(tx);
             } else {
                 tx.complete(Err(SubscribeError::TopicNotFound));
