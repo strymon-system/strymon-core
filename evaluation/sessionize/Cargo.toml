@@ -1,11 +1,23 @@
 [package]
+authors = ["Sebastian Wicki <swicki@student.ethz.ch>"]
 name = "sessionize-query"
 version = "0.1.0"
-authors = ["Sebastian Wicki <swicki@student.ethz.ch>"]
 
 [dependencies]
-sessionize = { path = "../trace-analyzer/amadeus/sessionize" }
-timely-query = { path = "../.." }
-timely-contrib = { path = "../trace-analyzer/timely-contrib" }
-timely = "0.1"
 abomonation = "0.4"
+libc = "0.2"
+time = "0.1"
+timely = "0.1.15"
+walkdir = "0.1"
+
+[dependencies.logparse]
+path = "../trace-analyzer/amadeus/logparse"
+
+[dependencies.sessionize]
+path = "../trace-analyzer/amadeus/sessionize"
+
+[dependencies.timely-contrib]
+path = "../trace-analyzer/timely-contrib"
+
+[dependencies.timely-query]
+path = "../.."

@@ -1,0 +1,11 @@
+Sessonization Benchmark
+-----------------------
+
+The main monolith is taken from trace_analizyer/analysis_stats. In order to
+build it, execute the following:
+
+    TODO
+    
+    git submodule init
+    cd logparse; build.sh
+    cargo build --release
