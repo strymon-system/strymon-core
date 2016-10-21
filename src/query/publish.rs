@@ -9,7 +9,7 @@ use futures::{Future, self};
 use coordinator::requests::*;
 use network::message::abomonate::NonStatic;
 
-use pubsub::publisher::StreamPublisher;
+use pubsub::publisher::item::ItemPublisher as StreamPublisher;
 use model::{Topic, TopicType};
 use query::Coordinator;
 

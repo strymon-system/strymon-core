@@ -1,4 +1,3 @@
-use std::collections::BTreeSet;
 use std::io::{Error, ErrorKind};
 
 use futures::Future;
@@ -9,6 +8,7 @@ use network::reqresp::{Outgoing, RequestBuf};
 
 use super::resources::CoordinatorRef;
 use super::requests::*;
+use super::util::HashBag;
 use model::*;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -21,7 +21,7 @@ enum State {
 
 pub struct Dispatch {
     coord: CoordinatorRef,
-    associated: BTreeSet<State>, // TODO this needs to be a multiset
+    associated: HashBag<State>,
     tx: Outgoing,
 }
 
@@ -30,7 +30,7 @@ impl Dispatch {
         debug!("dispatching on new incoming connection");
         Dispatch {
             coord: coord,
-            associated: BTreeSet::new(),
+            associated: HashBag::new(),
             tx: tx,
         }
     }
@@ -85,11 +85,11 @@ impl Dispatch {
 
 impl Drop for Dispatch {
     fn drop(&mut self) {
-        for state in &self.associated {
+        /*for state in &self.associated {
             match *state {
                 State::Executor(id) => self.coord.remove_executor(id),
                 _ => unimplemented!()
             }
-        }
+        }*/
     }
 }
