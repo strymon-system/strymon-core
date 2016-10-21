@@ -1,6 +1,6 @@
 use std::io::{Result, Error};
 use std::net::{TcpListener, TcpStream, Shutdown, ToSocketAddrs};
-use std::sync::{mpsc, Arc, Mutex};
+use std::sync::{mpsc, Arc};
 use std::thread::{self, JoinHandle};
 
 use futures::{Future, Poll};
@@ -14,7 +14,6 @@ pub mod reqresp;
 #[derive(Clone)]
 pub struct Network {
     external: Arc<String>,
-    threads: Arc<ThreadPool>,
 }
 
 impl Network {
@@ -23,7 +22,6 @@ impl Network {
             .unwrap_or_else(|| String::from("localhost"));
         Ok(Network {
             external: Arc::new(external),
-            threads: Arc::new(ThreadPool::new()),
         })
     }
 
@@ -40,7 +38,7 @@ impl Network {
         let mut outstream = stream;
 
         let (sender_tx, sender_rx) = mpsc::channel();
-        self.threads.spawn(move || {
+        let thr = thread::spawn(move || {
             while let Ok(msg) = sender_rx.recv() {
                 if let Err(err) = write(&mut outstream, &msg) {
                     info!("unexpected error while writing bytes: {:?}", err);
@@ -51,8 +49,13 @@ impl Network {
             drop(outstream.shutdown(Shutdown::Both));
         });
 
+        let sender = Sender {
+            tx: Some(sender_tx),
+            thr: Arc::new(Some(thr)),
+        };
+
         let (receiver_tx, receiver_rx) = stream::channel();
-        self.threads.spawn(move || {
+        thread::spawn(move || {
             let mut tx = receiver_tx;
             let mut is_ok = true;
             while is_ok {
@@ -66,48 +69,31 @@ impl Network {
 
             drop(instream.shutdown(Shutdown::Both));
         });
+        let receiver = Receiver { rx: receiver_rx };
 
-        Ok((Sender { tx: sender_tx }, Receiver { rx: receiver_rx }))
-    }
-}
-
-struct ThreadPool {
-    threads: Mutex<Vec<JoinHandle<()>>>,
-}
-
-impl ThreadPool {
-    fn new() -> Self {
-        ThreadPool {
-            threads: Mutex::new(Vec::new()),
-        }
-    }
-
-    fn spawn<F: FnOnce() + Send +'static>(&self, f: F) {
-        let handle = thread::spawn(f);
-        self.threads.lock().unwrap().push(handle);
-    }
-}
-
-impl Drop for ThreadPool {
-    fn drop(&mut self) {
-        debug!("waiting for all network threads to finish");
-        let threads = self.threads.get_mut().unwrap();
-        for thread in threads.drain(..) {
-            if let Err(err) = thread.join() {
-                error!("network thread panicked: {:?}", err);
-            }
-        }
+        Ok((sender, receiver))
     }
 }
 
 #[derive(Clone)]
 pub struct Sender {
-    tx: mpsc::Sender<MessageBuf>,
+    tx: Option<mpsc::Sender<MessageBuf>>,
+    thr: Arc<Option<JoinHandle<()>>>,
 }
 
 impl Sender {
     pub fn send<T: Into<MessageBuf>>(&self, msg: T) {
-        drop(self.tx.send(msg.into()));
+        drop(self.tx.as_ref().unwrap().send(msg.into()));
+    }
+}
+
+impl Drop for Sender {
+    fn drop(&mut self) {
+        // make sure to drain the queue if the other side is still connected
+        drop(self.tx.take());
+        if let Some(handle) = Arc::get_mut(&mut self.thr).and_then(Option::take) {
+            drop(handle.join());
+        }
     }
 }
 

@@ -2,6 +2,7 @@ use std::env;
 use std::num;
 use std::process::{Command, Child};
 use std::ffi::OsStr;
+use std::thread::Builder as ThreadBuilder;
 
 use model::QueryId;
 use executor::requests::SpawnError;
@@ -62,8 +63,8 @@ pub fn spawn<S: AsRef<OsStr>>(executable: S,
                               hostlist: &[String],
                               coord: &str,
                               host: &str)
-                              -> Result<Child, SpawnError> {
-    Command::new(executable)
+                              -> Result<(), SpawnError> {
+    let mut child = Command::new(executable)
         .args(args)
         .env("RUST_LOG", "debug") // TODO(swicki): this is only for debugging
         .env(QUERY_ID, id.0.to_string())
@@ -73,5 +74,13 @@ pub fn spawn<S: AsRef<OsStr>>(executable: S,
         .env(COORD, coord)
         .env(HOST, host)
         .spawn()
-        .map_err(|_| SpawnError::ExecFailed)
+        .map_err(|_| SpawnError::ExecFailed)?;
+
+    // TODO(swicki): This a bit an expensive way to deal with zombies
+    ThreadBuilder::new()
+        .stack_size(128)
+        .spawn(move || child.wait().ok())
+        .expect("failed to spawn reaper thread");
+
+    Ok(())
 }

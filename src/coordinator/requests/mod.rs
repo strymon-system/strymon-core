@@ -51,7 +51,10 @@ impl Request for AddExecutor {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct QueryToken(pub QueryId, pub u64);
+pub struct QueryToken {
+    pub id: QueryId,
+    pub auth: u64,
+}
 
 #[derive(Clone, Debug)]
 pub struct AddWorkerGroup {
@@ -61,9 +64,9 @@ pub struct AddWorkerGroup {
 
 #[derive(Clone, Debug)]
 pub enum WorkerGroupError {
-    InvalidQueryId,
     InvalidWorkerGroup,
-    FailedPeer,
+    SpawningAborted,
+    PeerFailed,
 }
 
 impl Request for AddWorkerGroup {

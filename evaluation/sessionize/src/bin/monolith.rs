@@ -21,6 +21,7 @@ use sessionize::sessionize::{MessagesForSession, Sessionize, SessionizableMessag
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
+use std::io::Write;
 
 use abomonation::Abomonation;
 use timely::dataflow::Scope;
@@ -191,12 +192,12 @@ fn main() {
             //println!("{},{},{},{},{}", worker_index, min_time, begin_ts, process_ts, end_ts);
 
             epochs_processed += 1;
-/*
-            if epochs_processed > 600 {
-                println_stderr!("WARNING: early exit -> only processed the first 10 minutes of log data [!]");
+
+            if epochs_processed > 60 {
+                println_stderr!("WARNING: early exit -> only processed the first minute of log data [!]");
                 break
             }
-*/
+
         }
     }).unwrap();
 }

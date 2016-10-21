@@ -44,7 +44,7 @@ fn initialize(id: QueryId, process: usize, coord: String, host: String) -> Resul
             Err(IoError::new(ErrorKind::Other, err))
         }))
         .map_err(Result::unwrap_err)?;
-    
+
     Ok(Coordinator {
         tx: tx,
         network: network,

@@ -14,11 +14,14 @@ use model::*;
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 enum State {
     Executor(ExecutorId),
+    Query(QueryToken),
+    Publication(TopicId),
+    Subscription(TopicId),
 }
 
 pub struct Dispatch {
     coord: CoordinatorRef,
-    associated: BTreeSet<State>,
+    associated: BTreeSet<State>, // TODO this needs to be a multiset
     tx: Outgoing,
 }
 
@@ -33,6 +36,7 @@ impl Dispatch {
     }
 
     pub fn dispatch(&mut self, req: RequestBuf) -> Result<(), Stop<Error>> {
+        debug!("dispatching request {}", req.name());
         match req.name() {
             "Submission" => {
                 let (req, resp) = req.decode::<Submission>()?;
@@ -46,7 +50,7 @@ impl Dispatch {
             "AddWorkerGroup" => {
                 let (AddWorkerGroup { query, group }, resp) = req.decode::<AddWorkerGroup>()?;
                 let response = self.coord
-                    .add_worker_group(query, group, self.tx.clone())
+                    .add_worker_group(query, group)
                     .map_err(|e| e.expect("worker group promise canceled?!"))
                     .then(|res| Ok(resp.respond(res)));
                 async::spawn(response)
@@ -84,6 +88,7 @@ impl Drop for Dispatch {
         for state in &self.associated {
             match *state {
                 State::Executor(id) => self.coord.remove_executor(id),
+                _ => unimplemented!()
             }
         }
     }

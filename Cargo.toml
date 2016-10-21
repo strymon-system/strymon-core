@@ -3,9 +3,6 @@ authors = ["Sebastian Wicki <swicki@student.ethz.ch>"]
 name = "timely-query"
 version = "0.1.0"
 
-[workspace]
-members = ["evaluation/sessionize", "evaluation/pubsub-throughput"]
-
 [[bin]]
 name = "coordinator"
 path = "src/bin/coordinator.rs"
@@ -33,3 +30,6 @@ void = "1.0.2"
 
 [replace."abomonation:0.4.4"]
 git = "https://github.com/frankmcsherry/abomonation"
+
+[workspace]
+members = ["evaluation/sessionize", "evaluation/pubsub-throughput"]
