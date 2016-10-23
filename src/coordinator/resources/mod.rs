@@ -294,7 +294,7 @@ impl Coordinator {
             Err(PublishError::AuthenticationFailure)
         } else {
             let query = req.token.id;
-            let result = self.catalog.publish(query, req.name, req.addr, req.kind);
+            let result = self.catalog.publish(query, req.name, req.addr, req.schema);
             if let Ok(ref topic) = result {
                 debug!("resolving lookup for topic: {:?}", &topic.name);
                 if let Some(pending) = self.lookups.remove(&topic.name) {

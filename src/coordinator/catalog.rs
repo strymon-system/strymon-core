@@ -48,7 +48,7 @@ impl Catalog {
                    query: QueryId,
                    name: String,
                    addr: (String, u16),
-                   kind: TopicType)
+                   schema: TopicSchema)
                    -> Result<Topic, PublishError> {
 
         // TODO(swicki): Check if query actually exists
@@ -61,7 +61,7 @@ impl Catalog {
                     id: id,
                     name: name,
                     addr: addr,
-                    kind: kind,
+                    schema: schema,
                 };
 
                 self.topics.insert(id, topic.clone());

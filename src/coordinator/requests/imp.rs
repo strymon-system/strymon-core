@@ -18,7 +18,7 @@ unsafe_abomonate!(SubscribeError);
 unsafe_abomonate!(Unsubscribe: topic, token);
 unsafe_abomonate!(UnsubscribeError);
 
-unsafe_abomonate!(Publish: name, addr, kind, token);
+unsafe_abomonate!(Publish: name, addr, schema, token);
 unsafe_abomonate!(PublishError);
 
 unsafe_abomonate!(Unpublish: topic, token);

@@ -1,13 +1,11 @@
-use std::io::{Result, Error, ErrorKind};
+use std::io::{Result};
 use std::any::Any;
 use std::marker::PhantomData;
 use std::collections::BTreeMap;
-use std::mem;
-use std::sync::Arc;
 
 use abomonation::Abomonation;
 
-use network::{Network, Listener, Receiver, Sender};
+use network::{Network, Sender};
 use network::message::abomonate::{Abomonate, NonStatic};
 use network::message::MessageBuf;
 

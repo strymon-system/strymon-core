@@ -125,7 +125,7 @@ impl Request for Unsubscribe {
 pub struct Publish {
     pub name: String,
     pub addr: (String, u16),
-    pub kind: TopicType,
+    pub schema: TopicSchema,
     pub token: QueryToken,
 }
 

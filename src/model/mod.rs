@@ -11,12 +11,19 @@ pub struct TopicType {
     pub name: String,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum TopicSchema {
+    Item(TopicType),
+    Collection(TopicType),
+    Timely(TopicType, TopicType),
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Topic {
     pub id: TopicId,
     pub name: String,
     pub addr: (String, u16),
-    pub kind: TopicType,
+    pub schema: TopicSchema,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]

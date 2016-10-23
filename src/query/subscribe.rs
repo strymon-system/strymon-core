@@ -7,18 +7,18 @@ use futures::stream::{Stream, Wait};
 use coordinator::requests::*;
 use network::message::abomonate::NonStatic;
 
-use pubsub::subscriber::Subscriber;
+use pubsub::subscriber::{ItemSubscriber, TimelySubscriber};
 use model::{Topic, TopicType};
 use query::Coordinator;
 
 // TODO(swicki) impl drop
-pub struct Subscription<D: Data + NonStatic> {
-    sub: Subscriber<D>,
+pub struct ItemSubscription<D: Data + NonStatic> {
+    sub: ItemSubscriber<D>,
     topic: Topic,
     coord: Coordinator,
 }
 
-impl<D: Data + NonStatic> IntoIterator for Subscription<D> {
+impl<D: Data + NonStatic> IntoIterator for ItemSubscription<D> {
     type Item = Vec<D>;
     type IntoIter = IntoIter<D>;
 
@@ -32,7 +32,7 @@ impl<D: Data + NonStatic> IntoIterator for Subscription<D> {
 }
 
 pub struct IntoIter<D: Data + NonStatic> {
-    sub: Wait<Subscriber<D>>,
+    sub: Wait<ItemSubscriber<D>>,
     topic: Topic,
     coord: Coordinator,
 }
@@ -43,6 +43,51 @@ impl<D: Data + NonStatic> Iterator for IntoIter<D> {
     fn next(&mut self) -> Option<Self::Item> {
         // we ignore any network errors here on purpose
         self.sub.next().and_then(Result::ok)
+    }
+}
+
+use timely::progress::Timestamp;
+use timely::dataflow::operators::Capability;
+
+// TODO(swicki) unsubscribe on drop
+pub struct TimelySubscription<T: Timestamp + NonStatic, D: Data + NonStatic> {
+    sub: Wait<TimelySubscriber<T, D>>,
+    topic: Topic,
+    coord: Coordinator,
+    frontier: Vec<Capability<T>>,
+}
+
+impl<T: Timestamp + NonStatic, D: Data + NonStatic> Iterator for TimelySubscription<T, D> {
+    type Item = (Capability<T>, Vec<D>);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let next = self.sub.next().and_then(Result::ok);
+        let (frontier, time, data) = if next.is_some() {
+            next.unwrap()
+        } else {
+            return None;
+        };
+
+        let mut time_cap = None;
+        let mut new_frontier = vec![];
+        for cap in self.frontier.iter() {
+            // get capability for resulting tuple
+            if time_cap.is_none() && time >= cap.time() {
+                time_cap = Some(cap.delayed(&time));
+            }
+            
+            // upgrade capability for new frontier
+            for t in frontier.iter() {
+                if *t >= cap.time() {
+                    new_frontier.push(cap.delayed(t));
+                }
+            }
+        };
+        
+        self.frontier = new_frontier;
+        let time = time_cap.expect("failed to get capability for tuple");
+        
+        Some((time, data))
     }
 }
 
@@ -69,7 +114,32 @@ impl From<IoError> for SubscriptionError {
 }
 
 impl Coordinator {
-    fn do_subscribe<D>(&self, name: String, blocking: bool) -> Result<Subscription<D>, SubscriptionError>
+
+    pub fn timely_subscribe<T, D>(&self, name: String, blocking: bool, root: Capability<T>) -> Result<TimelySubscription<T, D>, SubscriptionError>
+        where T: Timestamp + NonStatic, D: Data + NonStatic {
+
+        let coord = self.clone();
+        self.tx.request(&Subscribe {
+            name: name,
+            token: self.token,
+            blocking: blocking,
+        }).map_err(|err| {
+            match err {
+                Ok(err) => SubscriptionError::from(err),
+                Err(err) => SubscriptionError::from(err),
+            }
+        }).and_then(move |topic| {
+            let sub = TimelySubscriber::<T, D>::connect(&topic, &coord.network)?;
+            Ok(TimelySubscription {
+                sub: sub.wait(),
+                topic: topic,
+                coord: coord,
+                frontier: vec![root],
+            })
+        }).wait()
+    }
+
+    fn do_subscribe<D>(&self, name: String, blocking: bool) -> Result<ItemSubscription<D>, SubscriptionError>
         where D: Data + NonStatic {
 
         let coord = self.clone();
@@ -83,28 +153,21 @@ impl Coordinator {
                 Err(err) => SubscriptionError::from(err),
             }
         }).and_then(move |topic| {
-            if topic.kind != TopicType::of::<D>() {
-                Err(SubscriptionError::TypeIdMismatch)
-            } else {
-                let sub = {
-                    let addr = (&*topic.addr.0, topic.addr.1);
-                    Subscriber::<D>::connect(&addr, &coord.network)?
-                };
-                Ok(Subscription {
-                    sub: sub,
-                    topic: topic,
-                    coord: coord,
-                })
-            }
+            let sub = ItemSubscriber::<D>::connect(&topic, &coord.network)?;
+            Ok(ItemSubscription {
+                sub: sub,
+                topic: topic,
+                coord: coord,
+            })
         }).wait()
     }
 
-    pub fn subscribe<D, N>(&self, name: N) -> Result<Subscription<D>, SubscriptionError>
+    pub fn subscribe<D, N>(&self, name: N) -> Result<ItemSubscription<D>, SubscriptionError>
         where N: Into<String>, D: Data + NonStatic {
         self.do_subscribe(name.into(), false)
     }
 
-    pub fn blocking_subscribe<D, N>(&self, name: N) -> Result<Subscription<D>, SubscriptionError>
+    pub fn blocking_subscribe<D, N>(&self, name: N) -> Result<ItemSubscription<D>, SubscriptionError>
         where N: Into<String>, D: Data + NonStatic {
         self.do_subscribe(name.into(), true)
     }
