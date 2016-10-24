@@ -5,73 +5,39 @@
 /// particular because we do not have a query interface and Rust does not support abstract return
 /// types which limits code reuse.)
 
-extern crate libc;
 extern crate logparse;
-extern crate time;
 extern crate timely;
-extern crate timely_contrib;
-extern crate walkdir;
-#[macro_use] extern crate abomonation;
+
 #[macro_use] extern crate sessionize;
+extern crate sessionize_shared;
 
-use logparse::input::LazyArchiveChain;
-use logparse::parser2::GetDcxidTrxnb;
+use logparse::parser2::{GetDcxidTrxnb, GetMsgTypeIP};
 use logparse::reorder::RecordReorder;
-use sessionize::sessionize::{MessagesForSession, Sessionize, SessionizableMessage};
 
-use std::collections::HashSet;
-use std::path::{Path, PathBuf};
-use std::io::Write;
+use sessionize::sessionize::{MessagesForSession, Sessionize};
+use sessionize::sessionize::{Histogram, TopK};
 
-use abomonation::Abomonation;
 use timely::dataflow::Scope;
-use timely::dataflow::operators::{Concatenate, Filter, Input, Inspect, Probe, Map};
+use timely::dataflow::operators::{Filter, Input, Inspect, Probe, Map};
 use timely::progress::timestamp::RootTimestamp;
-use timely_contrib::operators::Accumulate;
-use walkdir::{DirEntry, WalkDir, WalkDirIterator};
 
-#[derive(Debug, Clone)]
-struct Message {
-   session_id: String,
-   trxnb: String,
-   time: u64,
-}
+use sessionize_shared::Message;
+use sessionize_shared::reconstruction;
+use sessionize_shared::util::{log_discretize, convert_trxnb, dump_histogram_hash_map};
+use sessionize_shared::reader::{locate_log_runs, get_max_fd_limit, open_file_readers_for_worker};
 
-unsafe_abomonate!(Message: session_id, trxnb, time);
+/// Window for the reorder buffer
+const MAX_ALLOWED_OUT_OF_ORDERNESS: u64 = 10;  // unit: seconds
 
-impl SessionizableMessage for Message {
-    fn time(&self) -> u64 {
-        self.time
-    }
+/// Interval spanned by each dataflow epoch, specified in terms of log timestamps
+const EPOCH_DURATION: u64 = 1_000_000;  // unit: microseconds
 
-    fn session(&self) -> &str {
-        &self.session_id
-    }
-}
-
-impl Message {
-    fn new(session_id: String, trxnb: String, time: u64) -> Message {
-        Message{session_id: session_id, trxnb: trxnb, time: time}
-    }
-}
-
-fn convert_trxnb(s: &str) -> Vec<u32> {
-    s.split('-').filter_map(|num| {
-        if num.is_empty() {
-            None  // discard empty segments (e.g. "2-1--8")
-        } else {
-            Some(::logparse::date_time::parse_positive_decimal(num))
-        }
-    }).collect()
-
-    // TODO: this is a good use case for SmallVec<[u32; 16]>
-    // https://github.com/servo/rust-smallvec
-}
+/// Duration after which an inactive session is terminated
+const SESSION_INACTIVITY_LIMIT: u64 = 5_000_000;  // unit: microseconds
 
 fn main() {
-
-    let prefix = ::std::env::args().nth(1).unwrap();
-    let window = ::std::env::args().nth(2).unwrap().parse::<u64>().unwrap();
+    let prefix = ::std::env::args().nth(1)
+        .expect("need to pass the prefix to the logs as the first argument");
 
     println!("starting analysis with prefix: {}", prefix);
     let inputs = locate_log_runs(prefix);
@@ -82,46 +48,87 @@ fn main() {
         }
     }
 
-    timely::execute_from_args(::std::env::args(), move |computation| {
+    timely::execute_from_args(::std::env::args().skip(2), move |computation| {
         let peers = computation.peers();
         let worker_index = computation.index();
         let (mut input, probe) = computation.scoped::<u64,_,_>(|scope| {
             let (input, stream) = scope.new_input();
-            let sessions = stream.sessionize(1_000_000, 5_000_000);
+            // Root Query: Messages per ssession
+            let sessionize = stream.sessionize(EPOCH_DURATION, SESSION_INACTIVITY_LIMIT);
+            
+            // we currently only probe after sessionization, in order to be
+            // comparable with the modular approach, i.e. in pub/sub we cannot
+            // know if the subscribers are catching up
+            let probe = sessionize.probe().0;
 
-            let streams_to_tie = vec![
-                stream.count_by_epoch()
-                        .inspect(|&(t, c)| println!("logs,{},{}", t.inner, c))
-                        .filter(|_| false).map(|_| 0),
+            ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-                sessions.count_by_epoch()
-                        .inspect(|&(t, c)| println!("sessions,{},{}", t.inner, c))
-                        .filter(|_| false).map(|_| 0),
+            // Leaf Query: Message count per session
+            let histogram_message_count = sessionize.map(|messages_for_session| messages_for_session.messages.len()).histogram(|x| x.clone());
+            histogram_message_count.inspect(move |x| {
+                let epoch = x.0;
+                let values = x.1.clone();
+                dump_histogram_hash_map("MessageCountLog", worker_index, epoch, values, Some(|x| log_discretize(x as u64) as usize), false);
+            });
 
-                sessions.map(|session| {
-                    session.messages.iter()
-                                    .map(|message: &Message| convert_trxnb(&message.trxnb))
-                                    .collect::<HashSet<_>>()
-                                    .len()
-                })
-				.accumulate_by_epoch(0, |sum, data| { for &x in data.iter() { *sum += x; } })
-				.inspect(|&(t, c)| println!("trx,{},{}", t.inner, c))
-				.filter(|_| false).map(|_| 0),
+            ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-                sessions.map(|session| {
-                    session.messages.iter()
-                                    .map(|message: &Message| convert_trxnb(&message.trxnb))
-                                    .filter(|trxnb| trxnb.len() == 1)
-                                    .collect::<HashSet<_>>()
-                                    .len()
-                })
-				.accumulate_by_epoch(0, |sum, data| { for &x in data.iter() { *sum += x; } })
-				.inspect(|&(t, c)| println!("root_trx,{},{}", t.inner, c))
-				.filter(|_| false).map(|_| 0),
-            ];
+            // Leaf Query: Session duration 
+            let histogram_log_span = sessionize.filter(|messages_for_session| messages_for_session.messages.len() >= 2)
+                                                .map(|messages_for_session : MessagesForSession<Message>| messages_for_session.messages.iter()
+                                                .map(|m| m.time).max().unwrap() - messages_for_session.messages.iter()
+                                                .map(|m| m.time).min().unwrap()).histogram(|x| log_discretize(x.clone()));
+            histogram_log_span.inspect(move |x| {
+                let epoch = x.0;
+                let values = x.1.clone();
+                dump_histogram_hash_map("LogMessageSpan", worker_index, epoch, values, Some(|x| x), true);
+            });
 
-            let concatenated_stream = scope.concatenate(streams_to_tie);
-            let probe = concatenated_stream.probe().0;
+            ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+            // Intermediate Query: Converted Transaction Ids
+            let txns_for_each_session_in_message = sessionize.map(|messages_for_session : MessagesForSession<Message>| messages_for_session.messages.iter()
+                                                            .map(|message| convert_trxnb(&message.trxnb)).collect::<Vec<_>>());
+
+            ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+            // Leaf Query: Transaction tree depth
+            let histogram_txn_depth = txns_for_each_session_in_message.map(|txns_in_messages| txns_in_messages.iter().map(|x| x.len()).max().unwrap())
+                                                                        .histogram(|x| x.clone());
+            histogram_txn_depth.inspect(move |x| {
+                let epoch = x.0;
+                let values = x.1.clone();
+                dump_histogram_hash_map("TrxnDepth", worker_index, epoch, values, Some(|x| x), true);
+            });
+
+            ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+            // Leaf Query: Top-k transaction tree patterns per epoch
+            let histogram_txn_type = txns_for_each_session_in_message.map(|txns_in_messages| reconstruction::reconstruct(&txns_in_messages))
+                                        .filter(|txn_shape| txn_shape.len() <= 25)
+                                        .topk(|x| x.clone(), 10);
+            histogram_txn_type.inspect(move |x| {
+                let epoch = x.0;
+                let values = x.1.clone();
+                dump_histogram_hash_map("TrxnTypeTop10", worker_index, epoch, values, Some(|x| x), true);
+            });
+
+            ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+            // Leaf Query: Top-k communicating pairs of services per epoch
+            let short_messages_for_each_session = sessionize.map(|messages_for_session : MessagesForSession<Message>|
+                    messages_for_session.messages.iter().map(|message| (convert_trxnb(&message.trxnb.clone()), message.msg_tag.clone(), message.ip.clone())).collect::<Vec<_>>());
+
+            let service_call_patterns = short_messages_for_each_session.flat_map(|mut short_messages| reconstruction::service_calls(&mut short_messages).into_iter())
+                                                                        .topk(|pairs| pairs.clone(), 10);
+            service_call_patterns.inspect(move |x| {
+                let epoch = x.0;
+                let values = x.1.clone();
+                dump_histogram_hash_map("ServiceCallsTop10", worker_index, epoch, values, Some(|x| x), true);
+            });
+
+            ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
             (input, probe)
         });
 
@@ -130,7 +137,7 @@ fn main() {
         println!("Worker {}: {} log runs across {} files", worker_index, worker_inputs.len(), file_count);
 
         let mut ordered = worker_inputs.into_iter()
-            .map(|x| RecordReorder::new(x, window, |rec| rec.timestamp.to_epoch_seconds() as u64).peekable())
+            .map(|x| RecordReorder::new(x, MAX_ALLOWED_OUT_OF_ORDERNESS, |rec| rec.timestamp.to_epoch_seconds() as u64).peekable())
             .collect::<Vec<_>>();
 
         let mut index = 0;
@@ -143,10 +150,7 @@ fn main() {
             }
         }
 
-        let mut epochs_processed = 0u64;
         while ordered.len() > 0 {
-            let begin_ts = time::precise_time_ns();
-
             // determine next smallest time to play
             let min_time = ordered.iter_mut().map(|x| x.peek().unwrap().timestamp.to_epoch_seconds()).min().unwrap() as u64;
 
@@ -162,7 +166,11 @@ fn main() {
                 while iterator.peek().is_some() && iterator.peek().unwrap().timestamp.to_epoch_seconds() as u64 == min_time {
                     let record = iterator.next().unwrap();
                     if let Some((dcx, trxnb)) = record.get_dcxid_trxnb() {
-                        input.send(Message::new(dcx.to_owned(), trxnb.to_owned(), record.timestamp.micros as u64));
+                        if let Some((msg_tag, ip, _, _)) = record.get_msg_type_ip_cor() {
+                            input.send(Message::new(dcx.to_owned(), trxnb.to_owned(), 
+                                        msg_tag.to_string(), ip.to_string(), 
+                                        record.timestamp.micros as u64));
+                        }
                     }
                 }
             }
@@ -178,94 +186,17 @@ fn main() {
                 }
             }
 
-            let process_ts = time::precise_time_ns();
-
             // advance input time
             if min_time > 0 {
                 input.advance_to(min_time + 1);
             }
+
+            // note: the probe is after sessionization, not the complete computation
+            // but we need to interleave somehow
             while probe.le(&RootTimestamp::new(min_time)) {
                 computation.step();
-            }
-            let end_ts = time::precise_time_ns();
-
-            //println!("{},{},{},{},{}", worker_index, min_time, begin_ts, process_ts, end_ts);
-
-            epochs_processed += 1;
-
-            if epochs_processed > 60 {
-                println_stderr!("WARNING: early exit -> only processed the first minute of log data [!]");
-                break
             }
 
         }
     }).unwrap();
-}
-
-/// Returns the limit on the number of file descriptors this process may allocate.
-fn get_max_fd_limit() -> Option<u64> {
-    let mut rlim = libc::rlimit { rlim_cur: 0, rlim_max: 0 };
-    let ret = unsafe { libc::getrlimit(libc::RLIMIT_NOFILE, &mut rlim) };
-    if ret == 0 { Some(rlim.rlim_cur) } else { None }
-}
-
-fn is_gzip(entry: &DirEntry) -> bool {
-    assert!(entry.file_type().is_file());
-    match entry.path().extension() {
-        None => false,
-        Some(ext) => ext == "gz",
-    }
-}
-
-// Takes a prefix for a collection of logs and produces a vector of paths for each time-ordered log run.
-fn locate_log_runs<P: AsRef<Path>>(prefix: P) -> Vec<Vec<PathBuf>> {
-    let mut walker = WalkDir::new(prefix.as_ref())
-        .min_depth(3)
-        .max_depth(3)
-        .into_iter()
-        .filter_entry(|e| e.file_type().is_dir())
-        .map(|e| e.unwrap())
-        .collect::<Vec<_>>();
-
-    // Iteration order is unspecified and depends on file system.  Sorting ensures that round-robin
-    // assignment is consistent even when running across several machines.
-    walker.sort_by(|x, y| Path::cmp(x.path(), y.path()));
-
-    let mut log_run_paths = Vec::new();
-    for log_entry in walker.into_iter() {
-        let log_dir = log_entry.path();
-
-        // Within each log run we need the files in lexographic order.  Each file has some portion
-        // of the records and the naming convention includes the date/time.
-        let mut entries = WalkDir::new(&log_dir)
-            .min_depth(1)
-            .max_depth(1)
-            .into_iter()
-            .filter_entry(|e| is_gzip(e))
-            .map(|e| e.unwrap().path().to_owned())
-            .collect::<Vec<_>>();
-        entries.sort_by(|p1, p2| PathBuf::cmp(p1, p2));
-
-        // NOTE: there are ~100 log runs where this does not hold true (for example 'lgssp105/sicif/01')
-        //assert!(!entries.is_empty(), "No files match '*.gz' in {}", log_dir.display());
-
-        if !entries.is_empty() {
-            log_run_paths.push(entries);
-        }
-    }
-
-    log_run_paths
-}
-
-// Strided access: each worker reads from a subset of the log servers
-fn open_file_readers_for_worker(all_inputs: &Vec<Vec<PathBuf>>, index: usize, peers: usize) -> Vec<LazyArchiveChain> {
-    let mut count = 0;
-    let mut record_iters = Vec::new();
-    for paths in all_inputs {
-        if count % peers == index {
-            record_iters.push(LazyArchiveChain::new(paths.to_owned()));
-        }
-        count += 1;
-    }
-    record_iters
 }

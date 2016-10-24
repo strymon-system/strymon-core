@@ -1,6 +1,6 @@
 [package]
 authors = ["Sebastian Wicki <swicki@student.ethz.ch>"]
-name = "sessionize-query"
+name = "sessionize-shared"
 version = "0.1.0"
 
 [dependencies]
