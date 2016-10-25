@@ -1,12 +1,6 @@
-/// Fork of the log analysis driver which has been extensively tidied up for benchmarking purposes.
-/// It only performs sessionization and does not collect histograms or run further applications.
-///
-/// (NOTE: this sadly had to be copied-and-pasted because the Timely glue is not easily modular, in
-/// particular because we do not have a query interface and Rust does not support abstract return
-/// types which limits code reuse.)
-
 extern crate logparse;
 extern crate timely;
+extern crate time;
 
 #[macro_use] extern crate sessionize;
 extern crate sessionize_shared;
@@ -18,7 +12,7 @@ use sessionize::sessionize::{MessagesForSession, Sessionize};
 use sessionize::sessionize::{Histogram, TopK};
 
 use timely::dataflow::Scope;
-use timely::dataflow::operators::{Filter, Input, Inspect, Probe, Map};
+use timely::dataflow::operators::{Concatenate, Filter, Input, Inspect, Probe, Map};
 use timely::progress::timestamp::RootTimestamp;
 
 use sessionize_shared::Message;
@@ -40,7 +34,7 @@ fn main() {
         .expect("need to pass the prefix to the logs as the first argument");
 
     println!("starting analysis with prefix: {}", prefix);
-    let inputs = locate_log_runs(prefix);
+    let inputs = locate_log_runs(prefix, true); // `true` for follow_symlinks
     if let Some(limit) = get_max_fd_limit() {
         if (inputs.len() as u64) > limit {
             println!("WARNING: file descriptor limit is too low ({} inputs but max is {}); \
@@ -55,21 +49,18 @@ fn main() {
             let (input, stream) = scope.new_input();
             // Root Query: Messages per ssession
             let sessionize = stream.sessionize(EPOCH_DURATION, SESSION_INACTIVITY_LIMIT);
-            
-            // we currently only probe after sessionization, in order to be
-            // comparable with the modular approach, i.e. in pub/sub we cannot
-            // know if the subscribers are catching up
-            let probe = sessionize.probe().0;
+            let mut streams_to_tie = vec![];
 
             ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
             // Leaf Query: Message count per session
             let histogram_message_count = sessionize.map(|messages_for_session| messages_for_session.messages.len()).histogram(|x| x.clone());
-            histogram_message_count.inspect(move |x| {
+            let output = histogram_message_count.inspect(move |x| {
                 let epoch = x.0;
                 let values = x.1.clone();
                 dump_histogram_hash_map("MessageCountLog", worker_index, epoch, values, Some(|x| log_discretize(x as u64) as usize), false);
             });
+            streams_to_tie.push(output.filter(|_| false).map(|_| ()));
 
             ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -78,11 +69,12 @@ fn main() {
                                                 .map(|messages_for_session : MessagesForSession<Message>| messages_for_session.messages.iter()
                                                 .map(|m| m.time).max().unwrap() - messages_for_session.messages.iter()
                                                 .map(|m| m.time).min().unwrap()).histogram(|x| log_discretize(x.clone()));
-            histogram_log_span.inspect(move |x| {
+            let output = histogram_log_span.inspect(move |x| {
                 let epoch = x.0;
                 let values = x.1.clone();
                 dump_histogram_hash_map("LogMessageSpan", worker_index, epoch, values, Some(|x| x), true);
             });
+            streams_to_tie.push(output.filter(|_| false).map(|_| ()));
 
             ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -95,11 +87,12 @@ fn main() {
             // Leaf Query: Transaction tree depth
             let histogram_txn_depth = txns_for_each_session_in_message.map(|txns_in_messages| txns_in_messages.iter().map(|x| x.len()).max().unwrap())
                                                                         .histogram(|x| x.clone());
-            histogram_txn_depth.inspect(move |x| {
+            let output = histogram_txn_depth.inspect(move |x| {
                 let epoch = x.0;
                 let values = x.1.clone();
                 dump_histogram_hash_map("TrxnDepth", worker_index, epoch, values, Some(|x| x), true);
             });
+            streams_to_tie.push(output.filter(|_| false).map(|_| ()));
 
             ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -107,11 +100,12 @@ fn main() {
             let histogram_txn_type = txns_for_each_session_in_message.map(|txns_in_messages| reconstruction::reconstruct(&txns_in_messages))
                                         .filter(|txn_shape| txn_shape.len() <= 25)
                                         .topk(|x| x.clone(), 10);
-            histogram_txn_type.inspect(move |x| {
+            let output = histogram_txn_type.inspect(move |x| {
                 let epoch = x.0;
                 let values = x.1.clone();
                 dump_histogram_hash_map("TrxnTypeTop10", worker_index, epoch, values, Some(|x| x), true);
             });
+            streams_to_tie.push(output.filter(|_| false).map(|_| ()));
 
             ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -121,13 +115,17 @@ fn main() {
 
             let service_call_patterns = short_messages_for_each_session.flat_map(|mut short_messages| reconstruction::service_calls(&mut short_messages).into_iter())
                                                                         .topk(|pairs| pairs.clone(), 10);
-            service_call_patterns.inspect(move |x| {
+            let output = service_call_patterns.inspect(move |x| {
                 let epoch = x.0;
                 let values = x.1.clone();
                 dump_histogram_hash_map("ServiceCallsTop10", worker_index, epoch, values, Some(|x| x), true);
             });
+            streams_to_tie.push(output.filter(|_| false).map(|_| ()));
 
             ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+            let concatenated_stream = scope.concatenate(streams_to_tie);
+            let probe = concatenated_stream.probe().0;
 
             (input, probe)
         });
@@ -151,6 +149,8 @@ fn main() {
         }
 
         while ordered.len() > 0 {
+            let epoch_start_ts = time::precise_time_ns();
+
             // determine next smallest time to play
             let min_time = ordered.iter_mut().map(|x| x.peek().unwrap().timestamp.to_epoch_seconds()).min().unwrap() as u64;
 
@@ -186,17 +186,19 @@ fn main() {
                 }
             }
 
+            let epoch_process_ts = time::precise_time_ns();
+
             // advance input time
             if min_time > 0 {
                 input.advance_to(min_time + 1);
             }
 
-            // note: the probe is after sessionization, not the complete computation
-            // but we need to interleave somehow
             while probe.le(&RootTimestamp::new(min_time)) {
                 computation.step();
             }
 
+            let epoch_end_ts = time::precise_time_ns();
+            println!("{},{},{},{},{}", worker_index, min_time, epoch_start_ts, epoch_process_ts, epoch_end_ts);
         }
     }).unwrap();
 }

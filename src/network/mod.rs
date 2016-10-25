@@ -118,7 +118,8 @@ pub struct Listener {
 
 impl Listener {
     fn new(network: Network, port: u16) -> Result<Self> {
-        let sockaddr = ("::", port);
+        //let sockaddr = ("::", port); // TODO this does not work on some machines?!
+        let sockaddr = ("0.0.0.0", port);
         let listener = TcpListener::bind(&sockaddr)?;
         let external = network.external.clone();
         let port = listener.local_addr()?.port();

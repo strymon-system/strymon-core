@@ -39,7 +39,7 @@ fn main() {
     let submission = Submission {
         query: query,
         name: None,
-        placement: Placement::Random(1, 1),
+        placement: Placement::Random(1, 32), // hosts, threads
     };
 
     let network = Network::init(None).unwrap();

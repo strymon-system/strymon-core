@@ -2,6 +2,7 @@ extern crate libc;
 extern crate walkdir;
 #[macro_use] extern crate abomonation;
 #[macro_use] extern crate sessionize;
+#[macro_use] extern crate log;
 extern crate logparse;
 
 use abomonation::Abomonation;

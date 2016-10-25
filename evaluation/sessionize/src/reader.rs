@@ -22,8 +22,8 @@ pub fn is_gzip(entry: &DirEntry) -> bool {
 }
 
 // Takes a prefix for a collection of logs and produces a vector of paths for each time-ordered log run.
-pub fn locate_log_runs<P: AsRef<Path>>(prefix: P) -> Vec<Vec<PathBuf>> {
-    let mut walker = WalkDir::new(prefix.as_ref())
+pub fn locate_log_runs<P: AsRef<Path>>(prefix: P, follow_links: bool) -> Vec<Vec<PathBuf>> {
+    let mut walker = WalkDir::new(prefix.as_ref()).follow_links(follow_links)
         .min_depth(3)
         .max_depth(3)
         .into_iter()
@@ -41,7 +41,7 @@ pub fn locate_log_runs<P: AsRef<Path>>(prefix: P) -> Vec<Vec<PathBuf>> {
 
         // Within each log run we need the files in lexographic order.  Each file has some portion
         // of the records and the naming convention includes the date/time.
-        let mut entries = WalkDir::new(&log_dir)
+        let mut entries = WalkDir::new(&log_dir).follow_links(follow_links)
             .min_depth(1)
             .max_depth(1)
             .into_iter()

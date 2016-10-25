@@ -24,4 +24,4 @@ pub mod pubsub;
 pub mod network;
 pub mod async;
 
-pub use query::execute;
+pub use query::*;

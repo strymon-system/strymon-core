@@ -6,6 +6,7 @@ version = "0.1.0"
 [dependencies]
 abomonation = "0.4"
 libc = "0.2"
+log = "0.3.6"
 time = "0.1"
 timely = "0.1.15"
 walkdir = "0.1"

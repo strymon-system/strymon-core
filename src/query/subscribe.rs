@@ -115,14 +115,14 @@ impl From<IoError> for SubscriptionError {
 
 impl Coordinator {
 
-    pub fn timely_subscribe<T, D>(&self, name: String, blocking: bool, root: Capability<T>) -> Result<TimelySubscription<T, D>, SubscriptionError>
+    pub fn subscribe<T, D>(&self, name: String, root: Capability<T>) -> Result<TimelySubscription<T, D>, SubscriptionError>
         where T: Timestamp + NonStatic, D: Data + NonStatic {
 
         let coord = self.clone();
         self.tx.request(&Subscribe {
             name: name,
             token: self.token,
-            blocking: blocking,
+            blocking: true,
         }).map_err(|err| {
             match err {
                 Ok(err) => SubscriptionError::from(err),
@@ -162,12 +162,12 @@ impl Coordinator {
         }).wait()
     }
 
-    pub fn subscribe<D, N>(&self, name: N) -> Result<ItemSubscription<D>, SubscriptionError>
+    pub fn subscribe_item<D, N>(&self, name: N) -> Result<ItemSubscription<D>, SubscriptionError>
         where N: Into<String>, D: Data + NonStatic {
         self.do_subscribe(name.into(), false)
     }
 
-    pub fn blocking_subscribe<D, N>(&self, name: N) -> Result<ItemSubscription<D>, SubscriptionError>
+    pub fn blocking_subscribe_item<D, N>(&self, name: N) -> Result<ItemSubscription<D>, SubscriptionError>
         where N: Into<String>, D: Data + NonStatic {
         self.do_subscribe(name.into(), true)
     }
