@@ -1,48 +1,101 @@
-use std::collections::btree_map::{BTreeMap, Values};
+use std::any::Any;
+use std::io::Result as IoResult;
 use std::collections::hash_map::{HashMap, Entry as HashEntry};
-use std::collections::btree_set::BTreeSet;
 
-use super::util::Generator;
+use abomonation::Abomonation;
 
 use model::*;
 use coordinator::requests::*;
 
-pub struct Catalog {
-    topic_id: Generator<TopicId>,
+use network::Network;
+use network::message::abomonate::{Abomonate, NonStatic};
+use pubsub::publisher::collection::CollectionPublisher;
+pub use pubsub::publisher::collection::Iter;
 
+use super::util::Generator;
+
+pub struct Catalog {
+    generator: Generator<TopicId>,
     directory: HashMap<String, TopicId>,
 
-    // TODO wrap these btreemaps into indexed collections
-    topics: BTreeMap<TopicId, Topic>,
-    executors: BTreeMap<ExecutorId, Executor>,
-    queries: BTreeMap<QueryId, Query>,
-    publications: BTreeSet<Publication>,
-    subscriptions: BTreeSet<Subscription>, // TODO(swicki): this should be a mulitset
+    topics: Collection<Topic>,
+    executors: Collection<Executor>,
+    queries: Collection<Query>,
+    publications: Collection<Publication>,
+    subscriptions: Collection<Subscription>,
 }
 
 impl Catalog {
-    pub fn new() -> Self {
-        Catalog {
-            topic_id: Generator::new(),
-            directory: HashMap::new(),
-            topics: BTreeMap::new(),
-            executors: BTreeMap::new(),
-            queries: BTreeMap::new(),
-            publications: BTreeSet::new(),
-            subscriptions: BTreeSet::new(),
-        }
+    pub fn new(network: &Network) -> IoResult<Self> {
+        let mut generator = Generator::<TopicId>::new();
+        let mut directory = HashMap::<String, TopicId>::new();
+
+        let id = generator.generate();
+        let (topic, mut topics) = Collection::<Topic>::new(network, id, "$topics")?;
+        directory.insert(topic.name.clone(), topic.id);
+        topics.insert(topic);
+
+        let id = generator.generate();
+        let (topic, executors) = Collection::<Executor>::new(network, id, "$executors")?;
+        directory.insert(topic.name.clone(), topic.id);
+        topics.insert(topic);
+
+        let id = generator.generate();
+        let (topic, queries) = Collection::<Query>::new(network, id, "$queries")?;
+        directory.insert(topic.name.clone(), topic.id);
+        topics.insert(topic);
+
+        let id = generator.generate();
+        let (topic, pubs) = Collection::<Publication>::new(network, id, "$publications")?;
+        directory.insert(topic.name.clone(), topic.id);
+        topics.insert(topic);
+
+        let id = generator.generate();
+        let (topic, subs) = Collection::<Subscription>::new(network, id, "$subscription")?;
+        directory.insert(topic.name.clone(), topic.id);
+        topics.insert(topic);
+
+        Ok(Catalog {
+            generator: generator,
+            directory: directory,
+            topics: topics,
+            executors: executors,
+            queries: queries,
+            publications: pubs,
+            subscriptions: subs,
+        })
     }
 
     pub fn add_executor(&mut self, executor: Executor) {
-        self.executors.insert(executor.id, executor);
+        self.executors.insert(executor);
     }
 
     pub fn remove_executor(&mut self, id: ExecutorId) {
-        self.executors.remove(&id);
+        // TODO(swicki): this is unnecessarily slow
+        let executor = self.executors.iter().find(|e| e.id == id).cloned();
+        if let Some(executor) = executor {
+            self.executors.remove(executor)
+        } else {
+            warn!("tried to remove inexisting executor: {:?}", id)
+        }
     }
 
     pub fn executors<'a>(&'a self) -> Executors<'a> {
-        Executors { values: self.executors.values() }
+        Executors { inner: self.executors.iter() }
+    }
+
+    pub fn add_query(&mut self, query: Query) {
+        self.queries.insert(query);
+    }
+
+    pub fn remove_query(&mut self, id: QueryId) {
+        // TODO(swicki): this is unnecessarily slow
+        let query = self.queries.iter().find(|q| q.id == id).cloned();
+        if let Some(query) = query {
+            self.queries.remove(query)
+        } else {
+            warn!("tried to remove inexisting query: {:?}", id)
+        }
     }
 
     pub fn publish(&mut self,
@@ -55,8 +108,8 @@ impl Catalog {
         // TODO(swicki): Check if query actually exists
         match self.directory.entry(name.clone()) {
             HashEntry::Occupied(_) => Err(PublishError::TopicAlreadyExists),
-            HashEntry::Vacant(directory) => {
-                let id = self.topic_id.generate();
+            HashEntry::Vacant(entry) => {
+                let id = self.generator.generate();
                 let publication = Publication(query, id);
                 let topic = Topic {
                     id: id,
@@ -65,53 +118,87 @@ impl Catalog {
                     schema: schema,
                 };
 
-                self.topics.insert(id, topic.clone());
+                self.topics.insert(topic.clone());
                 self.publications.insert(publication);
-                directory.insert(id);
-                
+                entry.insert(id);
+
                 Ok(topic)
             }
         }
     }
     
     pub fn unpublish(&mut self, query_id: QueryId, topic: TopicId) -> Result<(), UnpublishError> {
-        if self.publications.remove(&Publication(query_id, topic)) {
-            Ok(())
-        } else {
-            Err(UnpublishError::InvalidTopicId)
-        }
+        // TODO(swicki): Check if topic and query actually exist
+        self.publications.remove(Publication(query_id, topic));
+        Ok(())
     }
 
     pub fn lookup(&mut self, name: &str) -> Option<Topic> {
         if let Some(id) = self.directory.get(name) {
-            self.topics.get(id).cloned()
+            // TODO(swicki): The point of the directory was to avoid linear search
+            self.topics.iter().find(|topic| topic.id == *id).cloned()
         } else {
             None
         }
     }
 
     pub fn subscribe(&mut self, query_id: QueryId, topic: TopicId) {
-        // TODO(swicki): Check if topic and query acutally exist
+        // TODO(swicki): Check if topic and query actually exist
         self.subscriptions.insert(Subscription(query_id, topic));
     }
 
     pub fn unsubscribe(&mut self, query_id: QueryId, topic: TopicId) -> Result<(), UnsubscribeError> {
-        if self.subscriptions.remove(&Subscription(query_id, topic)) {
-            Ok(())
-        } else {
-            Err(UnsubscribeError::InvalidTopicId)
+        // TODO(swicki): Check if topic and query actually exist
+        self.subscriptions.remove(Subscription(query_id, topic));
+        Ok(())
+    }
+}
+
+struct Collection<T> {
+    publisher: CollectionPublisher<T>,
+}
+
+impl<T: Abomonation + Any + Clone + Eq + NonStatic> Collection<T> {
+    fn new(network: &Network, id: TopicId, name: &str) -> IoResult<(Topic, Self)> {
+        let (addr, publisher) = CollectionPublisher::<T>::new(network)?;
+
+        let elem = TopicType::of::<T>();
+        let schema = TopicSchema::Collection(elem);
+        let topic = Topic {
+            id: id,
+            name: String::from(name),
+            addr: addr,
+            schema: schema,
+        };
+
+        Ok((topic, Collection { publisher: publisher }))
+    }
+
+    fn insert(&mut self, elem: T) {
+        if let Err(err) = self.publisher.publish(&vec![(elem, 1)]) {
+            error!("I/O failure in catalog: {:?}", err)
         }
+    }
+
+    fn remove(&mut self, elem: T) {
+        if let Err(err) = self.publisher.publish(&vec![(elem, -1)]) {
+            error!("I/O failure in catalog: {:?}", err)
+        }
+    }
+
+    fn iter(&self) -> Iter<T> {
+        self.publisher.into_iter()
     }
 }
 
 pub struct Executors<'a> {
-    values: Values<'a, ExecutorId, Executor>,
+    inner: Iter<'a, Executor>,
 }
 
 impl<'a> Iterator for Executors<'a> {
     type Item = &'a Executor;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.values.next()
+        self.inner.next()
     }
 }

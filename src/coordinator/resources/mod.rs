@@ -23,6 +23,7 @@ pub mod executor;
 
 enum QueryState {
     Spawning {
+        query: Query,
         submitter: Complete<QueryId, SubmissionError>,
         waiting: Vec<Complete<QueryToken, WorkerGroupError>>,
     },
@@ -48,10 +49,10 @@ pub struct Coordinator {
 }
 
 impl Coordinator {
-    pub fn new() -> CoordinatorRef {
+    pub fn new(catalog: Catalog) -> CoordinatorRef {
         let coord = Coordinator {
             handle: Weak::new(),
-            catalog: Catalog::new(),
+            catalog: catalog,
             queryid: Generator::new(),
             executorid: Generator::new(),
             executors: BTreeMap::new(),
@@ -154,6 +155,7 @@ impl Coordinator {
         // TODO(swicki) add a timeout that triggers SpawnFailed here
         debug!("add pending submission for {:?}", query.id);
         let state = QueryState::Spawning {
+            query: query,
             submitter: tx,
             waiting: vec![],
         };
@@ -169,7 +171,7 @@ impl Coordinator {
 
     fn remove_submission(&mut self, id: QueryId, err: SubmissionError) {
         if let Some(query) = self.queries.remove(&id) {
-            if let QueryState::Spawning { submitter, waiting } = query.state {
+            if let QueryState::Spawning { submitter, waiting, .. } = query.state {
                 submitter.complete(Err(err));
                 for worker in waiting {
                     worker.complete(Err(WorkerGroupError::PeerFailed));
@@ -212,12 +214,17 @@ impl Coordinator {
 
         // step 3: at this point, all worker groups have registered themselves
         let waiting = mem::replace(&mut query.state, QueryState::Running);
-        let (submitter, waiting) = match waiting {
-            QueryState::Spawning { submitter, waiting } => (submitter, waiting),
+        let (submitter, waiting, query) = match waiting {
+            QueryState::Spawning { submitter, waiting, query } => {
+                (submitter, waiting, query)
+            }
             _ => unreachable!()
         };
 
-        // step 4: respond to everyone
+        // step 4: add query to catalog
+        self.catalog.add_query(query);
+
+        // step 5: respond to everyone
         let token = QueryToken {
             id: id,
             auth: rand::random::<u64>(),
@@ -251,6 +258,7 @@ impl Coordinator {
 
         // and we're done
         if count == 0 {
+            self.catalog.remove_query(id);
             query.remove();
         }
     }

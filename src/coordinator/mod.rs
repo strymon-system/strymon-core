@@ -10,6 +10,7 @@ use network::reqresp;
 
 use self::resources::Coordinator;
 use self::dispatch::Dispatch;
+use self::catalog::Catalog;
 
 pub mod requests;
 
@@ -20,10 +21,11 @@ pub mod dispatch;
 mod util;
 
 pub fn coordinate(port: u16) -> Result<()> {
-    let network = Network::init(None)?;
+    let network = Network::init(None)?; // TODO: topics must know external
     let listener = network.listen(port)?;
 
-    let coord = Coordinator::new();
+    let catalog = Catalog::new(&network)?;
+    let coord = Coordinator::new(catalog);
     let server = listener.map(reqresp::multiplex).for_each(move |(tx, rx)| {
         // every connection gets its own handle
         let mut disp = Dispatch::new(coord.clone(), tx);

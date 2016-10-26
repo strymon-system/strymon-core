@@ -46,7 +46,7 @@ impl<D: Abomonation + Any + Clone + Eq + NonStatic> CollectionPublisher<D> {
                 }
 
                 assert!(count >= 0, "negative amount in collection");
-            } else {
+            } else if delta > 0 {
                 // add a new one
                 self.collection.push((new.clone(), delta));
             }
