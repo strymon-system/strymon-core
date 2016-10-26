@@ -20,7 +20,7 @@ fn main() {
             input
         });
         
-        let sub = coord.timely_subscribe::<_, i32>("frontier".into(), true, cap).unwrap();
+        let sub = coord.subscribe::<_, i32>("frontier".into(), cap).unwrap();
         for (time, data) in sub {
             input.session(time).give_iterator(data.into_iter());
             root.step();

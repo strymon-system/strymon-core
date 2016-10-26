@@ -9,6 +9,7 @@ use coordinator::requests::*;
 
 pub struct Catalog {
     topic_id: Generator<TopicId>,
+
     directory: HashMap<String, TopicId>,
 
     // TODO wrap these btreemaps into indexed collections

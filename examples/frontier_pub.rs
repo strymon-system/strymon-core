@@ -6,12 +6,14 @@ use timely::dataflow::{Scope};
 use timely::progress::timestamp::RootTimestamp;
 use timely::dataflow::channels::pact::Pipeline;
 
+use timely_query::publish::Topics;
+
 fn main() {
     timely_query::execute(|root, coord| {
         let (mut input, mut cap) = root.scoped(|scope| {
             let (input, stream) = scope.new_unordered_input();
 
-            coord.publish_timely("frontier", &stream).unwrap();         
+            coord.publish("frontier", &stream, Topics::Merge).unwrap();         
 
             stream.unary_notify(Pipeline, "example", Vec::new(), |input, output, notificator| {
                 input.for_each(|time, data| {
