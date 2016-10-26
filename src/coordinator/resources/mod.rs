@@ -455,6 +455,7 @@ impl CoordinatorRef {
     }
 }
 
+// will only clone the coordinator ref, not the tracked calls
 impl Clone for CoordinatorRef {
     fn clone(&self) -> Self {
         CoordinatorRef::from(self.coord.clone())

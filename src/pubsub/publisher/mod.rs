@@ -10,6 +10,7 @@ use network::{Network, Listener, Receiver, Sender};
 
 pub mod item;
 pub mod timely;
+pub mod collection;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SubscriberId(pub u32);
