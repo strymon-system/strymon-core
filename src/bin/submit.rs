@@ -19,7 +19,9 @@ use timely_query::network::reqresp;
 fn main() {
     drop(env_logger::init());
 
-    let binary = env::args().nth(1).expect("missing binary path");
+    let processes: usize = env::args().nth(1).unwrap().parse().unwrap();
+    let threads: usize = env::args().nth(2).unwrap().parse().unwrap();
+    let binary = env::args().nth(3).expect("missing binary path");
     let coord = "localhost:9189".to_string();
 
     let source = fs::canonicalize(binary)
@@ -33,13 +35,13 @@ fn main() {
     let query = QueryProgram {
         source: source,
         format: ExecutionFormat::NativeExecutable,
-        args: env::args().skip(2).collect(),
+        args: env::args().skip(4).collect(),
     };
     
     let submission = Submission {
         query: query,
         name: None,
-        placement: Placement::Random(1, 32), // hosts, threads
+        placement: Placement::Random(processes, threads), // hosts, threads
     };
 
     let network = Network::init(None).unwrap();

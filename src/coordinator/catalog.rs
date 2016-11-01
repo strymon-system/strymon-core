@@ -1,6 +1,7 @@
 use std::any::Any;
 use std::io::Result as IoResult;
 use std::collections::hash_map::{HashMap, Entry as HashEntry};
+use std::hash::Hash;
 
 use abomonation::Abomonation;
 
@@ -67,10 +68,12 @@ impl Catalog {
     }
 
     pub fn add_executor(&mut self, executor: Executor) {
+        debug!("add_executor: {:?}", executor);
         self.executors.insert(executor);
     }
 
     pub fn remove_executor(&mut self, id: ExecutorId) {
+        debug!("remove_executor: {:?}", id);
         // TODO(swicki): this is unnecessarily slow
         let executor = self.executors.iter().find(|e| e.id == id).cloned();
         if let Some(executor) = executor {
@@ -85,10 +88,12 @@ impl Catalog {
     }
 
     pub fn add_query(&mut self, query: Query) {
+        debug!("add_query: {:?}", query);
         self.queries.insert(query);
     }
 
     pub fn remove_query(&mut self, id: QueryId) {
+        debug!("remove_query: {:?}", id);
         // TODO(swicki): this is unnecessarily slow
         let query = self.queries.iter().find(|q| q.id == id).cloned();
         if let Some(query) = query {
@@ -104,7 +109,6 @@ impl Catalog {
                    addr: (String, u16),
                    schema: TopicSchema)
                    -> Result<Topic, PublishError> {
-
         // TODO(swicki): Check if query actually exists
         match self.directory.entry(name.clone()) {
             HashEntry::Occupied(_) => Err(PublishError::TopicAlreadyExists),
@@ -118,6 +122,8 @@ impl Catalog {
                     schema: schema,
                 };
 
+                debug!("publish: {:?}", publication);
+
                 self.topics.insert(topic.clone());
                 self.publications.insert(publication);
                 entry.insert(id);
@@ -129,7 +135,9 @@ impl Catalog {
     
     pub fn unpublish(&mut self, query_id: QueryId, topic: TopicId) -> Result<(), UnpublishError> {
         // TODO(swicki): Check if topic and query actually exist
-        self.publications.remove(Publication(query_id, topic));
+        let publication = Publication(query_id, topic);
+        debug!("unpublish: {:?}", publication);
+        self.publications.remove(publication);
         Ok(())
     }
 
@@ -144,12 +152,16 @@ impl Catalog {
 
     pub fn subscribe(&mut self, query_id: QueryId, topic: TopicId) {
         // TODO(swicki): Check if topic and query actually exist
-        self.subscriptions.insert(Subscription(query_id, topic));
+        let subscription = Subscription(query_id, topic);
+        debug!("subscribe: {:?}", subscription);
+        self.subscriptions.insert(subscription);
     }
 
     pub fn unsubscribe(&mut self, query_id: QueryId, topic: TopicId) -> Result<(), UnsubscribeError> {
         // TODO(swicki): Check if topic and query actually exist
-        self.subscriptions.remove(Subscription(query_id, topic));
+        let subscription = Subscription(query_id, topic);
+        debug!("unsubscribe: {:?}", subscription);
+        self.subscriptions.remove(subscription);
         Ok(())
     }
 }

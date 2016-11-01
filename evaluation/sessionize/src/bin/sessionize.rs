@@ -15,10 +15,11 @@ use timely::dataflow::Scope;
 use timely::dataflow::operators::*;
 use timely::progress::timestamp::RootTimestamp;
 
-use timely_query::publish::Topics;
+use timely_query::publish::Partition as Topics;
 
 use sessionize_shared::Message;
 use sessionize_shared::reader::{locate_log_runs, get_max_fd_limit, open_file_readers_for_worker};
+use sessionize_shared::monitor::ThroughputPerSec;
 
 /// Window for the reorder buffer
 const MAX_ALLOWED_OUT_OF_ORDERNESS: u64 = 10;  // unit: seconds
@@ -34,6 +35,9 @@ fn main() {
 
     let prefix = ::std::env::args().nth(1)
         .expect("need to pass the prefix to the logs as the first argument");
+
+    let logdir = ::std::path::PathBuf::from(::std::env::args().nth(2)
+        .expect("second arg needs to be logdir"));
 
     println!("starting analysis with prefix: {}", prefix);
     let inputs = locate_log_runs(prefix, true); // `true` for follow_symlinks
@@ -51,7 +55,7 @@ fn main() {
             let (input, stream) = scope.new_input();
             // Root Query: Messages per ssession
             let sessionize = stream.sessionize(EPOCH_DURATION, SESSION_INACTIVITY_LIMIT);
-
+            sessionize.throughput_per_sec(logdir.join(format!("sessionize_out.{}.csv", worker_index)));
             coord.publish("sessionize", &sessionize, Topics::PerWorker).unwrap();
 
             let probe = sessionize.probe().0;
@@ -77,7 +81,7 @@ fn main() {
         }
 
         while ordered.len() > 0 {
-            //let epoch_start_ts = time::precise_time_ns();
+            let input_start = time::precise_time_ns();
 
             // determine next smallest time to play
             let min_time = ordered.iter_mut().map(|x| x.peek().unwrap().timestamp.to_epoch_seconds()).min().unwrap() as u64;
@@ -114,19 +118,18 @@ fn main() {
                 }
             }
 
-            //let epoch_process_ts = time::precise_time_ns();
-
             // advance input time
             if min_time > 0 {
                 input.advance_to(min_time + 1);
             }
 
+            let process_start = time::precise_time_ns();
             while probe.le(&RootTimestamp::new(min_time)) {
                 computation.step();
             }
 
-            //let epoch_end_ts = time::precise_time_ns();
-            //println!("{},{},{},{},{}", worker_index, min_time, epoch_start_ts, epoch_process_ts, epoch_end_ts);
+            let iter_end = time::precise_time_ns();
+            println!("sessionize.{},{},{},{}", worker_index, input_start, process_start, iter_end);
         }
     }).unwrap();
 

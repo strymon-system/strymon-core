@@ -5,6 +5,7 @@ use timely::dataflow::operators::*;
 use timely::dataflow::{Scope};
 use timely::progress::timestamp::RootTimestamp;
 use timely::dataflow::channels::pact::Pipeline;
+use timely::dataflow::channels::message::Content;
 
 fn main() {
     timely_query::execute(|root, coord| {
@@ -22,7 +23,7 @@ fn main() {
         
         let sub = coord.subscribe::<_, i32>("frontier".into(), cap).unwrap();
         for (time, data) in sub {
-            input.session(time).give_iterator(data.into_iter());
+            input.session(time).give_content(&mut Content::Typed(data));
             root.step();
         }
     }).unwrap();

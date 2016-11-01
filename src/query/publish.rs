@@ -41,22 +41,22 @@ impl From<IoError> for PublicationError {
 }
 
 #[derive(Debug, Copy, Clone)]
-pub enum Topics {
+pub enum Partition {
     PerWorker,
     Merge,
 }
 
 const PUBLISH_WORKER_ID: u64 = 0;
 
-impl<T: Timestamp, D: Data> ParallelizationContract<T, D> for Topics
+impl<T: Timestamp, D: Data> ParallelizationContract<T, D> for Partition
 {
     fn connect<A: Allocate>(self,
                             allocator: &mut A,
                             identifier: usize)
                             -> (Box<Push<(T, Content<D>)>>, Box<Pull<(T, Content<D>)>>) {
         match self {
-            Topics::PerWorker => Pipeline.connect(allocator, identifier),
-            Topics::Merge => Exchange::new(|_| PUBLISH_WORKER_ID).connect(allocator, identifier),
+            Partition::PerWorker => Pipeline.connect(allocator, identifier),
+            Partition::Merge => Exchange::new(|_| PUBLISH_WORKER_ID).connect(allocator, identifier),
         }
     }
 }
@@ -95,15 +95,15 @@ impl Coordinator {
         }).wait()
     }
 
-    pub fn publish<S, D>(&self, name: &str, stream: &Stream<S, D>, partition: Topics) -> Result<Stream<S, D>, PublicationError>
+    pub fn publish<S, D>(&self, name: &str, stream: &Stream<S, D>, partition: Partition) -> Result<Stream<S, D>, PublicationError>
         where D: Data + NonStatic, S: Scope, S::Timestamp: NonStatic,
     {
         let worker_id = stream.scope().index() as u64;
         let name = match partition {
-            Topics::PerWorker => {
+            Partition::PerWorker => {
                 Some(format!("{}.{}", name, worker_id))
             }
-            Topics::Merge if (worker_id == PUBLISH_WORKER_ID) => {
+            Partition::Merge if (worker_id == PUBLISH_WORKER_ID) => {
                 Some(String::from(name))
             },
             _ => None,

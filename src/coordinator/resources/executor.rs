@@ -17,12 +17,12 @@ impl ExecutorState {
     }
 
     pub fn has_ports(&self) -> bool {
-        // TODO(swicki): Do actual port allocation
-        true
+        self.port_min < self.port_max
     }
 
     pub fn allocate_port(&mut self) -> u16 {
         // TODO(swicki): Do actual port allocation
+        self.port_min += 1;
         self.port_min
     }
 

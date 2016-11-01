@@ -4,6 +4,7 @@ extern crate walkdir;
 #[macro_use] extern crate sessionize;
 #[macro_use] extern crate log;
 extern crate logparse;
+extern crate timely;
 
 use abomonation::Abomonation;
 use sessionize::sessionize::{SessionizableMessage};
@@ -11,6 +12,7 @@ use sessionize::sessionize::{SessionizableMessage};
 pub mod reader;
 pub mod reconstruction;
 pub mod util;
+pub mod monitor;
 
 #[derive(Debug, Clone)]
 pub struct Message {

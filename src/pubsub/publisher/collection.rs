@@ -2,6 +2,7 @@ use std::io::{Result};
 use std::any::Any;
 use std::collections::BTreeMap;
 use std::slice::Iter as VecIter;
+use std::hash::Hash;
 
 use abomonation::Abomonation;
 

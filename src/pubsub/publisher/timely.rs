@@ -15,7 +15,6 @@ pub struct TimelyPublisher<T, D> {
     server: PollServer,
     subscribers: BTreeMap<SubscriberId, Sender>,
     marker: PhantomData<(T, D)>,
-    _frontier: Vec<T>,
 }
 
 impl<T, D> TimelyPublisher<T, D>
@@ -32,11 +31,10 @@ impl<T, D> TimelyPublisher<T, D>
         Ok((addr, TimelyPublisher {
             server: PollServer::from(server),
             subscribers: BTreeMap::new(),
-            _frontier: Vec::new(),
             marker: PhantomData,
         }))
     }
-    
+
     pub fn publish(&mut self, frontier: &[T], time: &T, item: &Vec<D>) -> Result<()> {
         for event in self.server.poll_events()? {
             match event {
