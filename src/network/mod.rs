@@ -3,6 +3,7 @@ use std::net::{TcpListener, TcpStream, Shutdown, ToSocketAddrs};
 use std::sync::{mpsc, Arc};
 use std::thread::{self, JoinHandle};
 
+use async::queue;
 use futures::{Future, Poll};
 use futures::stream::{self, Stream};
 
@@ -54,16 +55,15 @@ impl Network {
             thr: Arc::new(Some(thr)),
         };
 
-        let (receiver_tx, receiver_rx) = stream::channel();
+        let (receiver_tx, receiver_rx) = queue::channel();
         thread::spawn(move || {
             let mut tx = receiver_tx;
             let mut is_ok = true;
             while is_ok {
                 let message = read(&mut instream);
                 is_ok = message.is_ok();
-                tx = match tx.send(message).wait() {
-                    Ok(tx) => tx,
-                    Err(_) => break,
+                if let Err(_) = tx.send(message) {
+                    break;
                 }
             }
 
@@ -98,7 +98,7 @@ impl Drop for Sender {
 }
 
 pub struct Receiver {
-    rx: stream::Receiver<MessageBuf, Error>,
+    rx: queue::Receiver<MessageBuf, Error>,
 }
 
 impl Stream for Receiver {
