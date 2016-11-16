@@ -15,3 +15,4 @@ done
 scp monitor.py cisco1.ethz.ch:~
 scp execute.sh cisco1.ethz.ch:~
 scp execute_mono.sh cisco1.ethz.ch:~
+scp runner.sh cisco1.ethz.ch:~

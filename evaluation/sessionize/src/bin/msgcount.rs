@@ -53,10 +53,10 @@ fn main() {
             let process_start = time::precise_time_ns();
             computation.step();
             let iter_end = time::precise_time_ns();
-            println!("msgcount.{},{},{},{}", worker_index, input_start, process_start, iter_end);
+            println!("iter:msgcount,{},{},{},{}", worker_index, input_start, process_start, iter_end);
         }
     }).unwrap();
 
     let end = time::precise_time_ns();
-    println!("msgcount,{},{}", start, end);
+    println!("total:msgcount,{},{}", start, end);
 }

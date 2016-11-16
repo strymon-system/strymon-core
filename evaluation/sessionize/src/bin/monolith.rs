@@ -204,10 +204,10 @@ fn main() {
             }
 
             let iter_end = time::precise_time_ns();
-            println!("monolith.{},{},{},{}", worker_index, input_start, process_start, iter_end);
+            println!("iter:monolith,{},{},{},{}", worker_index, input_start, process_start, iter_end);
         }
     }).unwrap();
 
     let end = time::precise_time_ns();
-    println!("monolith,{},{}", start, end);
+    println!("total:monolith,{},{}", start, end);
 }

@@ -15,7 +15,7 @@ pub mod collection;
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SubscriberId(pub u32);
 
-pub struct PublisherServer {
+struct PublisherServer {
     listener: Fuse<Listener>,
     subscribers: Vec<(SubscriberId, Fuse<Receiver>)>,
     events: Vec<SubscriberEvent>,

@@ -50,10 +50,10 @@ fn main() {
             let process_start = time::precise_time_ns();
             computation.step();
             let iter_end = time::precise_time_ns();
-            println!("servicetop10.{},{},{},{}", worker_index, input_start, process_start, iter_end);
+            println!("iter:txns,{},{},{},{}", worker_index, input_start, process_start, iter_end);
         }
     }).unwrap();
 
     let end = time::precise_time_ns();
-    println!("txns,{},{}", start, end);
+    println!("total:txns,{},{}", start, end);
 }

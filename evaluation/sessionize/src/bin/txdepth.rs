@@ -54,10 +54,10 @@ fn main() {
             let process_start = time::precise_time_ns();
             computation.step();
             let iter_end = time::precise_time_ns();
-            println!("txdepth.{},{},{},{}", worker_index, input_start, process_start, iter_end);
+            println!("iter:txdepth,{},{},{},{}", worker_index, input_start, process_start, iter_end);
         }
     }).unwrap();
 
     let end = time::precise_time_ns();
-    println!("txdepth,{},{}", start, end);
+    println!("total:txdepth,{},{}", start, end);
 }

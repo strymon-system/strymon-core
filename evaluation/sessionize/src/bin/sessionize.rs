@@ -129,10 +129,10 @@ fn main() {
             }
 
             let iter_end = time::precise_time_ns();
-            println!("sessionize.{},{},{},{}", worker_index, input_start, process_start, iter_end);
+            println!("iter:sessionize,{},{},{},{}", worker_index, input_start, process_start, iter_end);
         }
     }).unwrap();
 
     let end = time::precise_time_ns();
-    println!("sessionize,{},{}", start, end);
+    println!("total:sessionize,{},{}", start, end);
 }

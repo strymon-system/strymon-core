@@ -32,4 +32,9 @@ void = "1.0.2"
 git = "https://github.com/frankmcsherry/abomonation"
 
 [workspace]
-members = ["evaluation/sessionize", "evaluation/pubsub-throughput"]
+members = ["evaluation/sessionize"]
+
+[profile.release]
+# for debugging symbols in perf
+#debug = true
+#lto = false

@@ -57,10 +57,10 @@ fn main() {
             let process_start = time::precise_time_ns();
             computation.step();
             let iter_end = time::precise_time_ns();
-            println!("msgspan.{},{},{},{}", worker_index, input_start, process_start, iter_end);
+            println!("iter:msgspan,{},{},{},{}", worker_index, input_start, process_start, iter_end);
         }
     }).unwrap();
 
     let end = time::precise_time_ns();
-    println!("msgspan,{},{}", start, end);
+    println!("total:msgspan,{},{}", start, end);
 }

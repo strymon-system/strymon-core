@@ -2,6 +2,7 @@ use std::io::{Result, Error};
 use std::any::Any;
 use std::marker::PhantomData;
 use std::time::Instant;
+use std::env;
 
 use futures::{Poll, Async};
 use futures::stream::Stream;
@@ -80,7 +81,7 @@ impl<T, D> Stream for TimelySubscriber<T, D>
             let data = buf.pop::<Abomonate, Vec<D>>().map_err(Into::<Error>::into)?;
             let duration = start.elapsed();
             let nanos = duration.as_secs() * 1e9 as u64 + duration.subsec_nanos() as u64;
-            info!("deserialize,{}", nanos);
+            println!("deserialize,{},{}", env::args().next().unwrap(), nanos);
 
             Some((frontier, time, data))
         } else {

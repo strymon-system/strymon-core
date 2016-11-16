@@ -14,7 +14,7 @@ fn main() {
             // results in `n` topics: "numbers.0", "numbers.1", ...
             coord.publish("numbers", &numbers, Partition::PerWorker)
                  .expect("failed to publish topic");
-
+/*
             // filtering performed by each worker
             let primes = numbers.filter(|x| x.is_prime());
 
@@ -22,6 +22,7 @@ fn main() {
             // published by worker number 0
             coord.publish("primes", &primes, Partition::Merge)
                  .expect("failed to publish topic");
+*/
         });
     }).unwrap();
 }

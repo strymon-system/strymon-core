@@ -3,6 +3,7 @@ use std::any::Any;
 use std::marker::PhantomData;
 use std::collections::BTreeMap;
 use std::time::Instant;
+use std::env;
 
 use abomonation::Abomonation;
 
@@ -55,7 +56,7 @@ impl<T, D> TimelyPublisher<T, D>
         buf.push::<Abomonate, Vec<D>>(item).unwrap();
         let duration = start.elapsed();
         let nanos = duration.as_secs() * 1e9 as u64 + duration.subsec_nanos() as u64;
-        info!("serialize,{}", nanos);
+        println!("serialize,{},{}", env::args().next().unwrap(), nanos);
 
         for sub in self.subscribers.values() {
             sub.send(buf.clone())
