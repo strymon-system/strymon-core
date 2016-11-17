@@ -1,6 +1,6 @@
 use std::io::Result;
 
-use futures::Future;
+use futures::{self, Future};
 use futures::stream::Stream;
 
 use async;
@@ -24,20 +24,23 @@ pub fn coordinate(port: u16) -> Result<()> {
     let network = Network::init(None)?; // TODO: topics must know external
     let listener = network.listen(port)?;
 
-    let catalog = Catalog::new(&network)?;
-    let coord = Coordinator::new(catalog);
-    let server = listener.map(reqresp::multiplex).for_each(move |(tx, rx)| {
-        // every connection gets its own handle
-        let mut disp = Dispatch::new(coord.clone(), tx);
-        let client = rx.do_while(move |req| disp.dispatch(req))
-            .map_err(|err| {
-                error!("failed to dispatch client: {:?}", err);
-            });
+    let coordinate = futures::lazy(move || {
+        let catalog = Catalog::new(&network).expect("failed to create catalog"); // TODO
+        let coord = Coordinator::new(catalog);
 
-        // handle client asynchronously
-        async::spawn(client);
-        Ok(())
+        listener.map(reqresp::multiplex).for_each(move |(tx, rx)| {
+            // every connection gets its own handle
+            let mut disp = Dispatch::new(coord.clone(), tx);
+            let client = rx.do_while(move |req| disp.dispatch(req))
+                .map_err(|err| {
+                    error!("failed to dispatch client: {:?}", err);
+                });
+
+            // handle client asynchronously
+            async::spawn(client);
+            Ok(())
+        })
     });
 
-    async::finish(server)
+    async::finish(coordinate)
 }

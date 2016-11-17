@@ -9,9 +9,8 @@ impl Abomonation for TopicSchema {
     #[inline]
     unsafe fn embalm(&mut self) {
         match *self {
-            TopicSchema::Item(ref mut d) => d.embalm(),
             TopicSchema::Collection(ref mut d) => d.embalm(),
-            TopicSchema::Timely(ref mut t, ref mut d) => {
+            TopicSchema::Stream(ref mut t, ref mut d) => {
                 t.embalm();
                 d.embalm();
             }
@@ -20,9 +19,8 @@ impl Abomonation for TopicSchema {
     #[inline]
     unsafe fn entomb(&self, bytes: &mut Vec<u8>) {
         match *self {
-            TopicSchema::Item(ref d) => d.entomb(bytes),
             TopicSchema::Collection(ref d) => d.entomb(bytes),
-            TopicSchema::Timely(ref t, ref d) => {
+            TopicSchema::Stream(ref t, ref d) => {
                 t.entomb(bytes);
                 d.entomb(bytes);
             }
@@ -31,9 +29,8 @@ impl Abomonation for TopicSchema {
     #[inline]
     unsafe fn exhume<'a, 'b>(&'a mut self, bytes: &'b mut [u8]) -> Option<&'b mut [u8]> {
         match *self {
-            TopicSchema::Item(ref mut d) => d.exhume(bytes),
             TopicSchema::Collection(ref mut d) => d.exhume(bytes),
-            TopicSchema::Timely(ref mut t, ref mut d) => {
+            TopicSchema::Stream(ref mut t, ref mut d) => {
                 Some(bytes)
                     .and_then(|bytes| t.exhume(bytes))
                     .and_then(|bytes| d.exhume(bytes))

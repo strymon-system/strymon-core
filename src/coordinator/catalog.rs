@@ -1,17 +1,20 @@
 use std::any::Any;
 use std::io::Result as IoResult;
 use std::collections::hash_map::{HashMap, Entry as HashEntry};
+use std::collections::btree_map::{BTreeMap, Values};
 use std::hash::Hash;
 
 use abomonation::Abomonation;
+use futures::Future;
 
 use model::*;
 use coordinator::requests::*;
 
+use async;
+
 use network::Network;
 use network::message::abomonate::{Abomonate, NonStatic};
-use pubsub::publisher::collection::CollectionPublisher;
-pub use pubsub::publisher::collection::Iter;
+use pubsub::publisher::collection::{CollectionPublisher, Mutator};
 
 use super::util::Generator;
 
@@ -19,9 +22,10 @@ pub struct Catalog {
     generator: Generator<TopicId>,
     directory: HashMap<String, TopicId>,
 
-    topics: Collection<Topic>,
-    executors: Collection<Executor>,
-    queries: Collection<Query>,
+    topics: MapCollection<TopicId, Topic>,
+    executors: MapCollection<ExecutorId, Executor>,
+    queries: MapCollection<QueryId, Query>,
+
     publications: Collection<Publication>,
     subscriptions: Collection<Subscription>,
 }
@@ -32,29 +36,29 @@ impl Catalog {
         let mut directory = HashMap::<String, TopicId>::new();
 
         let id = generator.generate();
-        let (topic, mut topics) = Collection::<Topic>::new(network, id, "$topics")?;
+        let (topic, mut topics) = MapCollection::new(network, id, "$topics")?;
         directory.insert(topic.name.clone(), topic.id);
-        topics.insert(topic);
+        topics.insert(topic.id, topic);
 
         let id = generator.generate();
-        let (topic, executors) = Collection::<Executor>::new(network, id, "$executors")?;
+        let (topic, executors) = MapCollection::new(network, id, "$executors")?;
         directory.insert(topic.name.clone(), topic.id);
-        topics.insert(topic);
+        topics.insert(topic.id, topic);
 
         let id = generator.generate();
-        let (topic, queries) = Collection::<Query>::new(network, id, "$queries")?;
+        let (topic, queries) = MapCollection::new(network, id, "$queries")?;
         directory.insert(topic.name.clone(), topic.id);
-        topics.insert(topic);
+        topics.insert(topic.id, topic);
 
         let id = generator.generate();
         let (topic, pubs) = Collection::<Publication>::new(network, id, "$publications")?;
         directory.insert(topic.name.clone(), topic.id);
-        topics.insert(topic);
+        topics.insert(topic.id, topic);
 
         let id = generator.generate();
-        let (topic, subs) = Collection::<Subscription>::new(network, id, "$subscription")?;
+        let (topic, subs) = Collection::<Subscription>::new(network, id, "$subscriptions")?;
         directory.insert(topic.name.clone(), topic.id);
-        topics.insert(topic);
+        topics.insert(topic.id, topic);
 
         Ok(Catalog {
             generator: generator,
@@ -69,38 +73,26 @@ impl Catalog {
 
     pub fn add_executor(&mut self, executor: Executor) {
         debug!("add_executor: {:?}", executor);
-        self.executors.insert(executor);
+        self.executors.insert(executor.id, executor);
     }
 
     pub fn remove_executor(&mut self, id: ExecutorId) {
         debug!("remove_executor: {:?}", id);
-        // TODO(swicki): this is unnecessarily slow
-        let executor = self.executors.iter().find(|e| e.id == id).cloned();
-        if let Some(executor) = executor {
-            self.executors.remove(executor)
-        } else {
-            warn!("tried to remove inexisting executor: {:?}", id)
-        }
+        self.executors.remove(&id);
     }
 
     pub fn executors<'a>(&'a self) -> Executors<'a> {
-        Executors { inner: self.executors.iter() }
+        Executors { inner: self.executors.values() }
     }
 
     pub fn add_query(&mut self, query: Query) {
         debug!("add_query: {:?}", query);
-        self.queries.insert(query);
+        self.queries.insert(query.id, query);
     }
 
     pub fn remove_query(&mut self, id: QueryId) {
         debug!("remove_query: {:?}", id);
-        // TODO(swicki): this is unnecessarily slow
-        let query = self.queries.iter().find(|q| q.id == id).cloned();
-        if let Some(query) = query {
-            self.queries.remove(query)
-        } else {
-            warn!("tried to remove inexisting query: {:?}", id)
-        }
+        self.queries.remove(&id);
     }
 
     pub fn publish(&mut self,
@@ -124,7 +116,7 @@ impl Catalog {
 
                 debug!("publish: {:?}", publication);
 
-                self.topics.insert(topic.clone());
+                self.topics.insert(id, topic.clone());
                 self.publications.insert(publication);
                 entry.insert(id);
 
@@ -143,22 +135,19 @@ impl Catalog {
 
     pub fn lookup(&mut self, name: &str) -> Option<Topic> {
         if let Some(id) = self.directory.get(name) {
-            // TODO(swicki): The point of the directory was to avoid linear search
-            self.topics.iter().find(|topic| topic.id == *id).cloned()
+            self.topics.get(&id).cloned()
         } else {
             None
         }
     }
 
     pub fn subscribe(&mut self, query_id: QueryId, topic: TopicId) {
-        // TODO(swicki): Check if topic and query actually exist
         let subscription = Subscription(query_id, topic);
         debug!("subscribe: {:?}", subscription);
         self.subscriptions.insert(subscription);
     }
 
     pub fn unsubscribe(&mut self, query_id: QueryId, topic: TopicId) -> Result<(), UnsubscribeError> {
-        // TODO(swicki): Check if topic and query actually exist
         let subscription = Subscription(query_id, topic);
         debug!("unsubscribe: {:?}", subscription);
         self.subscriptions.remove(subscription);
@@ -166,45 +155,94 @@ impl Catalog {
     }
 }
 
-struct Collection<T> {
-    publisher: CollectionPublisher<T>,
+struct MapCollection<K, V> {
+    inner: BTreeMap<K, V>,
+    mutator: Mutator<V>,
 }
 
-impl<T: Abomonation + Any + Clone + Eq + NonStatic> Collection<T> {
-    fn new(network: &Network, id: TopicId, name: &str) -> IoResult<(Topic, Self)> {
-        let (addr, publisher) = CollectionPublisher::<T>::new(network)?;
-
-        let elem = TopicType::of::<T>();
-        let schema = TopicSchema::Collection(elem);
+impl<K: Ord, V: Abomonation + Any + Clone + Eq + NonStatic> MapCollection<K, V> {
+    fn new(network: &Network, topic_id: TopicId, name: &'static str) -> IoResult<(Topic, Self)> {
+        let (addr, mutator, publisher) = CollectionPublisher::new(network)?;
         let topic = Topic {
-            id: id,
+            id: topic_id,
             name: String::from(name),
             addr: addr,
-            schema: schema,
+            schema: TopicSchema::Collection(TopicType::of::<V>())
         };
 
-        Ok((topic, Collection { publisher: publisher }))
+        async::spawn(publisher.map_err(|err| {
+            error!("failure in catalog publisher: {:?}", err)
+        }));
+
+        Ok((topic, MapCollection {
+            inner: BTreeMap::new(),
+            mutator: mutator,
+        }))
+    }
+    
+    fn insert(&mut self, key: K, value: V) {
+        self.inner.insert(key, value.clone());
+        self.mutator.insert(value);
     }
 
-    fn insert(&mut self, elem: T) {
-        if let Err(err) = self.publisher.publish(&vec![(elem, 1)]) {
-            error!("I/O failure in catalog: {:?}", err)
+    fn remove(&mut self, key: &K) {
+        if let Some(value) = self.inner.remove(key) {
+            self.mutator.remove(value);
         }
     }
 
-    fn remove(&mut self, elem: T) {
-        if let Err(err) = self.publisher.publish(&vec![(elem, -1)]) {
-            error!("I/O failure in catalog: {:?}", err)
-        }
+    fn get(&self, key: &K) -> Option<&V> {
+        self.inner.get(key)
     }
 
-    fn iter(&self) -> Iter<T> {
-        self.publisher.into_iter()
+    fn values<'a>(&'a self) -> Values<'a, K, V> {
+        self.inner.values()
+    }
+}
+
+struct Collection<T> {
+    inner: HashMap<T, usize>,
+    mutator: Mutator<T>,
+}
+
+impl<T: Abomonation + Any + Clone + Eq + Hash + NonStatic> Collection<T> {
+    fn new(network: &Network, topic_id: TopicId, name: &'static str) -> IoResult<(Topic, Self)> {
+        let (addr, mutator, publisher) = CollectionPublisher::new(network)?;
+        let topic = Topic {
+            id: topic_id,
+            name: String::from(name),
+            addr: addr,
+            schema: TopicSchema::Collection(TopicType::of::<T>())
+        };
+
+        async::spawn(publisher.map_err(|err| {
+            error!("failure in catalog publisher: {:?}", err)
+        }));
+
+        Ok((topic, Collection {
+            inner: HashMap::new(),
+            mutator: mutator,
+        }))
+    }
+
+    fn insert(&mut self, item: T) {
+        *self.inner.entry(item).or_insert(0) += 1;
+    }
+
+    fn remove(&mut self, item: T) {
+        if let HashEntry::Occupied(mut entry) = self.inner.entry(item) {
+            self.mutator.remove(entry.key().clone());
+            if *entry.get() == 1 {
+                entry.remove();
+            } else {
+                *entry.get_mut() -= 1;
+            }
+        }
     }
 }
 
 pub struct Executors<'a> {
-    inner: Iter<'a, Executor>,
+    inner: Values<'a, ExecutorId, Executor>,
 }
 
 impl<'a> Iterator for Executors<'a> {

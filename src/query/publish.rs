@@ -62,39 +62,6 @@ impl<T: Timestamp, D: Data> ParallelizationContract<T, D> for Partition
 }
 
 impl Coordinator {
-    // TODO(swicki): Merge contract
-    pub fn publish_item<D, S, N>(&self, name: N, stream: &Stream<S, D>) -> Result<Topic, PublicationError>
-        where D: Data + NonStatic, N: Into<String>, S: Scope
-    {
-        let (addr, publisher) = StreamPublisher::<D>::new(&self.network)?;
-
-        let mut publisher = Some(publisher);
-
-        stream.unary_stream::<D, _, _>(Pipeline, "publisher", move |input, output| {
-            input.for_each(|time, data| {
-                if let Some(ref mut publisher) = publisher {
-                    publisher.publish(data).unwrap();
-                }
-
-                output.session(&time).give_content(data);
-            });
-        });
-
-        let item = TopicType::of::<D>();
-        let schema = TopicSchema::Item(item);
-        self.tx.request(&Publish {
-            name: name.into(),
-            token: self.token,
-            schema: schema,
-            addr: addr,
-        }).map_err(|err| {
-            match err {
-                Ok(err) => PublicationError::from(err),
-                Err(err) => PublicationError::from(err),
-            }
-        }).wait()
-    }
-
     pub fn publish<S, D>(&self, name: &str, stream: &Stream<S, D>, partition: Partition) -> Result<Stream<S, D>, PublicationError>
         where D: Data + NonStatic, S: Scope, S::Timestamp: NonStatic,
     {
@@ -120,7 +87,7 @@ impl Coordinator {
             // local worker hosts a publication
             let item = TopicType::of::<D>();
             let time = TopicType::of::<S::Timestamp>();
-            let schema = TopicSchema::Timely(item, time);
+            let schema = TopicSchema::Stream(item, time);
             self.tx.request(&Publish {
                 name: name.unwrap(),
                 token: self.token,

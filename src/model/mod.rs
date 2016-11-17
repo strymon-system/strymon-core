@@ -13,9 +13,8 @@ pub struct TopicType {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum TopicSchema {
-    Item(TopicType),
     Collection(TopicType),
-    Timely(TopicType, TopicType),
+    Stream(TopicType, TopicType),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
