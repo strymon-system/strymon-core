@@ -6,7 +6,7 @@ use async;
 use async::do_while::Stop;
 use network::reqresp::{Outgoing, RequestBuf};
 
-use super::resources::CoordinatorRef;
+use super::handler::CoordinatorRef;
 use super::requests::*;
 
 pub struct Dispatch {

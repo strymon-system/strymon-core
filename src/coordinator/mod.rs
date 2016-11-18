@@ -8,13 +8,13 @@ use async::do_while::DoWhileExt;
 use network::Network;
 use network::reqresp;
 
-use self::resources::Coordinator;
+use self::handler::Coordinator;
 use self::dispatch::Dispatch;
 use self::catalog::Catalog;
 
 pub mod requests;
 
-pub mod resources;
+pub mod handler;
 pub mod catalog;
 pub mod dispatch;
 

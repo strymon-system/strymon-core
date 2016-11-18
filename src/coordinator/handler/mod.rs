@@ -303,21 +303,33 @@ impl Coordinator {
         self.catalog.unpublish(query_id, topic_id)
     }
 
-    fn subscribe(&mut self, req: Subscribe) -> Promise<Topic, SubscribeError> {
-        let (tx, rx) = promise();
-
+    fn subscribe(&mut self, req: Subscribe)
+        -> Box<Future<Item=Topic, Error=SubscribeError>>
+    {
         let query = req.token.id;
+
         if let Some(topic) = self.catalog.lookup(&req.name) {
             self.catalog.subscribe(query, topic.id);
-            tx.complete(Ok(topic));
+            return futures::finished(topic).boxed();
         } else if req.blocking {
             debug!("inserting blocking lookup for topic: {:?}", &req.name);
-            self.lookups.entry(req.name).or_insert(Vec::new()).push(tx);
+            let (lookup, result) = promise();
+            
+            let handle = self.handle();
+            let result = result.and_then(move |topic: Topic| {
+                handle.borrow_mut().catalog.subscribe(query, topic.id);
+                Ok(topic)
+            }).map_err(|err| match err {
+                Ok(err) => err,
+                Err(_) => SubscribeError::TopicNotFound,
+            });
+
+            self.lookups.entry(req.name).or_insert(Vec::new()).push(lookup);
+
+            return Box::new(result);
         } else {
-            tx.complete(Err(SubscribeError::TopicNotFound));
+            return futures::failed(SubscribeError::TopicNotFound).boxed();
         }
-        
-        rx
     }
 
     fn unsubscribe(&mut self, query_id: QueryId, topic_id: TopicId) -> Result<(), UnsubscribeError>  {
@@ -430,10 +442,6 @@ impl CoordinatorRef {
 
         let state = self.state.clone();
         let future = self.coord.borrow_mut().subscribe(req)
-            .map_err(|err| match err {
-                Ok(err) => err,
-                Err(_) => SubscribeError::TopicNotFound,
-            })
             .and_then(move |topic| {
                 let topic_id = topic.id;
                 let query_id = query.id;
