@@ -20,11 +20,16 @@ abomonation = "0.4.4"
 byteorder = "0.5.3"
 env_logger = "0.3"
 futures = "0.1.2"
+getopts = "0.2.14"
 log = "0.3"
 rand = "0.3.14"
 timely = "0.1.15"
 timely_communication = "0.1.5"
 void = "1.0.2"
+
+[profile]
+
+[profile.release]
 
 [replace]
 
@@ -33,8 +38,3 @@ git = "https://github.com/frankmcsherry/abomonation"
 
 [workspace]
 members = ["evaluation/sessionize"]
-
-[profile.release]
-# for debugging symbols in perf
-#debug = true
-#lto = false

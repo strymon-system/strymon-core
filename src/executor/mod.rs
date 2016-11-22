@@ -76,6 +76,20 @@ pub struct Builder {
     ports: (u16, u16),
 }
 
+impl Builder {
+    pub fn host(&mut self, host: String) {
+        self.host = host;
+    }
+    
+    pub fn coordinator(&mut self, coord: String) {
+        self.coord = coord;
+    }
+
+    pub fn ports(&mut self, min: u16, max: u16) {
+        self.ports = (min, max);
+    }
+}
+
 impl Default for Builder {
     fn default() -> Self {
         Builder {
