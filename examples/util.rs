@@ -11,7 +11,7 @@ use timely_query::model::Topic;
 fn main() {
     drop(env_logger::init());
 
-    timely_query::execute(|root, coord| {
+    timely_query::execute(|root, coord| {    
         let mut input = root.scoped::<i32,_,_>(|scope| {
             let (input, stream) = scope.new_input();
             stream.inspect(|x| println!("topic event: {:?}", x));

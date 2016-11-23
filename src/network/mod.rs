@@ -10,6 +10,7 @@ use network::message::buf::{MessageBuf, read, write};
 
 pub mod message;
 pub mod reqresp;
+pub mod reqrep;
 
 #[derive(Clone)]
 pub struct Network {
@@ -34,42 +35,11 @@ impl Network {
     }
 
     fn channel(&self, stream: TcpStream) -> Result<(Sender, Receiver)> {
-        let mut instream = stream.try_clone()?;
-        let mut outstream = stream;
+        let instream = stream.try_clone()?;
+        let outstream = stream;
 
-        let (sender_tx, sender_rx) = mpsc::channel();
-        let thr = thread::spawn(move || {
-            while let Ok(msg) = sender_rx.recv() {
-                if let Err(err) = write(&mut outstream, &msg) {
-                    info!("unexpected error while writing bytes: {:?}", err);
-                    break;
-                }
-            }
-
-            drop(outstream.shutdown(Shutdown::Both));
-        });
-
-        let sender = Sender {
-            tx: Some(sender_tx),
-            thr: Arc::new(Some(thr)),
-        };
-
-        let (receiver_tx, receiver_rx) = stream::channel();
-        thread::spawn(move || {
-            let mut tx = receiver_tx;
-            let mut is_ok = true;
-            while is_ok {
-                let message = read(&mut instream);
-                is_ok = message.is_ok();
-                tx = match tx.send(message).wait() {
-                    Ok(tx) => tx,
-                    Err(_) => break,
-                }
-            }
-
-            drop(instream.shutdown(Shutdown::Both));
-        });
-        let receiver = Receiver { rx: receiver_rx };
+        let sender = Sender::new(outstream);
+        let receiver = Receiver::new(instream);
 
         Ok((sender, receiver))
     }
@@ -82,6 +52,25 @@ pub struct Sender {
 }
 
 impl Sender {
+    fn new(mut outstream: TcpStream) -> Self {
+        let (sender_tx, sender_rx) = mpsc::channel();
+        let thr = thread::spawn(move || {
+            while let Ok(msg) = sender_rx.recv() {
+                if let Err(err) = write(&mut outstream, &msg) {
+                    info!("unexpected error while writing bytes: {:?}", err);
+                    break;
+                }
+            }
+
+            drop(outstream.shutdown(Shutdown::Both));
+        });
+
+        Sender {
+            tx: Some(sender_tx),
+            thr: Arc::new(Some(thr)),
+        }
+    }
+
     pub fn send<T: Into<MessageBuf>>(&self, msg: T) {
         drop(self.tx.as_ref().unwrap().send(msg.into()));
     }
@@ -99,6 +88,28 @@ impl Drop for Sender {
 
 pub struct Receiver {
     rx: stream::Receiver<MessageBuf, Error>,
+}
+
+impl Receiver {
+    fn new(mut instream: TcpStream) -> Self {
+        let (receiver_tx, receiver_rx) = stream::channel();
+        thread::spawn(move || {
+            let mut tx = receiver_tx;
+            let mut is_ok = true;
+            while is_ok {
+                let message = read(&mut instream);
+                is_ok = message.is_ok();
+                tx = match tx.send(message).wait() {
+                    Ok(tx) => tx,
+                    Err(_) => break,
+                }
+            }
+
+            drop(instream.shutdown(Shutdown::Both));
+        });
+
+        Receiver { rx: receiver_rx }
+    }
 }
 
 impl Stream for Receiver {

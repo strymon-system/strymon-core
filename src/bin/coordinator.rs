@@ -17,7 +17,7 @@ fn usage(opts: Options, err: Option<String>) -> ! {
         writeln!(io::stderr(), "{}\n\n{}", msg, brief).unwrap();
         process::exit(1);
     } else {
-        writeln!(io::stderr(), "{}", opts.usage(&brief)).unwrap();
+        println!("{}", opts.usage(&brief));
         process::exit(0);
     }
 }
