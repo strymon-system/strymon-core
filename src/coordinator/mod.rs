@@ -6,7 +6,7 @@ use futures::stream::Stream;
 use async;
 use async::do_while::DoWhileExt;
 use network::Network;
-use network::reqresp;
+use network::reqrep;
 
 use self::handler::Coordinator;
 use self::dispatch::Dispatch;
@@ -47,13 +47,13 @@ impl Default for Builder {
 impl Builder {
     pub fn run(self) -> Result<()> {
         let network = Network::init(self.host)?;
-        let listener = network.listen(self.port)?;
+        let server = network.server(self.port)?;
 
         let coordinate = futures::lazy(move || {
             let catalog = Catalog::new(&network).expect("failed to create catalog"); // TODO
             let coord = Coordinator::new(catalog);
 
-            listener.map(reqresp::multiplex).for_each(move |(tx, rx)| {
+            server.for_each(move |(tx, rx)| {
                 // every connection gets its own handle
                 let mut disp = Dispatch::new(coord.clone(), tx);
                 let client = rx.do_while(move |req| disp.dispatch(req))

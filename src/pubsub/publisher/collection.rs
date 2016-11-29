@@ -98,7 +98,8 @@ impl<D: Abomonation + Any + Clone + Eq + NonStatic> Future for CollectionPublish
                 SubscriberEvent::Accepted(id, tx) => {
                     accepted.push((id, tx));
                 }
-                SubscriberEvent::Disconnected(id, _) => {
+                SubscriberEvent::Disconnected(id) |
+                SubscriberEvent::Error(id, _) => {
                     self.subscribers.remove(&id);
                 }
             }

@@ -13,13 +13,13 @@ use abomonation::Abomonation;
 use byteorder::{NetworkEndian, ByteOrder};
 
 use futures::{self, Future, Async, Complete, Poll};
-use futures::stream::{Stream, Fuse};
+use futures::stream::{self, Stream};
 
 use async::queue;
 use network::message::{Encode, Decode};
 use network::message::abomonate::{Abomonate, NonStatic};
 use network::message::buf::{MessageBuf, read};
-use network::Sender;
+use network::{Sender, Network, accept};
 
 use void::Void;
 
@@ -161,6 +161,12 @@ pub struct Response<R: Request> {
     token: Token,
 }
 
+impl<R: Request> Response<R> {
+    pub fn wait_unwrap(self) -> Result<R::Success, R::Error> {
+        self.map_err(|e| e.expect("request failed with I/O error")).wait()
+    }
+}
+
 impl<R: Request> Future for Response<R> {
     type Item = R::Success;
     type Error = Result<<R as Request>::Error, IoError>;
@@ -285,11 +291,13 @@ impl Resolver {
     fn dispatch(mut self) {
         thread::spawn(move || {
             loop {
-                let res = read(&mut self.stream).and_then(|message| {
-                    self.decode(message)
-                });
-            
-                // TODO: if read failed bc. no byte received, just exit
+                let res = match read(&mut self.stream) {
+                    Ok(Some(message)) => self.decode(message),
+                    Ok(None) => break,
+                    Err(err) => Err(err),
+                };
+                
+                // make sure to announce any decoding errors to client
                 if let Err(err) = res {
                     let _ = self.incoming.send(Err(err));
                     break;
@@ -301,6 +309,42 @@ impl Resolver {
     }
 }
 
+pub struct Server {
+    external: Arc<String>,
+    port: u16,
+    rx: stream::Receiver<(Outgoing, Incoming), IoError>,
+}
+
+impl Server {
+    // TODO(swicki) this is just copied over from network::Listener
+    fn new(network: Network, port: u16) -> IoResult<Self> {
+        let sockaddr = ("0.0.0.0", port);
+        let listener = TcpListener::bind(&sockaddr)?;
+        let external = network.external.clone();
+        let port = listener.local_addr()?.port();
+        let rx = accept(listener, multiplex);
+
+        Ok(Server {
+            external: external,
+            port: port,
+            rx: rx,
+        })
+    }
+
+    pub fn external_addr(&self) -> (&str, u16) {
+        (&*self.external, self.port)
+    }
+}
+
+impl Stream for Server {
+    type Item = (Outgoing, Incoming);
+    type Error = IoError;
+
+    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
+        self.rx.poll()
+    }
+}
+
 fn multiplex(stream: TcpStream) -> IoResult<(Outgoing, Incoming)> {
     let instream = stream.try_clone()?;
     let outstream = stream;
@@ -309,13 +353,13 @@ fn multiplex(stream: TcpStream) -> IoResult<(Outgoing, Incoming)> {
     let pending = Arc::new(Mutex::new(HashMap::new()));
     let sender = Sender::new(outstream);
 
-    Resolver {
+    let resolver = Resolver {
         pending: pending.clone(),
         sender: sender.clone(),
         incoming: incoming_tx,
         stream: instream,
-    }.dispatch();
-
+    };
+    
     let outgoing = Outgoing {
         token: Default::default(),
         pending: pending,
@@ -326,5 +370,93 @@ fn multiplex(stream: TcpStream) -> IoResult<(Outgoing, Incoming)> {
         receiver: incoming_rx,
     };
 
+    resolver.dispatch();
+
     Ok((outgoing, incoming))
+}
+
+impl Network {
+    pub fn client<E: ToSocketAddrs>(&self, endpoint: E) -> IoResult<(Outgoing, Incoming)> {
+        multiplex(TcpStream::connect(endpoint)?)
+    }
+    
+    pub fn server<P: Into<Option<u16>>>(&self, port: P) -> IoResult<Server> {
+        Server::new(self.clone(), port.into().unwrap_or(0))
+    }
+}
+
+fn _assert() {
+    fn _is_send<T: Send>() {}
+    _is_send::<Incoming>();
+    _is_send::<Outgoing>();
+    _is_send::<Server>();
+}
+
+#[cfg(test)]
+mod tests {
+    use abomonation::Abomonation;
+    use async;
+    use async::do_while::*;
+    use futures::{self, Future};
+    use network::reqrep::Request;
+    use network::Network;
+
+    fn assert_io<F: FnOnce() -> ::std::io::Result<()>>(f: F) {
+        f().expect("I/O test failed")
+    }
+
+    #[derive(Clone)]
+    struct Ping(i32);
+    #[derive(Clone)]
+    struct Pong(i32);
+    unsafe_abomonate!(Ping);
+    unsafe_abomonate!(Pong);
+    impl Request for Ping {
+        type Success = Pong;
+        type Error = ();
+
+        fn name() -> &'static str {
+            "Ping"
+        }
+    }
+
+    #[test]
+    fn simple_ping() {
+
+        assert_io(|| {
+            let network = Network::init(None)?;
+            let server = network.server(None)?;
+
+            let (tx, _) = network.client(server.external_addr())?;
+            let server = 
+                server.do_while(|(_, rx)| {
+                    let handler = rx.do_while(move |req| {
+                            assert_eq!(req.name(), "Ping");
+                            let (req, resp) = req.decode::<Ping>().unwrap();
+                            resp.respond(Ok(Pong(req.0 + 1)));
+
+                            Err(Stop::Terminate)
+                        })
+                        .map_err(|e| Err(e).unwrap());
+
+                    async::spawn(handler);
+
+                    Err(Stop::Terminate)
+                })
+                .map_err(|e| Err(e).unwrap());
+
+            let done = futures::lazy(move || {
+                async::spawn(server);
+
+                tx.request(&Ping(5))
+                    .and_then(move |pong| {
+                        assert_eq!(pong.0, 6);
+                        Ok(())
+                    })
+                    .map_err(|_| panic!("got ping error"))
+            });
+
+            async::finish(done)
+        });
+    }
 }

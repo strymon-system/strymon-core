@@ -38,7 +38,8 @@ impl<D: Abomonation + Any + Clone + NonStatic> ItemPublisher<D> {
                 SubscriberEvent::Accepted(id, tx) => {
                     self.subscribers.insert(id, tx);
                 }
-                SubscriberEvent::Disconnected(id, _) => {
+                SubscriberEvent::Disconnected(id) |
+                SubscriberEvent::Error(id, _) => {
                     self.subscribers.remove(&id);
                 }
             }

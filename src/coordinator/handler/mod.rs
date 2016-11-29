@@ -9,7 +9,7 @@ use rand;
 
 use async;
 use async::promise::{promise, Promise, Complete};
-use network::reqresp::Outgoing;
+use network::reqrep::Outgoing;
 use model::*;
 use executor::requests::*;
 
@@ -335,6 +335,13 @@ impl Coordinator {
     fn unsubscribe(&mut self, query_id: QueryId, topic_id: TopicId) -> Result<(), UnsubscribeError>  {
         self.catalog.unsubscribe(query_id, topic_id)
     }
+
+    fn lookup(&self, name: &str) -> Result<Topic, ()>  {
+        match self.catalog.lookup(name) {
+            Some(topic) => Ok(topic),
+            None => Err(())
+        }
+    }
 }
 
 struct State {
@@ -468,6 +475,10 @@ impl CoordinatorRef {
                 }
                 Ok(())
             })
+    }
+
+    pub fn lookup(&self, name: &str) -> Result<Topic, ()> {
+        self.coord.borrow().lookup(name)
     }
 }
 

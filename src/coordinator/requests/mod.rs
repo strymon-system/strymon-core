@@ -1,5 +1,5 @@
 use model::*;
-use network::reqresp::Request;
+use network::reqrep::Request;
 
 mod imp;
 
@@ -162,5 +162,19 @@ impl Request for Unpublish {
     
     fn name() -> &'static str {
         "Unpublish"
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Lookup {
+    pub name: String,
+}
+
+impl Request for Lookup {
+    type Success = Topic;
+    type Error = ();
+
+    fn name() -> &'static str {
+        "Lookup"
     }
 }

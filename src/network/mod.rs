@@ -9,7 +9,6 @@ use futures::stream::{self, Stream};
 use network::message::buf::{MessageBuf, read, write};
 
 pub mod message;
-pub mod reqresp;
 pub mod reqrep;
 
 #[derive(Clone)]
@@ -27,22 +26,22 @@ impl Network {
     }
 
     pub fn connect<E: ToSocketAddrs>(&self, endpoint: E) -> Result<(Sender, Receiver)> {
-        self.channel(TcpStream::connect(endpoint)?)
+        channel(TcpStream::connect(endpoint)?)
     }
 
     pub fn listen<P: Into<Option<u16>>>(&self, port: P) -> Result<Listener> {
         Listener::new(self.clone(), port.into().unwrap_or(0))
     }
+}
 
-    fn channel(&self, stream: TcpStream) -> Result<(Sender, Receiver)> {
-        let instream = stream.try_clone()?;
-        let outstream = stream;
+fn channel(stream: TcpStream) -> Result<(Sender, Receiver)> {
+    let instream = stream.try_clone()?;
+    let outstream = stream;
 
-        let sender = Sender::new(outstream);
-        let receiver = Receiver::new(instream);
+    let sender = Sender::new(outstream);
+    let receiver = Receiver::new(instream);
 
-        Ok((sender, receiver))
-    }
+    Ok((sender, receiver))
 }
 
 #[derive(Clone)]
@@ -95,14 +94,21 @@ impl Receiver {
         let (receiver_tx, receiver_rx) = stream::channel();
         thread::spawn(move || {
             let mut tx = receiver_tx;
-            let mut is_ok = true;
-            while is_ok {
-                let message = read(&mut instream);
-                is_ok = message.is_ok();
+            let mut stop = false;
+            while !stop {
+                let message = match read(&mut instream) {
+                    Ok(Some(msg)) => Ok(msg),
+                    Ok(None) => break,
+                    Err(err) => {
+                        stop = true;
+                        Err(err)
+                    }
+                };
+                
                 tx = match tx.send(message).wait() {
                     Ok(tx) => tx,
                     Err(_) => break,
-                }
+                };
             }
 
             drop(instream.shutdown(Shutdown::Both));
@@ -121,6 +127,30 @@ impl Stream for Receiver {
     }
 }
 
+fn accept<T, F>(listener: TcpListener, mut f: F) -> stream::Receiver<T, Error>
+    where F: FnMut(TcpStream) -> Result<T>,
+          F: Send + 'static,
+          T: Send + 'static
+{
+    let (tx, rx) = stream::channel();
+    thread::spawn(move || {
+        let mut tx = tx;
+        let mut is_ok = true;
+        while is_ok {
+            let stream = listener.accept();
+            is_ok = stream.is_ok();
+            let res = stream.and_then(|(s, _)| f(s));
+            tx = match tx.send(res).wait() {
+                Ok(tx) => tx,
+                Err(_) => break,
+            }
+        }
+        debug!("listener thread is exiting");
+    });
+    
+    rx
+}
+
 pub struct Listener {
     external: Arc<String>,
     port: u16,
@@ -129,27 +159,11 @@ pub struct Listener {
 
 impl Listener {
     fn new(network: Network, port: u16) -> Result<Self> {
-        //let sockaddr = ("::", port); // TODO this does not work on some machines?!
         let sockaddr = ("0.0.0.0", port);
         let listener = TcpListener::bind(&sockaddr)?;
         let external = network.external.clone();
         let port = listener.local_addr()?.port();
-
-        let (tx, rx) = stream::channel();
-        thread::spawn(move || {
-            let mut tx = tx;
-            let mut is_ok = true;
-            while is_ok {
-                let stream = listener.accept();
-                is_ok = stream.is_ok();
-                let pair = stream.and_then(|(s, _)| network.channel(s));
-                tx = match tx.send(pair).wait() {
-                    Ok(tx) => tx,
-                    Err(_) => break,
-                }
-            }
-            debug!("listener thread is exiting");
-        });
+        let rx = accept(listener, channel);
 
         Ok(Listener {
             external: external,
@@ -177,6 +191,7 @@ fn _assert() {
     fn _is_send<T: Send>() {}
     _is_send::<Sender>();
     _is_send::<Receiver>();
+    _is_send::<Listener>();
     _is_send::<Network>();
 }
 

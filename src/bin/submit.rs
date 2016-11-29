@@ -6,15 +6,11 @@ extern crate futures;
 use std::env;
 use std::fs;
 use std::io;
-use std::thread;
-
-use futures::Future;
-use futures::stream::Stream;
 
 use timely_query::coordinator::requests::*;
 use timely_query::model::*;
 use timely_query::network::Network;
-use timely_query::network::reqresp;
+use timely_query::submit::Submitter;
 
 fn main() {
     drop(env_logger::init());
@@ -38,18 +34,9 @@ fn main() {
         args: env::args().skip(4).collect(),
     };
     
-    let submission = Submission {
-        query: query,
-        name: None,
-        placement: Placement::Random(processes, threads), // hosts, threads
-    };
-
     let network = Network::init(None).unwrap();
-    let (tx, rx) = network.connect(&*coord).map(reqresp::multiplex).unwrap();
-    thread::spawn(move || rx.for_each(|_| Ok(())).wait().expect("coordinator connection dropped"));
+    let submitter = Submitter::new(&network, &*coord).unwrap();
 
-    let id = tx.request(&submission)
-        .map_err(|e| e.unwrap_err())
-        .wait().expect("spawn error");
+    let id = submitter.submit(query, None, Placement::Random(processes, threads)).wait_unwrap();
     println!("spawned query: {:?}", id);
 }

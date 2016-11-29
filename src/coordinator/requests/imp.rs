@@ -24,6 +24,8 @@ unsafe_abomonate!(PublishError);
 unsafe_abomonate!(Unpublish: topic, token);
 unsafe_abomonate!(UnpublishError);
 
+unsafe_abomonate!(Lookup: name);
+
 impl Abomonation for Placement {
     #[inline]
     unsafe fn embalm(&mut self) {

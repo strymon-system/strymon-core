@@ -80,14 +80,18 @@ impl PublisherServer {
         let events = &mut self.events;
         PublisherServer::retain(&mut self.subscribers, move |&mut (id, ref mut rx)| {
             match rx.poll() {
-                Ok(Async::NotReady) => return true,
-                Ok(Async::Ready(_)) => {
+                Ok(Async::NotReady) => true,
+                Ok(Async::Ready(Some(_))) => {
                     error!("unexpected message from subscriber {:?}", id);
-                    return false;
+                    false
+                }
+                Ok(Async::Ready(None)) => {
+                    events.push(SubscriberEvent::Disconnected(id));
+                    false
                 }
                 Err(err) => {
-                    events.push(SubscriberEvent::Disconnected(id, err));
-                    return false;
+                    events.push(SubscriberEvent::Error(id, err));
+                    false
                 }
             }
         });
@@ -96,7 +100,8 @@ impl PublisherServer {
 
 pub enum SubscriberEvent {
     Accepted(SubscriberId, Sender),
-    Disconnected(SubscriberId, Error),
+    Error(SubscriberId, Error),
+    Disconnected(SubscriberId),
 }
 
 impl Stream for PublisherServer {
@@ -104,10 +109,12 @@ impl Stream for PublisherServer {
     type Error = Error;
     
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        // these will fill self.events
+        // these functions populate self.events
         if !self.listener.is_done() {
+            // accepting new subscribers
             self.poll_listener()?;
         }
+        // removing old ones
         self.poll_subscribers();
 
         if !self.events.is_empty() {
@@ -138,7 +145,7 @@ impl PollServer {
         match self.server.poll_stream(self.unpark.clone())? {
             Async::Ready(Some(events)) => Ok(events),
             Async::NotReady => Ok(Vec::new()),
-            Async::Ready(None) => Err(Error::new(ErrorKind::NotConnected, "disconnected")),
+            Async::Ready(None) => Err(Error::new(ErrorKind::NotConnected, "server closed")),
         }
     }
 }

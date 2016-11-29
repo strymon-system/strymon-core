@@ -10,7 +10,7 @@ use futures::Future;
 use futures::stream::Stream;
 
 use network::{Network};
-use network::reqresp::{self, Outgoing};
+use network::reqrep::{self, Outgoing};
 
 use executor::executable::NativeExecutable;
 use model::QueryId;
@@ -28,10 +28,7 @@ pub struct Coordinator {
 
 fn initialize(id: QueryId, process: usize, coord: String, host: String) -> Result<Coordinator, IoError> {
     let network = Network::init(host)?;
-    let (tx, rx) = network.connect(&*coord).map(reqresp::multiplex)?;
-
-    // TODO(swicki) get rid of this
-    thread::spawn(move || rx.for_each(|_| Ok(())).wait().expect("coordinator connection dropped"));
+    let (tx, _) = network.client(&*coord)?;
 
     let announce = tx.request(&AddWorkerGroup {
         query: id,

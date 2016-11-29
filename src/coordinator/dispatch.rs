@@ -4,7 +4,7 @@ use futures::Future;
 
 use async;
 use async::do_while::Stop;
-use network::reqresp::{Outgoing, RequestBuf};
+use network::reqrep::{Outgoing, RequestBuf};
 
 use super::handler::CoordinatorRef;
 use super::requests::*;
@@ -63,6 +63,10 @@ impl Dispatch {
             "Unsubscribe" => {
                 let (Unsubscribe { token, topic }, resp) = req.decode::<Unsubscribe>()?;
                 resp.respond(self.coord.unsubscribe(token, topic));
+            }
+            "Lookup" => {
+                let (Lookup { name }, resp) = req.decode::<Lookup>()?;
+                resp.respond(self.coord.lookup(&name));
             }
             _ => {
                 let err = Error::new(ErrorKind::InvalidData, "invalid request");

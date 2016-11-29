@@ -1,4 +1,4 @@
-use network::reqresp::*;
+use network::reqrep::*;
 use executor::requests::*;
 
 pub struct ExecutorState {

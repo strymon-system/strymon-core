@@ -1,7 +1,7 @@
 use abomonation::Abomonation;
 
 use model::*;
-use network::reqresp::Request;
+use network::reqrep::Request;
 
 #[derive(Debug, Clone)]
 pub struct SpawnQuery {

@@ -29,8 +29,16 @@ impl MessageBuf {
     }
 }
 
-pub fn read<R: Read>(reader: &mut R) -> io::Result<MessageBuf> {
-    let length = reader.read_u32::<NetworkEndian>()?;
+pub fn read<R: Read>(reader: &mut R) -> io::Result<Option<MessageBuf>> {
+    let length = match reader.read_u32::<NetworkEndian>() {
+        Ok(length) => length,
+        // special case: remote host disconneced without sending any new message
+        Err(ref err) if err.kind() == ErrorKind::UnexpectedEof => {
+            return Ok(None)
+        },
+        Err(err) => return Err(err),
+    };
+
     let buflen = reader.read_u32::<NetworkEndian>()?;
 
     if buflen >= length || (length - buflen) % 8 != 0 {
@@ -53,12 +61,12 @@ pub fn read<R: Read>(reader: &mut R) -> io::Result<MessageBuf> {
 
     buf.truncate(buflen as usize);
 
-    Ok(MessageBuf {
+    Ok(Some(MessageBuf {
         inner: Arc::new(Buf {
             buf: buf,
             pos: pos,
         }),
-    })
+    }))
 }
 
 pub fn write<W: Write>(writer: &mut W, msg: &MessageBuf) -> io::Result<()> {
@@ -185,7 +193,7 @@ mod tests {
 
         let mut stream = Vec::<u8>::new();
         write(&mut stream, &buf).expect("failed to write");
-        let mut out = read(&mut &*stream).expect("failed to read");
+        let mut out = read(&mut &*stream).expect("failed to read").unwrap();
 
         assert_eq!("Some Content", out.pop::<Abomonate, String>().unwrap());
         assert_eq!(3.14, out.pop::<Abomonate, f32>().unwrap());

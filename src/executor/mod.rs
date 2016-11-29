@@ -8,7 +8,7 @@ use async::do_while::{DoWhileExt, Stop};
 use async::queue;
 
 use network::Network;
-use network::reqresp::{self, RequestBuf};
+use network::reqrep::{self, RequestBuf};
 
 use model::*;
 
@@ -104,15 +104,9 @@ impl Builder {
     pub fn start(self) -> Result<(), Error> {
         let Builder { host, ports, coord } = self;
         let network = Network::init(host.clone())?;
-        let (tx, rx) = network.connect(&*coord).map(reqresp::multiplex)?;
+        let (tx, rx) = network.client(&*coord)?;
 
         async::finish(futures::lazy(move || {
-            // TODO(swicki): this is not so nice currently,
-            // but we need to poll on `rx` in order to make progress
-            let (buf_tx, buf_rx) = queue::channel();
-            async::spawn(rx.then(Ok)
-                .do_while(move |res| buf_tx.send(res).map_err(|_| Stop::Terminate)));
-
             // announce ourselves at the coordinator
             let id = tx.request(&AddExecutor {
                     host: host.clone(),
@@ -124,7 +118,7 @@ impl Builder {
             // once we get results, start the actual executor service
             id.and_then(move |id| {
                 let mut executor = ExecutorService::new(id, coord, host);
-                buf_rx.do_while(move |req| executor.dispatch(req))
+                rx.do_while(move |req| executor.dispatch(req))
             })
         }))
     }

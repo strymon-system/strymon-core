@@ -133,7 +133,7 @@ impl Catalog {
         Ok(())
     }
 
-    pub fn lookup(&mut self, name: &str) -> Option<Topic> {
+    pub fn lookup(&self, name: &str) -> Option<Topic> {
         if let Some(id) = self.directory.get(name) {
             self.topics.get(&id).cloned()
         } else {
