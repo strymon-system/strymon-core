@@ -49,15 +49,16 @@ impl<T, D> TimelyPublisher<T, D>
             }
         }
 
-        let mut buf = MessageBuf::empty();
-        buf.push::<Abomonate, Vec<T>>(&frontier.to_owned()).unwrap();
-        buf.push::<Abomonate, T>(time).unwrap();
-        buf.push::<Abomonate, Vec<D>>(item).unwrap();
+        if !self.subscribers.is_empty() {
+            let mut buf = MessageBuf::empty();
+            buf.push::<Abomonate, Vec<D>>(item).unwrap();
+            buf.push::<Abomonate, T>(time).unwrap();
+            buf.push::<Abomonate, Vec<T>>(&frontier.to_owned()).unwrap();
 
-        for sub in self.subscribers.values() {
-            sub.send(buf.clone())
+            for sub in self.subscribers.values() {
+                sub.send(buf.clone())
+            }
         }
-
         Ok(())
     }
 }

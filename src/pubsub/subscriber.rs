@@ -11,18 +11,20 @@ use network::{Network, Receiver, Sender};
 use network::message::abomonate::{Abomonate, NonStatic};
 use model::Topic;
 
-pub struct ItemSubscriber<D> {
+pub type CollectionSubscriber<D> = Subscriber<(D, i32)>;
+
+pub struct Subscriber<D> {
     rx: Receiver,
     _tx: Sender,
     marker: PhantomData<D>,
 }
 
-impl<D> ItemSubscriber<D> {
+impl<D> Subscriber<D> {
     pub fn connect(topic: &Topic, network: &Network) -> Result<Self> {
         // TODO(swicki) check topic type
         let (tx, rx) = network.connect((&*topic.addr.0, topic.addr.1))?;
 
-        Ok(ItemSubscriber {
+        Ok(Subscriber {
             rx: rx,
             _tx: tx,
             marker: PhantomData,
@@ -30,7 +32,7 @@ impl<D> ItemSubscriber<D> {
     }
 }
 
-impl<D: Abomonation + Any + Clone + NonStatic> Stream for ItemSubscriber<D> {
+impl<D: Abomonation + Any + Clone + NonStatic> Stream for Subscriber<D> {
     type Item = Vec<D>;
     type Error = Error;
 
@@ -74,9 +76,9 @@ impl<T, D> Stream for TimelySubscriber<T, D>
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Error> {   
         let data = if let Some(mut buf) = try_ready!(self.rx.poll()) {
-            let frontier = buf.pop::<Abomonate, Vec<T>>().map_err(Into::<Error>::into)?;
-            let time = buf.pop::<Abomonate, T>().map_err(Into::<Error>::into)?;
             let data = buf.pop::<Abomonate, Vec<D>>().map_err(Into::<Error>::into)?;
+            let time = buf.pop::<Abomonate, T>().map_err(Into::<Error>::into)?;
+            let frontier = buf.pop::<Abomonate, Vec<T>>().map_err(Into::<Error>::into)?;
 
             Some((frontier, time, data))
         } else {

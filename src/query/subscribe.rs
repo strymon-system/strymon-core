@@ -7,18 +7,18 @@ use futures::stream::{Stream, Wait};
 use coordinator::requests::*;
 use network::message::abomonate::NonStatic;
 
-use pubsub::subscriber::{ItemSubscriber, TimelySubscriber};
+use pubsub::subscriber::{Subscriber, TimelySubscriber};
 use model::{Topic, TopicType};
 use query::Coordinator;
 
 // TODO(swicki) impl drop
-pub struct ItemSubscription<D: Data + NonStatic> {
-    sub: ItemSubscriber<D>,
+pub struct Subscription<D: Data + NonStatic> {
+    sub: Subscriber<D>,
     topic: Topic,
     coord: Coordinator,
 }
 
-impl<D: Data + NonStatic> IntoIterator for ItemSubscription<D> {
+impl<D: Data + NonStatic> IntoIterator for Subscription<D> {
     type Item = Vec<D>;
     type IntoIter = IntoIter<D>;
 
@@ -32,7 +32,7 @@ impl<D: Data + NonStatic> IntoIterator for ItemSubscription<D> {
 }
 
 pub struct IntoIter<D: Data + NonStatic> {
-    sub: Wait<ItemSubscriber<D>>,
+    sub: Wait<Subscriber<D>>,
     topic: Topic,
     coord: Coordinator,
 }
@@ -139,7 +139,7 @@ impl Coordinator {
         }).wait()
     }
 
-    fn do_subscribe<D>(&self, name: String, blocking: bool) -> Result<ItemSubscription<D>, SubscriptionError>
+    fn do_subscribe<D>(&self, name: String, blocking: bool) -> Result<Subscription<D>, SubscriptionError>
         where D: Data + NonStatic {
 
         let coord = self.clone();
@@ -153,8 +153,8 @@ impl Coordinator {
                 Err(err) => SubscriptionError::from(err),
             }
         }).and_then(move |topic| {
-            let sub = ItemSubscriber::<D>::connect(&topic, &coord.network)?;
-            Ok(ItemSubscription {
+            let sub = Subscriber::<D>::connect(&topic, &coord.network)?;
+            Ok(Subscription {
                 sub: sub,
                 topic: topic,
                 coord: coord,
@@ -162,12 +162,12 @@ impl Coordinator {
         }).wait()
     }
 
-    pub fn subscribe_item<D, N>(&self, name: N) -> Result<ItemSubscription<D>, SubscriptionError>
+    pub fn subscribe_item<D, N>(&self, name: N) -> Result<Subscription<D>, SubscriptionError>
         where N: Into<String>, D: Data + NonStatic {
         self.do_subscribe(name.into(), false)
     }
 
-    pub fn blocking_subscribe_item<D, N>(&self, name: N) -> Result<ItemSubscription<D>, SubscriptionError>
+    pub fn blocking_subscribe_item<D, N>(&self, name: N) -> Result<Subscription<D>, SubscriptionError>
         where N: Into<String>, D: Data + NonStatic {
         self.do_subscribe(name.into(), true)
     }

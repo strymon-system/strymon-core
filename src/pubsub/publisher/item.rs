@@ -11,13 +11,13 @@ use network::message::MessageBuf;
 
 use super::{PollServer, PublisherServer, SubscriberId, SubscriberEvent};
 
-pub struct ItemPublisher<D> {
+pub struct Publisher<D> {
     server: PollServer,
     subscribers: BTreeMap<SubscriberId, Sender>,
     marker: PhantomData<D>,
 }
 
-impl<D: Abomonation + Any + Clone + NonStatic> ItemPublisher<D> {
+impl<D: Abomonation + Any + Clone + NonStatic> Publisher<D> {
     pub fn new(network: &Network) -> Result<((String, u16), Self)> {
         let server = PublisherServer::new(network)?;
         let addr = {
@@ -25,7 +25,7 @@ impl<D: Abomonation + Any + Clone + NonStatic> ItemPublisher<D> {
             (host.to_string(), port)
         };
 
-        Ok((addr, ItemPublisher {
+        Ok((addr, Publisher {
             server: PollServer::from(server),
             subscribers: BTreeMap::new(),
             marker: PhantomData,
@@ -45,10 +45,12 @@ impl<D: Abomonation + Any + Clone + NonStatic> ItemPublisher<D> {
             }
         }
 
-        let mut buf = MessageBuf::empty();
-        buf.push::<Abomonate, Vec<D>>(item).unwrap();
-        for sub in self.subscribers.values() {
-            sub.send(buf.clone())
+        if !self.subscribers.is_empty() {
+            let mut buf = MessageBuf::empty();
+            buf.push::<Abomonate, Vec<D>>(item).unwrap();
+            for sub in self.subscribers.values() {
+                sub.send(buf.clone())
+            }
         }
 
         Ok(())

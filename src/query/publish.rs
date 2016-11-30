@@ -13,7 +13,6 @@ use futures::{Future, self};
 use coordinator::requests::*;
 use network::message::abomonate::NonStatic;
 
-use pubsub::publisher::item::ItemPublisher as StreamPublisher;
 use pubsub::publisher::timely::TimelyPublisher;
 use model::{Topic, TopicType, TopicSchema};
 use query::Coordinator;
