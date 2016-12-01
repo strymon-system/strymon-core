@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::collections::btree_map::Entry;
 use std::rc::{Rc, Weak};
 use std::cell::RefCell;
@@ -9,17 +9,47 @@ use rand;
 
 use async;
 use async::promise::{promise, Promise, Complete};
-use network::reqrep::Outgoing;
+use network::reqrep::{Outgoing, Response};
+
 use model::*;
 use executor::requests::*;
 
 use coordinator::requests::*;
 use coordinator::catalog::Catalog;
 
-use self::executor::ExecutorState;
 use super::util::Generator;
 
-pub mod executor;
+struct ExecutorState {
+    tx: Outgoing,
+    ports: VecDeque<u16>,
+}
+
+impl ExecutorState {
+    fn new(tx: Outgoing, ports: (u16, u16)) -> Self {
+        let ports = (ports.0 .. (ports.1 + 1)).collect();
+        ExecutorState {
+            tx: tx,
+            ports: ports,
+        }
+    }
+
+    fn has_ports(&self) -> bool {
+        !self.ports.is_empty()
+    }
+
+    fn allocate_port(&mut self) -> u16 {
+        self.ports.pop_front().expect("coordinator has no free ports")
+    }
+
+    fn free_port(&mut self, port: u16) {
+        self.ports.push_back(port);
+    }
+
+    fn spawn(&self, req: &SpawnQuery) -> Response<SpawnQuery> {
+        debug!("issue spawn request {:?}", req);
+        self.tx.request(req)
+    }
+}
 
 enum QueryState {
     Spawning {
@@ -34,6 +64,7 @@ enum QueryState {
 struct WorkerGroup {
     state: QueryState,
     count: usize,
+    ports: Vec<(ExecutorId, u16)>,
 }
 
 pub struct Coordinator {
@@ -115,10 +146,15 @@ impl Coordinator {
         };
 
         // step 3: create the Timely configuration
-        let hostlist: Vec<String> = executors.iter()
+        let ports: Vec<(ExecutorId, u16)> = executors.iter()
             .map(|executor| {
-                let resources = executor_res.get_mut(&executor.id).unwrap();
-                let port = resources.allocate_port();
+                let id = executor.id;
+                let executor = executor_res.get_mut(&id).unwrap();
+                (id, executor.allocate_port())
+            }).collect();
+
+        let hostlist: Vec<String> = executors.iter().zip(ports.iter())
+            .map(|(executor, &(_, port))| {
                 format!("{}:{}", executor.host, port)
             })
             .collect();
@@ -144,9 +180,8 @@ impl Coordinator {
             let response = executor.spawn(&spawnquery)
                 .map_err(move |_| {
                     // TODO(swicki): convert executor error to real error
-                    // TODO(swicki): free port on failure
                     let err = SubmissionError::SpawnError;
-                    handle.borrow_mut().remove_submission(queryid, err);
+                    handle.borrow_mut().cancel_submission(queryid, err);
                 });
 
             async::spawn(response);
@@ -163,19 +198,24 @@ impl Coordinator {
         let worker_group = WorkerGroup {
             state: state,
             count: executors.len(),
+            ports: ports,
         };
         self.queries.insert(queryid, worker_group);
 
         return rx;
     }
 
-    fn remove_submission(&mut self, id: QueryId, err: SubmissionError) {
+    fn cancel_submission(&mut self, id: QueryId, err: SubmissionError) {
         if let Some(query) = self.queries.remove(&id) {
             if let QueryState::Spawning { submitter, waiting, .. } = query.state {
                 submitter.complete(Err(err));
                 for worker in waiting {
                     worker.complete(Err(WorkerGroupError::PeerFailed));
                 }
+            }
+
+            for (id, port) in query.ports {
+                self.executors.get_mut(&id).map(|e| e.free_port(port));
             }
         }
     }
@@ -237,7 +277,7 @@ impl Coordinator {
 
         rx
     }
-    
+
     fn remove_worker_group(&mut self, id: QueryId) {
         let mut query = match self.queries.entry(id) {
             Entry::Occupied(query) => query,
@@ -259,7 +299,11 @@ impl Coordinator {
         // and we're done
         if count == 0 {
             self.catalog.remove_query(id);
-            query.remove();
+            let query = query.remove();
+
+            for (id, port) in query.ports {
+                self.executors.get_mut(&id).map(|e| e.free_port(port));
+            }
         }
     }
 

@@ -316,7 +316,7 @@ pub struct Server {
 }
 
 impl Server {
-    // TODO(swicki) this is just copied over from network::Listener
+    // TODO(swicki) could this be merged with network::Listener?
     fn new(network: Network, port: u16) -> IoResult<Self> {
         let sockaddr = ("0.0.0.0", port);
         let listener = TcpListener::bind(&sockaddr)?;

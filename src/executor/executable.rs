@@ -66,7 +66,6 @@ pub fn spawn<S: AsRef<OsStr>>(executable: S,
                               -> Result<(), SpawnError> {
     let mut child = Command::new(executable)
         .args(args)
-        .env("RUST_LOG", "debug") // TODO(swicki): this is only for debugging
         .env(QUERY_ID, id.0.to_string())
         .env(THREADS, threads.to_string())
         .env(PROCESS, process.to_string())
