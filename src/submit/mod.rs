@@ -55,8 +55,9 @@ impl Submitter {
     fn get_collection<D>(&self, name: &str) -> Result<Vec<D>>
         where D: Abomonation + Any + Clone + NonStatic
     {
-        // TODO check topic type
         let topic = self.lookup(name)?;
+        assert_eq!(topic.schema, TopicSchema::Collection(TopicType::of::<D>()));
+        
         let sub = CollectionSubscriber::<D>::connect(&topic, &self.network)?;
 
         match sub.into_future().wait() {

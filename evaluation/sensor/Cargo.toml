@@ -1,0 +1,10 @@
+[package]
+authors = ["Sebastian Wicki <swicki@student.ethz.ch>"]
+name = "demo"
+version = "0.1.0"
+
+[dependencies]
+timely = "0.1.15"
+
+[dependencies.timely-query]
+path = "../.."

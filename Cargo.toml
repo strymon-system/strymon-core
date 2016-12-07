@@ -27,14 +27,9 @@ timely = "0.1.15"
 timely_communication = "0.1.5"
 void = "1.0.2"
 
-[profile]
-
-[profile.release]
-
-[replace]
-
 [replace."abomonation:0.4.4"]
+rev = "aa2d0971"
 git = "https://github.com/frankmcsherry/abomonation"
 
 [workspace]
-members = ["evaluation/sessionize"]
+members = ["evaluation/sessionize", "evaluation/sensor"]

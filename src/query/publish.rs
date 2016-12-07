@@ -14,6 +14,7 @@ use coordinator::requests::*;
 use network::message::abomonate::NonStatic;
 
 use pubsub::publisher::timely::TimelyPublisher;
+use pubsub::publisher::collection::CollectionPublisher;
 use model::{Topic, TopicType, TopicSchema};
 use query::Coordinator;
 
@@ -60,12 +61,9 @@ impl<T: Timestamp, D: Data> ParallelizationContract<T, D> for Partition
     }
 }
 
-impl Coordinator {
-    pub fn publish<S, D>(&self, name: &str, stream: &Stream<S, D>, partition: Partition) -> Result<Stream<S, D>, PublicationError>
-        where D: Data + NonStatic, S: Scope, S::Timestamp: NonStatic,
-    {
-        let worker_id = stream.scope().index() as u64;
-        let name = match partition {
+impl Partition {
+    fn name(&self, name: &str, worker_id: u64) -> Option<String> {
+        match *self {
             Partition::PerWorker => {
                 Some(format!("{}.{}", name, worker_id))
             }
@@ -73,7 +71,30 @@ impl Coordinator {
                 Some(String::from(name))
             },
             _ => None,
-        };
+        }
+    }
+}
+
+impl Coordinator {
+    fn publish_request(&self, name: String, schema: TopicSchema, addr: (String, u16)) -> Result<Topic, PublicationError> {
+        self.tx.request(&Publish {
+            name: name,
+            token: self.token,
+            schema: schema,
+            addr: addr,
+        }).map_err(|err| {
+            match err {
+                Ok(err) => PublicationError::from(err),
+                Err(err) => PublicationError::from(err),
+            }
+        }).wait()
+    }
+
+    pub fn publish<S, D>(&self, name: &str, stream: &Stream<S, D>, partition: Partition) -> Result<Stream<S, D>, PublicationError>
+        where D: Data + NonStatic, S: Scope, S::Timestamp: NonStatic,
+    {
+        let worker_id = stream.scope().index() as u64;
+        let name = partition.name(name, worker_id);
 
         let (addr, mut publisher) = if name.is_some() {
             let (addr, publisher) = TimelyPublisher::<S::Timestamp, D>::new(&self.network)?;
@@ -87,17 +108,7 @@ impl Coordinator {
             let item = TopicType::of::<D>();
             let time = TopicType::of::<S::Timestamp>();
             let schema = TopicSchema::Stream(item, time);
-            self.tx.request(&Publish {
-                name: name.unwrap(),
-                token: self.token,
-                schema: schema,
-                addr: addr.unwrap(),
-            }).map_err(|err| {
-                match err {
-                    Ok(err) => PublicationError::from(err),
-                    Err(err) => PublicationError::from(err),
-                }
-            }).wait()?;
+            self.publish_request(name.unwrap(), schema, addr.unwrap())?;
         }
 
         let output = stream.unary_notify(partition, "timelypublisher", Vec::new(), move |input, output, notif| {
@@ -110,6 +121,42 @@ impl Coordinator {
             });
         });
         
+        Ok(output)
+    }
+
+    pub fn publish_collection<S, D>(&self, name: &str, stream: &Stream<S, (D, i32)>, partition: Partition) -> Result<Stream<S, (D, i32)>, PublicationError>
+        where D: Data + Eq + NonStatic, S: Scope
+    {
+        let worker_id = stream.scope().index() as u64;
+        let name = partition.name(name, worker_id);
+
+        let (addr, mut mutator, mut publisher) = if name.is_some() {
+            let (addr, mutator, publisher) = CollectionPublisher::<D>::new(&self.network)?;
+            (Some(addr), Some(mutator), Some(publisher.spawn()))
+        } else {
+            (None, None, None)
+        };
+
+        if name.is_some() {
+            // local worker hosts a publication
+            let item = TopicType::of::<D>();
+            let schema = TopicSchema::Collection(item);
+            self.publish_request(name.unwrap(), schema, addr.unwrap())?;
+        }
+
+        let output = stream.unary_stream(partition, "collectionpublisher", move |input, output| {
+            input.for_each(|time, data| {
+                if let Some(ref mut mutator) = mutator {
+                    mutator.update_from(data.clone().into_typed());
+                }
+                output.session(&time).give_content(data);
+            });
+            
+            if let Some(ref mut publisher) = publisher {
+                publisher.poll().unwrap();
+            }
+        });
+
         Ok(output)
     }
 }

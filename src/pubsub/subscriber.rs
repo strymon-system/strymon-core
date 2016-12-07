@@ -21,7 +21,6 @@ pub struct Subscriber<D> {
 
 impl<D> Subscriber<D> {
     pub fn connect(topic: &Topic, network: &Network) -> Result<Self> {
-        // TODO(swicki) check topic type
         let (tx, rx) = network.connect((&*topic.addr.0, topic.addr.1))?;
 
         Ok(Subscriber {
@@ -56,7 +55,6 @@ pub struct TimelySubscriber<T, D> {
 
 impl<T, D> TimelySubscriber<T, D> {
     pub fn connect(topic: &Topic, network: &Network) -> Result<Self> {
-        // TODO(swicki) check topic type
         let (tx, rx) = network.connect((&*topic.addr.0, topic.addr.1))?;
 
         Ok(TimelySubscriber {

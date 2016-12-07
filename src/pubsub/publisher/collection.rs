@@ -1,11 +1,12 @@
 use std::io::{Result, Error};
 use std::any::Any;
 use std::collections::BTreeMap;
-use std::slice::Iter as VecIter;
+use std::sync::Arc;
 use std::hash::Hash;
 
 use abomonation::Abomonation;
 use futures::{Future, Poll, Async};
+use futures::task::{self, Unpark, Spawn};
 use futures::stream::Stream;
 use void::{self, Void};
 
@@ -15,7 +16,7 @@ use network::{Network, Sender};
 use network::message::abomonate::{Abomonate, NonStatic};
 use network::message::MessageBuf;
 
-use super::{PollServer, PublisherServer, SubscriberId, SubscriberEvent};
+use super::{Nop, PublisherServer, SubscriberId, SubscriberEvent};
 
 pub struct CollectionPublisher<D> {
     server: PublisherServer,
@@ -67,6 +68,24 @@ impl<D: Abomonation + Any + Clone + Eq + NonStatic> CollectionPublisher<D> {
                 self.collection.push((new, delta));
             }
         }
+    }
+    
+    pub fn spawn(self) -> SpawnedPublisher {
+        SpawnedPublisher {
+            publisher: task::spawn(Box::new(self)),
+            unpark: Arc::new(Nop),
+        }
+    }
+}
+
+pub struct SpawnedPublisher {
+    publisher: Spawn<Box<Future<Item=(), Error=Error>>>,
+    unpark: Arc<Unpark>,
+}
+
+impl SpawnedPublisher {
+    pub fn poll(&mut self) -> Result<()> {
+        self.publisher.poll_future(self.unpark.clone()).map(|_| ())
     }
 }
 

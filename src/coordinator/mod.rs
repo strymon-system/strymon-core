@@ -50,7 +50,8 @@ impl Builder {
         let server = network.server(self.port)?;
 
         let coordinate = futures::lazy(move || {
-            let catalog = Catalog::new(&network).expect("failed to create catalog"); // TODO
+            // TODO(swicki) we should return an I/O error instead
+            let catalog = Catalog::new(&network).expect("failed to create catalog");
             let coord = Coordinator::new(catalog);
 
             server.for_each(move |(tx, rx)| {
