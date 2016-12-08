@@ -21,11 +21,7 @@ fn main() {
         let mut input = root.scoped::<u64, _, _>(|scope| {
             let (input, stream) = scope.new_input();
 
-            let sensor = stream.map(|(h, p, m, _, t)| (h, p, m, t));
-            coord.publish("sensor", &sensor, Partition::Merge).expect("failed to publish");
-
-            let mic = stream.map(|(_, _, _, mic, _)| mic);
-            coord.publish("microphone", &mic, Partition::Merge).expect("failed to publish");
+            coord.publish("sensor", &stream, Partition::Merge).expect("failed to publish");
 
             input
         });
@@ -63,11 +59,11 @@ impl Sensor {
             let mic = data.next().unwrap().parse::<i32>().unwrap_or(0);
             let temp = data.next().unwrap().parse::<f32>().unwrap_or(0.0);
 
-            thread::sleep(Duration::from_millis(20));
+            thread::sleep(Duration::from_millis(1));
 
             (ts, (hum, pir, motion, mic, temp))           
         });
-        
+
         Sensor { source: Box::new(iter) }
     }
 }

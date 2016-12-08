@@ -3,7 +3,6 @@ use abomonation::Abomonation;
 use super::*;
 
 unsafe_abomonate!(Submission: query, name, placement);
-unsafe_abomonate!(SubmissionError);
 
 unsafe_abomonate!(AddExecutor: host, ports, format);
 unsafe_abomonate!(ExecutorError);
@@ -46,6 +45,33 @@ impl Abomonation for Placement {
         match *self {
             Placement::Random(_, _) => Some(bytes),
             Placement::Fixed(ref mut e, _) => e.exhume(bytes),
+        }
+    }
+}
+
+impl Abomonation for SubmissionError {
+    #[inline]
+    unsafe fn embalm(&mut self) {
+        match *self {
+            SubmissionError::ExecutorsNotFound |
+            SubmissionError::ExecutorUnreachable  => (),
+            SubmissionError::SpawnError(ref mut e) => e.embalm(),
+        }
+    }
+    #[inline]
+    unsafe fn entomb(&self, bytes: &mut Vec<u8>) {
+        match *self {
+            SubmissionError::ExecutorsNotFound |
+            SubmissionError::ExecutorUnreachable  => (),
+            SubmissionError::SpawnError(ref e) => e.entomb(bytes),
+        }
+    }
+    #[inline]
+    unsafe fn exhume<'a, 'b>(&'a mut self, bytes: &'b mut [u8]) -> Option<&'b mut [u8]> {
+        match *self {
+            SubmissionError::ExecutorsNotFound |
+            SubmissionError::ExecutorUnreachable  => Some(bytes),
+            SubmissionError::SpawnError(ref mut e) => e.exhume(bytes),
         }
     }
 }

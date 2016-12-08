@@ -1,4 +1,6 @@
 use std::io::{Error, ErrorKind};
+use std::env;
+use std::path::PathBuf;
 
 use futures::{self, Future};
 use futures::stream::Stream;
@@ -22,14 +24,35 @@ pub struct ExecutorService {
     id: ExecutorId,
     coord: String,
     host: String,
+    network: Network,
 }
 
 impl ExecutorService {
-    pub fn new(id: ExecutorId, coord: String, host: String) -> Self {
+    pub fn new(id: ExecutorId, coord: String, network: Network) -> Self {
         ExecutorService {
             id: id,
             coord: coord,
-            host: host,
+            host: network.hostname(),
+            network: network,
+        }
+    }
+
+    fn fetch(&self, url: &str) -> Result<PathBuf, SpawnError> {
+        debug!("fetching: {:?}", url);
+        if url.starts_with("tcp://") {
+            self.network.download(url).map_err(|_| SpawnError::FetchFailed)
+        } else {
+            let path = if url.starts_with("file://") {
+                PathBuf::from(&url[7..])
+            } else {
+                PathBuf::from(url)
+            };
+
+            if path.exists() {
+                Ok(path.to_owned())
+            } else {
+                Err(SpawnError::FetchFailed)
+            }
         }
     }
 
@@ -39,17 +62,10 @@ impl ExecutorService {
             .position(|&id| self.id == id)
             .ok_or(SpawnError::InvalidRequest)?;
         let threads = query.workers / hostlist.len();
-        let executable = query.program.source;
+        let executable = self.fetch(&query.program.source)?;
         let args = &*query.program.args;
         let id = query.id;
-        let _child = executable::spawn(&executable,
-                                      id,
-                                      args,
-                                      threads,
-                                      process,
-                                      &*hostlist,
-                                      &self.coord,
-                                      &self.host)?;
+        executable::spawn(&executable, id,args, threads, process, &*hostlist, &self.coord, &self.host)?;
 
         Ok(())
     }
@@ -71,16 +87,15 @@ impl ExecutorService {
 }
 
 pub struct Builder {
-    host: String,
     coord: String,
     ports: (u16, u16),
 }
 
 impl Builder {
     pub fn host(&mut self, host: String) {
-        self.host = host;
+        env::set_var("TIMELY_QUERY_HOSTNAME", host);
     }
-    
+
     pub fn coordinator(&mut self, coord: String) {
         self.coord = coord;
     }
@@ -93,7 +108,6 @@ impl Builder {
 impl Default for Builder {
     fn default() -> Self {
         Builder {
-            host: String::from("localhost"),
             coord: String::from("localhost:9189"),
             ports: (2101, 4101),
         }
@@ -102,14 +116,15 @@ impl Default for Builder {
 
 impl Builder {
     pub fn start(self) -> Result<(), Error> {
-        let Builder { host, ports, coord } = self;
-        let network = Network::init(host.clone())?;
+        let Builder { ports, coord } = self;
+        let network = Network::init()?;
+        let host = network.hostname();
         let (tx, rx) = network.client(&*coord)?;
 
         async::finish(futures::lazy(move || {
             // announce ourselves at the coordinator
             let id = tx.request(&AddExecutor {
-                    host: host.clone(),
+                    host: host,
                     ports: ports,
                     format: ExecutionFormat::NativeExecutable,
                 })
@@ -117,7 +132,7 @@ impl Builder {
 
             // once we get results, start the actual executor service
             id.and_then(move |id| {
-                let mut executor = ExecutorService::new(id, coord, host);
+                let mut executor = ExecutorService::new(id, coord, network);
                 rx.do_while(move |req| executor.dispatch(req))
             })
         }))

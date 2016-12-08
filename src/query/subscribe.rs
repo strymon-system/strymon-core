@@ -115,9 +115,9 @@ impl From<IoError> for SubscriptionError {
 
 impl Coordinator {
 
-    pub fn subscribe<T, D>(&self, name: String, root: Capability<T>) -> Result<TimelySubscription<T, D>, SubscriptionError>
+    pub fn subscribe<T, D>(&self, name: &str, root: Capability<T>) -> Result<TimelySubscription<T, D>, SubscriptionError>
         where T: Timestamp + NonStatic, D: Data + NonStatic {
-
+        let name = name.to_string();
         let coord = self.clone();
         self.tx.request(&Subscribe {
             name: name,
@@ -162,7 +162,7 @@ impl Coordinator {
         }).wait()
     }
 
-    pub fn subscribe_item<D, N>(&self, name: N) -> Result<Subscription<D>, SubscriptionError>
+    pub fn subscribe_collection<D, N>(&self, name: N) -> Result<Subscription<D>, SubscriptionError>
         where N: Into<String>, D: Data + NonStatic {
         self.do_subscribe(name.into(), false)
     }

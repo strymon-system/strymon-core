@@ -2,6 +2,7 @@ use std::io::{Result, Error};
 use std::net::{TcpListener, TcpStream, Shutdown, ToSocketAddrs};
 use std::sync::{mpsc, Arc};
 use std::thread::{self, JoinHandle};
+use std::env;
 
 use futures::{Future, Poll};
 use futures::stream::{self, Stream};
@@ -10,6 +11,7 @@ use network::message::buf::{MessageBuf, read, write};
 
 pub mod message;
 pub mod reqrep;
+pub mod fetch;
 
 #[derive(Clone)]
 pub struct Network {
@@ -17,12 +19,26 @@ pub struct Network {
 }
 
 impl Network {
-    pub fn init<T: Into<Option<String>>>(external: T) -> Result<Self> {
-        let external = external.into()
-            .unwrap_or_else(|| String::from("localhost"));
+    fn external() -> String {
+        // try to guess external hostname
+        if let Ok(hostname) = env::var("TIMELY_QUERY_HOSTNAME") {
+            return hostname;
+        }
+
+        warn!("unable to retrieve external hostname of machine.");
+        warn!("falling back to 'localhost', set TIMELY_QUERY_HOSTNAME to override");
+
+        String::from("localhost")
+    }
+
+    pub fn init() -> Result<Self> {
         Ok(Network {
-            external: Arc::new(external),
+            external: Arc::new(Self::external()),
         })
+    }
+    
+    pub fn hostname(&self) -> String {
+        (*self.external).clone()
     }
 
     pub fn connect<E: ToSocketAddrs>(&self, endpoint: E) -> Result<(Sender, Receiver)> {
@@ -80,7 +96,8 @@ impl Drop for Sender {
         // make sure to drain the queue if the other side is still connected
         drop(self.tx.take());
         if let Some(handle) = Arc::get_mut(&mut self.thr).and_then(Option::take) {
-            drop(handle.join());
+            // TODO(swicki) seems to deadlock
+            //drop(handle.join());
         }
     }
 }
@@ -211,7 +228,7 @@ mod tests {
     #[test]
     fn network_integration() {
         assert_io(|| {
-            let network = Network::init(None)?;
+            let network = Network::init()?;
             let listener = network.listen(None)?;
             let (tx, rx) = network.connect(listener.external_addr())?;
 

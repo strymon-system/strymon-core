@@ -126,9 +126,14 @@ impl Catalog {
     }
     
     pub fn unpublish(&mut self, query_id: QueryId, topic: TopicId) -> Result<(), UnpublishError> {
-        // TODO(swicki): Check if topic and query actually exist
         let publication = Publication(query_id, topic);
         debug!("unpublish: {:?}", publication);
+
+        if let Some(name) = self.topics.get(&topic).map(|t| &*t.name) {
+            self.directory.remove(name);
+        }
+        
+        self.topics.remove(&topic);
         self.publications.remove(publication);
         Ok(())
     }

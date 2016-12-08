@@ -424,7 +424,7 @@ mod tests {
     fn simple_ping() {
 
         assert_io(|| {
-            let network = Network::init(None)?;
+            let network = Network::init()?;
             let server = network.server(None)?;
 
             let (tx, _) = network.client(server.external_addr())?;

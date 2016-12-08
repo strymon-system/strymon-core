@@ -1,8 +1,9 @@
 use std::env;
 use std::num;
-use std::process::{Command, Child};
+use std::process::{Command, Child, Stdio};
 use std::ffi::OsStr;
-use std::thread::Builder as ThreadBuilder;
+use std::io::{BufRead, BufReader};
+use std::thread;
 
 use model::QueryId;
 use executor::requests::SpawnError;
@@ -12,7 +13,7 @@ pub const THREADS: &'static str = "TIMELY_EXEC_CONF_THREADS";
 pub const PROCESS: &'static str = "TIMELY_EXEC_CONF_PROCESS";
 pub const HOSTLIST: &'static str = "TIMELY_EXEC_CONF_HOSTLIST";
 pub const COORD: &'static str = "TIMELY_EXEC_CONF_COORD";
-pub const HOST: &'static str = "TIMELY_EXEC_CONF_HOST";
+pub const HOST: &'static str = "TIMELY_QUERY_HOSTNAME";
 
 #[derive(Debug)]
 pub struct NativeExecutable {
@@ -72,14 +73,31 @@ pub fn spawn<S: AsRef<OsStr>>(executable: S,
         .env(HOSTLIST, hostlist.join("|"))
         .env(COORD, coord)
         .env(HOST, host)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .stdin(Stdio::null())
         .spawn()
         .map_err(|_| SpawnError::ExecFailed)?;
 
-    // TODO(swicki): This a bit an expensive way to deal with zombies
-    ThreadBuilder::new()
-        .stack_size(128)
-        .spawn(move || child.wait().ok())
-        .expect("failed to spawn reaper thread");
+    let stdout = child.stdout.take();
+    let stderr = child.stderr.take();
+
+    // TODO(swicki) On Unix, we could make this more efficient using RawFd and signals
+    thread::spawn(move || {
+        let mut stdout = BufReader::new(stdout.expect("no stdout?!")).lines();
+        while let Some(Ok(line)) = stdout.next() {
+            info!("{:?} | {}", id, line)
+        }
+
+        child.wait().ok();
+    });
+
+    thread::spawn(move || {
+        let mut stderr = BufReader::new(stderr.expect("no stderr?!")).lines();
+        while let Some(Ok(line)) = stderr.next() {
+            warn!("{:?} | {}", id, line)
+        }
+    });
 
     Ok(())
 }

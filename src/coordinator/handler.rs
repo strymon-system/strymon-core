@@ -178,9 +178,14 @@ impl Coordinator {
             let handle = handle.clone();
             let executor = &executor_res[&executor.id];
             let response = executor.spawn(&spawnquery)
-                .map_err(move |_| {
-                    // TODO(swicki): convert executor error to real error
-                    let err = SubmissionError::SpawnError;
+                .map_err(move |err| {
+                    let err = match err {
+                        Ok(err) => SubmissionError::SpawnError(err),
+                        Err(err) => {
+                            error!("executor request failed: {}", err);
+                            SubmissionError::ExecutorUnreachable
+                        }
+                    };
                     handle.borrow_mut().cancel_submission(queryid, err);
                 });
 
@@ -206,6 +211,7 @@ impl Coordinator {
     }
 
     fn cancel_submission(&mut self, id: QueryId, err: SubmissionError) {
+        debug!("canceling pending submission for {:?}", id);
         if let Some(query) = self.queries.remove(&id) {
             if let QueryState::Spawning { submitter, waiting, .. } = query.state {
                 submitter.complete(Err(err));

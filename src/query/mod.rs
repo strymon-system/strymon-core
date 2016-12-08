@@ -26,8 +26,8 @@ pub struct Coordinator {
     tx: Outgoing,
 }
 
-fn initialize(id: QueryId, process: usize, coord: String, host: String) -> Result<Coordinator, IoError> {
-    let network = Network::init(host)?;
+fn initialize(id: QueryId, process: usize, coord: String) -> Result<Coordinator, IoError> {
+    let network = Network::init()?;
     let (tx, _) = network.client(&*coord)?;
 
     let announce = tx.request(&AddWorkerGroup {
@@ -59,17 +59,17 @@ pub fn execute<T, F>(func: F) -> Result<WorkerGuards<T>, String>
 
     // create timely configuration
     let timely_conf = if config.hostlist.len() > 1 {
-        println!("Configuration:Cluster({}, {}/{})", config.threads, config.process, config.hostlist.len());
+        info!("Configuration:Cluster({}, {}/{})", config.threads, config.process, config.hostlist.len());
         Configuration::Cluster(config.threads, config.process, config.hostlist, true)
     } else if config.threads > 1 {
-        println!("Configuration:Process({})", config.threads);
+        info!("Configuration:Process({})", config.threads);
         Configuration::Process(config.threads)
     } else {
-        println!("Configuration:Thread");
+        info!("Configuration:Thread");
         Configuration::Thread
     };
 
-    let coord = initialize(config.query_id, config.process, config.coord, config.host)
+    let coord = initialize(config.query_id, config.process, config.coord)
         .map_err(|err| format!("failed to connect to coordinator: {:?}", err))?;
 
     // wrap in mutex because timely requires `Sync` for some reason

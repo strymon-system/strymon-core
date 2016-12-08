@@ -19,7 +19,8 @@ pub struct Submission {
 #[derive(Clone, Debug)]
 pub enum SubmissionError {
     ExecutorsNotFound,
-    SpawnError,
+    ExecutorUnreachable,
+    SpawnError(::executor::requests::SpawnError),
 }
 
 impl Request for Submission {

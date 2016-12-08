@@ -89,7 +89,8 @@ fn main() {
         .optopt("r", "random", "number of executors selected randomly", "NUM")
         .optopt("f", "fixed", "comma-separated list of executor ids", "LIST")
         .optopt("n", "hosts", "comma-separated executor hostnames", "LIST")
-        .optopt("d", "desc", "optional query description", "DESC");
+        .optopt("d", "desc", "optional query description", "DESC")
+        .optflag("l", "local", "use local URL for submission");
 
     let m = match options.parse(&args) {
         Ok(m) => m,
@@ -116,25 +117,38 @@ fn main() {
         Err(err) => usage(options, Some(err.to_string())),
     };
 
+    let local = m.opt_present("l");
+
     let coord = m.opt_str("c").unwrap_or(String::from("localhost:9189"));
     let desc = m.opt_str("d");
     let args = m.free.clone();
 
-    let network = Network::init(None).unwrap();
-    let submitter = Submitter::new(&network, &*coord).unwrap();
-    let executors = submitter.executors().unwrap();
+    let network = Network::init().unwrap();
+    let submitter = Submitter::new(&network, &*coord)
+        .expect("cannot connect to coordinator");
+    let executors = submitter.executors()
+        .expect("coordinator topic unreachable (incorrect external hostname?)");
 
     let placement = match parse_placement(m, executors) {
         Ok(placement) => placement,
         Err(err) => usage(options, Some(err)),
     };
 
+    let (url, upload) = if local {
+        (format!("file://{}", source), None)
+    } else {
+        let handle = network.upload(source).unwrap();
+        (handle.url(), Some(handle))
+    };
+
     let query = QueryProgram {
-        source: source,
+        source: url,
         format: ExecutionFormat::NativeExecutable,
         args: args,
     };
 
     let id = submitter.submit(query, desc, placement).wait_unwrap();
     println!("spawned query: {:?}", id);
+    
+    drop(upload)
 }

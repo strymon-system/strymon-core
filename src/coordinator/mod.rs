@@ -1,4 +1,5 @@
 use std::io::Result;
+use std::env;
 
 use futures::{self, Future};
 use futures::stream::Stream;
@@ -22,12 +23,11 @@ mod util;
 
 pub struct Builder {
     port: u16,
-    host: Option<String>,
 }
 
 impl Builder {
     pub fn host(&mut self, host: String) {
-        self.host = Some(host);
+        env::set_var("TIMELY_QUERY_HOSTNAME", host);
     }
 
     pub fn port(&mut self, port: u16) {
@@ -38,7 +38,6 @@ impl Builder {
 impl Default for Builder {
     fn default() -> Self {
         Builder {
-            host: None,
             port: 9189,
         }
     }
@@ -46,7 +45,7 @@ impl Default for Builder {
 
 impl Builder {
     pub fn run(self) -> Result<()> {
-        let network = Network::init(self.host)?;
+        let network = Network::init()?;
         let server = network.server(self.port)?;
 
         let coordinate = futures::lazy(move || {
