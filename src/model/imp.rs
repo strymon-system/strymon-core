@@ -1,3 +1,4 @@
+use std::fmt;
 use std::any::Any;
 use std::intrinsics::type_name;
 
@@ -34,6 +35,19 @@ impl Abomonation for TopicSchema {
                 Some(bytes)
                     .and_then(|bytes| t.exhume(bytes))
                     .and_then(|bytes| d.exhume(bytes))
+            }
+        }
+    }
+}
+
+impl fmt::Display for TopicSchema {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            TopicSchema::Collection(ref d) => {
+                write!(f, "Collection(item={:?})", d.name)
+            }
+            TopicSchema::Stream(ref d, ref t) => {
+                write!(f, "Stream(timestamp={:?}, data={:?})", t.name, d.name)
             }
         }
     }

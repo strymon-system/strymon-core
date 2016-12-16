@@ -54,7 +54,7 @@ fn parse_placement(m: Matches, executors: Vec<Executor>) -> Result<Placement, St
         (None, None, Some(n)) => {
             let mut fixed = vec![];
             for name in n.split(",") {
-                let mut executor = executors.iter().filter(|e| e.host == n);
+                let mut executor = executors.iter().filter(|e| e.host == name);
                 if let Some(executor) = executor.next() {
                     fixed.push(executor.id);
                 } else {
@@ -90,7 +90,7 @@ fn main() {
         .optopt("f", "fixed", "comma-separated list of executor ids", "LIST")
         .optopt("n", "hosts", "comma-separated executor hostnames", "LIST")
         .optopt("d", "desc", "optional query description", "DESC")
-        .optflag("l", "local", "use local URL for submission");
+        .optflag("l", "local", "use local file path for submission");
 
     let m = match options.parse(&args) {
         Ok(m) => m,
@@ -129,11 +129,13 @@ fn main() {
     let executors = submitter.executors()
         .expect("coordinator topic unreachable (incorrect external hostname?)");
 
+    // assemble the placement configuration
     let placement = match parse_placement(m, executors) {
         Ok(placement) => placement,
         Err(err) => usage(options, Some(err)),
     };
 
+    // prepare location for executors to fetch binary
     let (url, upload) = if local {
         (format!("file://{}", source), None)
     } else {

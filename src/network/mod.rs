@@ -96,8 +96,7 @@ impl Drop for Sender {
         // make sure to drain the queue if the other side is still connected
         drop(self.tx.take());
         if let Some(handle) = Arc::get_mut(&mut self.thr).and_then(Option::take) {
-            // TODO(swicki) seems to deadlock
-            //drop(handle.join());
+            drop(handle.join());
         }
     }
 }

@@ -231,6 +231,7 @@ impl<T: Abomonation + Any + Clone + Eq + Hash + NonStatic> Collection<T> {
     }
 
     fn insert(&mut self, item: T) {
+        self.mutator.insert(item.clone());
         *self.inner.entry(item).or_insert(0) += 1;
     }
 

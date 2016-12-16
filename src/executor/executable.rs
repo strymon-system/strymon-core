@@ -2,7 +2,7 @@ use std::env;
 use std::num;
 use std::process::{Command, Child, Stdio};
 use std::ffi::OsStr;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Error, ErrorKind};
 use std::thread;
 
 use model::QueryId;
@@ -88,8 +88,16 @@ pub fn spawn<S: AsRef<OsStr>>(executable: S,
         while let Some(Ok(line)) = stdout.next() {
             info!("{:?} | {}", id, line)
         }
-
-        child.wait().ok();
+        
+        let result = child.wait().and_then(|code| if code.success() {
+            Ok(())
+        } else {
+            Err(Error::new(ErrorKind::Other, "child exited with non-zero code"))
+        });
+        
+        if let Err(err) = result {
+            error!("{:?} | child failed: {}", id, err.to_string())
+        }
     });
 
     thread::spawn(move || {

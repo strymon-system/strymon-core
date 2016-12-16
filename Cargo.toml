@@ -15,6 +15,10 @@ path = "src/bin/executor.rs"
 name = "submit"
 path = "src/bin/submit.rs"
 
+[[bin]]
+name = "status"
+path = "src/bin/status.rs"
+
 [dependencies]
 abomonation = "0.4.4"
 byteorder = "0.5.3"

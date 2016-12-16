@@ -1,7 +1,10 @@
 use std::io::Error as IoError;
 
 use timely::{Data};
-use futures::Future;
+use timely::progress::Timestamp;
+use timely::dataflow::operators::Capability;
+
+use futures::{Future, Poll, Async};
 use futures::stream::{Stream, Wait};
 
 use coordinator::requests::*;
@@ -18,54 +21,64 @@ pub struct Subscription<D: Data + NonStatic> {
     coord: Coordinator,
 }
 
+impl<D: Data + NonStatic> Stream for Subscription<D> {
+    type Item = Vec<D>;
+    type Error = IoError;
+    
+    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
+        self.sub.poll()
+    }
+}
+
 impl<D: Data + NonStatic> IntoIterator for Subscription<D> {
     type Item = Vec<D>;
-    type IntoIter = IntoIter<D>;
+    type IntoIter = IntoIter<Self>;
 
     fn into_iter(self) -> Self::IntoIter {
         IntoIter {
-            sub: self.sub.wait(),
-            topic: self.topic,
-            coord: self.coord,
+            inner: self.wait()
         }
     }
 }
 
-pub struct IntoIter<D: Data + NonStatic> {
-    sub: Wait<Subscriber<D>>,
-    topic: Topic,
-    coord: Coordinator,
-}
+impl<D: Data + NonStatic> Drop for Subscription<D> {
+    fn drop(&mut self) {
 
-impl<D: Data + NonStatic> Iterator for IntoIter<D> {
-    type Item = Vec<D>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        // we ignore any network errors here on purpose
-        self.sub.next().and_then(Result::ok)
     }
 }
 
-use timely::progress::Timestamp;
-use timely::dataflow::operators::Capability;
+pub struct IntoIter<I> {
+    inner: Wait<I>,
+}
+
+impl<S: Stream> Iterator for IntoIter<S> {
+    type Item = S::Item;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next().and_then(Result::ok)
+    }
+}
+
 
 // TODO(swicki) unsubscribe on drop
 pub struct TimelySubscription<T: Timestamp + NonStatic, D: Data + NonStatic> {
-    sub: Wait<TimelySubscriber<T, D>>,
+    sub: TimelySubscriber<T, D>,
     topic: Topic,
     coord: Coordinator,
     frontier: Vec<Capability<T>>,
 }
 
-impl<T: Timestamp + NonStatic, D: Data + NonStatic> Iterator for TimelySubscription<T, D> {
+impl<T: Timestamp + NonStatic, D: Data + NonStatic> Stream for TimelySubscription<T, D> {
     type Item = (Capability<T>, Vec<D>);
+    type Error = IoError;
 
-    fn next(&mut self) -> Option<Self::Item> {
-        let next = self.sub.next().and_then(Result::ok);
+    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
+        let next = try_ready!(self.sub.poll());
+    
         let (frontier, time, data) = if next.is_some() {
             next.unwrap()
         } else {
-            return None;
+            return Ok(Async::Ready(None));
         };
 
         let mut time_cap = None;
@@ -87,7 +100,18 @@ impl<T: Timestamp + NonStatic, D: Data + NonStatic> Iterator for TimelySubscript
         self.frontier = new_frontier;
         let time = time_cap.expect("failed to get capability for tuple");
         
-        Some((time, data))
+        Ok(Async::Ready(Some((time, data))))
+    }
+}
+
+impl<T: Timestamp + NonStatic, D: Data + NonStatic> IntoIterator for TimelySubscription<T, D> {
+    type Item = (Capability<T>, Vec<D>);
+    type IntoIter = IntoIter<Self>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        IntoIter {
+            inner: self.wait()
+        }
     }
 }
 
@@ -114,15 +138,14 @@ impl From<IoError> for SubscriptionError {
 }
 
 impl Coordinator {
-
-    pub fn subscribe<T, D>(&self, name: &str, root: Capability<T>) -> Result<TimelySubscription<T, D>, SubscriptionError>
+    fn timely<T, D>(&self, name: String, root: Capability<T>, blocking: bool) -> Result<TimelySubscription<T, D>, SubscriptionError>
         where T: Timestamp + NonStatic, D: Data + NonStatic {
         let name = name.to_string();
         let coord = self.clone();
         self.tx.request(&Subscribe {
             name: name,
             token: self.token,
-            blocking: true,
+            blocking: blocking,
         }).map_err(|err| {
             match err {
                 Ok(err) => SubscriptionError::from(err),
@@ -131,7 +154,7 @@ impl Coordinator {
         }).and_then(move |topic| {
             let sub = TimelySubscriber::<T, D>::connect(&topic, &coord.network)?;
             Ok(TimelySubscription {
-                sub: sub.wait(),
+                sub: sub,
                 topic: topic,
                 coord: coord,
                 frontier: vec![root],
@@ -139,7 +162,17 @@ impl Coordinator {
         }).wait()
     }
 
-    fn do_subscribe<D>(&self, name: String, blocking: bool) -> Result<Subscription<D>, SubscriptionError>
+    pub fn subscribe<T, D>(&self, name: &str, root: Capability<T>) -> Result<TimelySubscription<T, D>, SubscriptionError>
+        where T: Timestamp + NonStatic, D: Data + NonStatic {
+        self.timely(name.to_string(), root, false)
+    }
+
+    pub fn subscribe_nonblocking<T, D>(&self, name: &str, root: Capability<T>) -> Result<TimelySubscription<T, D>, SubscriptionError>
+            where T: Timestamp + NonStatic, D: Data + NonStatic {
+        self.timely(name.to_string(), root, true)
+    }
+
+    fn collection<D>(&self, name: String, blocking: bool) -> Result<Subscription<D>, SubscriptionError>
         where D: Data + NonStatic {
 
         let coord = self.clone();
@@ -162,13 +195,15 @@ impl Coordinator {
         }).wait()
     }
 
-    pub fn subscribe_collection<D, N>(&self, name: N) -> Result<Subscription<D>, SubscriptionError>
-        where N: Into<String>, D: Data + NonStatic {
-        self.do_subscribe(name.into(), false)
+    pub fn subscribe_collection<D>(&self, name: &str) -> Result<Subscription<D>, SubscriptionError>
+        where D: Data + NonStatic
+    {
+        self.collection(name.to_string(), false)
     }
 
-    pub fn blocking_subscribe_item<D, N>(&self, name: N) -> Result<Subscription<D>, SubscriptionError>
-        where N: Into<String>, D: Data + NonStatic {
-        self.do_subscribe(name.into(), true)
+    pub fn subscribe_collection_nonblocking<D>(&self, name: &str) -> Result<Subscription<D>, SubscriptionError>
+       where D: Data + NonStatic
+    {
+        self.collection(name.to_string(), true)
     }
 }
