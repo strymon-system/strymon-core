@@ -221,7 +221,7 @@ impl Coordinator {
         where T: Timestamp + NonStatic,
               D: Data + NonStatic
     {
-        self.timely(name.to_string(), root, false)
+        self.timely(name.to_string(), root, true)
     }
 
     pub fn subscribe_nonblocking<T, D>
@@ -232,7 +232,7 @@ impl Coordinator {
         where T: Timestamp + NonStatic,
               D: Data + NonStatic
     {
-        self.timely(name.to_string(), root, true)
+        self.timely(name.to_string(), root, false)
     }
 
     fn collection<D>(&self,
@@ -270,7 +270,7 @@ impl Coordinator {
                                    -> Result<Subscription<D>, SubscriptionError>
         where D: Data + NonStatic
     {
-        self.collection(name.to_string(), false)
+        self.collection(name.to_string(), true)
     }
 
     pub fn subscribe_collection_nonblocking<D>
@@ -279,6 +279,6 @@ impl Coordinator {
          -> Result<Subscription<D>, SubscriptionError>
         where D: Data + NonStatic
     {
-        self.collection(name.to_string(), true)
+        self.collection(name.to_string(), false)
     }
 }
