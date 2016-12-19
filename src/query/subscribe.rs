@@ -1,6 +1,6 @@
 use std::io::Error as IoError;
 
-use timely::{Data};
+use timely::Data;
 use timely::progress::Timestamp;
 use timely::dataflow::operators::Capability;
 
@@ -23,7 +23,7 @@ pub struct Subscription<D: Data + NonStatic> {
 impl<D: Data + NonStatic> Stream for Subscription<D> {
     type Item = Vec<D>;
     type Error = IoError;
-    
+
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         self.sub.poll()
     }
@@ -34,9 +34,7 @@ impl<D: Data + NonStatic> IntoIterator for Subscription<D> {
     type IntoIter = IntoIter<Self>;
 
     fn into_iter(self) -> Self::IntoIter {
-        IntoIter {
-            inner: self.wait()
-        }
+        IntoIter { inner: self.wait() }
     }
 }
 
@@ -74,7 +72,7 @@ impl<T: Timestamp + NonStatic, D: Data + NonStatic> Stream for TimelySubscriptio
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         let next = try_ready!(self.sub.poll());
-    
+
         let (frontier, time, data) = if next.is_some() {
             next.unwrap()
         } else {
@@ -88,30 +86,31 @@ impl<T: Timestamp + NonStatic, D: Data + NonStatic> Stream for TimelySubscriptio
             if time_cap.is_none() && time >= cap.time() {
                 time_cap = Some(cap.delayed(&time));
             }
-            
+
             // upgrade capability for new frontier
             for t in frontier.iter() {
                 if *t >= cap.time() {
                     new_frontier.push(cap.delayed(t));
                 }
             }
-        };
-        
+        }
+
         self.frontier = new_frontier;
         let time = time_cap.expect("failed to get capability for tuple");
-        
+
         Ok(Async::Ready(Some((time, data))))
     }
 }
 
-impl<T: Timestamp + NonStatic, D: Data + NonStatic> IntoIterator for TimelySubscription<T, D> {
+impl<T, D> IntoIterator for TimelySubscription<T, D>
+    where T: Timestamp + NonStatic,
+          D: Data + NonStatic
+{
     type Item = (Capability<T>, Vec<D>);
     type IntoIter = IntoIter<Self>;
 
     fn into_iter(self) -> Self::IntoIter {
-        IntoIter {
-            inner: self.wait()
-        }
+        IntoIter { inner: self.wait() }
     }
 }
 
@@ -128,14 +127,16 @@ pub enum SubscriptionError {
     TopicNotFound,
     TypeIdMismatch,
     AuthenticationFailure,
-    IoError(IoError)
+    IoError(IoError),
 }
 
 impl From<SubscribeError> for SubscriptionError {
     fn from(err: SubscribeError) -> Self {
         match err {
             SubscribeError::TopicNotFound => SubscriptionError::TopicNotFound,
-            SubscribeError::AuthenticationFailure => SubscriptionError::AuthenticationFailure,
+            SubscribeError::AuthenticationFailure => {
+                SubscriptionError::AuthenticationFailure
+            }
         }
     }
 }
@@ -144,7 +145,9 @@ impl From<UnsubscribeError> for SubscriptionError {
     fn from(err: UnsubscribeError) -> Self {
         match err {
             UnsubscribeError::InvalidTopicId => SubscriptionError::TopicNotFound,
-            UnsubscribeError::AuthenticationFailure => SubscriptionError::AuthenticationFailure,
+            UnsubscribeError::AuthenticationFailure => {
+                SubscriptionError::AuthenticationFailure
+            }
         }
     }
 }
@@ -155,7 +158,10 @@ impl From<IoError> for SubscriptionError {
     }
 }
 
-impl<T, E> From<Result<T, E>> for SubscriptionError where T: Into<SubscriptionError>, E: Into<SubscriptionError> {
+impl<T, E> From<Result<T, E>> for SubscriptionError
+    where T: Into<SubscriptionError>,
+          E: Into<SubscriptionError>
+{
     fn from(err: Result<T, E>) -> Self {
         match err {
             Ok(err) => err.into(),
@@ -166,83 +172,112 @@ impl<T, E> From<Result<T, E>> for SubscriptionError where T: Into<SubscriptionEr
 
 impl Coordinator {
     fn unsubscribe(&self, topic: TopicId) -> Result<(), SubscriptionError> {
-        self.tx.request(&Unsubscribe {
-            topic: topic,
-            token: self.token,
-        })
-        .map_err(SubscriptionError::from)
-        .wait()
+        self.tx
+            .request(&Unsubscribe {
+                topic: topic,
+                token: self.token,
+            })
+            .map_err(SubscriptionError::from)
+            .wait()
     }
 
-    fn timely<T, D>(&self, name: String, root: Capability<T>, blocking: bool) -> Result<TimelySubscription<T, D>, SubscriptionError>
-        where T: Timestamp + NonStatic, D: Data + NonStatic {
+    fn timely<T, D>(&self,
+                    name: String,
+                    root: Capability<T>,
+                    blocking: bool)
+                    -> Result<TimelySubscription<T, D>, SubscriptionError>
+        where T: Timestamp + NonStatic,
+              D: Data + NonStatic
+    {
         let name = name.to_string();
         let coord = self.clone();
-        self.tx.request(&Subscribe {
-            name: name,
-            token: self.token,
-            blocking: blocking,
-        })
-        .map_err(SubscriptionError::from)
-        .and_then(move |topic| {
-            if !topic.schema.is_stream::<T, D>() {
-                return Err(SubscriptionError::TypeIdMismatch)
-            }
-        
-            let sub = TimelySubscriber::<T, D>::connect(&topic, &coord.network)?;
-            Ok(TimelySubscription {
-                sub: sub,
-                topic: topic,
-                coord: coord,
-                frontier: vec![root],
+        self.tx
+            .request(&Subscribe {
+                name: name,
+                token: self.token,
+                blocking: blocking,
             })
-        })
-        .wait()
+            .map_err(SubscriptionError::from)
+            .and_then(move |topic| {
+                if !topic.schema.is_stream::<T, D>() {
+                    return Err(SubscriptionError::TypeIdMismatch);
+                }
+
+                let sub = TimelySubscriber::<T, D>::connect(&topic, &coord.network)?;
+                Ok(TimelySubscription {
+                    sub: sub,
+                    topic: topic,
+                    coord: coord,
+                    frontier: vec![root],
+                })
+            })
+            .wait()
     }
 
-    pub fn subscribe<T, D>(&self, name: &str, root: Capability<T>) -> Result<TimelySubscription<T, D>, SubscriptionError>
-        where T: Timestamp + NonStatic, D: Data + NonStatic {
+    pub fn subscribe<T, D>(&self,
+                           name: &str,
+                           root: Capability<T>)
+                           -> Result<TimelySubscription<T, D>, SubscriptionError>
+        where T: Timestamp + NonStatic,
+              D: Data + NonStatic
+    {
         self.timely(name.to_string(), root, false)
     }
 
-    pub fn subscribe_nonblocking<T, D>(&self, name: &str, root: Capability<T>) -> Result<TimelySubscription<T, D>, SubscriptionError>
-            where T: Timestamp + NonStatic, D: Data + NonStatic {
+    pub fn subscribe_nonblocking<T, D>
+        (&self,
+         name: &str,
+         root: Capability<T>)
+         -> Result<TimelySubscription<T, D>, SubscriptionError>
+        where T: Timestamp + NonStatic,
+              D: Data + NonStatic
+    {
         self.timely(name.to_string(), root, true)
     }
 
-    fn collection<D>(&self, name: String, blocking: bool) -> Result<Subscription<D>, SubscriptionError>
-        where D: Data + NonStatic {
+    fn collection<D>(&self,
+                     name: String,
+                     blocking: bool)
+                     -> Result<Subscription<D>, SubscriptionError>
+        where D: Data + NonStatic
+    {
 
         let coord = self.clone();
-        self.tx.request(&Subscribe {
-            name: name,
-            token: self.token,
-            blocking: blocking,
-        })
-        .map_err(SubscriptionError::from)
-        .and_then(move |topic| {
-            if !topic.schema.is_collection::<D>() {
-                return Err(SubscriptionError::TypeIdMismatch)
-            }
-
-            let sub = Subscriber::<D>::connect(&topic, &coord.network)?;
-            Ok(Subscription {
-                sub: sub,
-                topic: topic,
-                coord: coord,
+        self.tx
+            .request(&Subscribe {
+                name: name,
+                token: self.token,
+                blocking: blocking,
             })
-        })
-        .wait()
+            .map_err(SubscriptionError::from)
+            .and_then(move |topic| {
+                if !topic.schema.is_collection::<D>() {
+                    return Err(SubscriptionError::TypeIdMismatch);
+                }
+
+                let sub = Subscriber::<D>::connect(&topic, &coord.network)?;
+                Ok(Subscription {
+                    sub: sub,
+                    topic: topic,
+                    coord: coord,
+                })
+            })
+            .wait()
     }
 
-    pub fn subscribe_collection<D>(&self, name: &str) -> Result<Subscription<D>, SubscriptionError>
+    pub fn subscribe_collection<D>(&self,
+                                   name: &str)
+                                   -> Result<Subscription<D>, SubscriptionError>
         where D: Data + NonStatic
     {
         self.collection(name.to_string(), false)
     }
 
-    pub fn subscribe_collection_nonblocking<D>(&self, name: &str) -> Result<Subscription<D>, SubscriptionError>
-       where D: Data + NonStatic
+    pub fn subscribe_collection_nonblocking<D>
+        (&self,
+         name: &str)
+         -> Result<Subscription<D>, SubscriptionError>
+        where D: Data + NonStatic
     {
         self.collection(name.to_string(), true)
     }

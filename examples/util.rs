@@ -11,24 +11,25 @@ use timely_query::model::Topic;
 fn main() {
     drop(env_logger::init());
 
-    timely_query::execute(|root, coord| {    
-        let mut input = root.scoped::<i32,_,_>(|scope| {
-            let (input, stream) = scope.new_input();
-            stream.inspect(|x| println!("topic event: {:?}", x));
+    timely_query::execute(|root, coord| {
+            let mut input = root.scoped::<i32, _, _>(|scope| {
+                let (input, stream) = scope.new_input();
+                stream.inspect(|x| println!("topic event: {:?}", x));
 
-            input
-        });
+                input
+            });
 
-        let subscriber = coord.subscribe_item::<(Topic, i32), _>("$topics")
-            .unwrap()
-            .into_iter()
-            .flat_map(|vec| vec);
+            let subscriber = coord.subscribe_item::<(Topic, i32), _>("$topics")
+                .unwrap()
+                .into_iter()
+                .flat_map(|vec| vec);
 
-        for (item, ts) in subscriber.zip(1..) {
-            input.send(item);
-            input.advance_to(ts);
-            root.step();
-        }
+            for (item, ts) in subscriber.zip(1..) {
+                input.send(item);
+                input.advance_to(ts);
+                root.step();
+            }
 
-    }).unwrap();
+        })
+        .unwrap();
 }

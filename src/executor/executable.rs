@@ -65,8 +65,7 @@ pub fn spawn<S: AsRef<OsStr>>(executable: S,
                               coord: &str,
                               host: &str)
                               -> Result<(), SpawnError> {
-    let mut child = Command::new(executable)
-        .args(args)
+    let mut child = Command::new(executable).args(args)
         .env(QUERY_ID, id.0.to_string())
         .env(THREADS, threads.to_string())
         .env(PROCESS, process.to_string())
@@ -88,13 +87,13 @@ pub fn spawn<S: AsRef<OsStr>>(executable: S,
         while let Some(Ok(line)) = stdout.next() {
             info!("{:?} | {}", id, line)
         }
-        
+
         let result = child.wait().and_then(|code| if code.success() {
             Ok(())
         } else {
             Err(Error::new(ErrorKind::Other, "child exited with non-zero code"))
         });
-        
+
         if let Err(err) = result {
             error!("{:?} | child failed: {}", id, err.to_string())
         }

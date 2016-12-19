@@ -33,11 +33,9 @@ impl<D: Abomonation + Any + Clone + Eq + NonStatic> CollectionPublisher<D> {
         };
 
         let (tx, rx) = queue::channel();
-        
-        let sink = Mutator {
-            sink: tx,
-        };
-        
+
+        let sink = Mutator { sink: tx };
+
         let publisher = CollectionPublisher {
             server: server,
             subscribers: BTreeMap::new(),
@@ -68,7 +66,7 @@ impl<D: Abomonation + Any + Clone + Eq + NonStatic> CollectionPublisher<D> {
             }
         }
     }
-    
+
     pub fn spawn(self) -> SpawnedPublisher {
         SpawnedPublisher {
             publisher: task::spawn(Box::new(self)),
@@ -78,7 +76,7 @@ impl<D: Abomonation + Any + Clone + Eq + NonStatic> CollectionPublisher<D> {
 }
 
 pub struct SpawnedPublisher {
-    publisher: Spawn<Box<Future<Item=(), Error=Error>>>,
+    publisher: Spawn<Box<Future<Item = (), Error = Error>>>,
     unpark: Arc<Unpark>,
 }
 
@@ -91,7 +89,7 @@ impl SpawnedPublisher {
 impl<D: Abomonation + Any + Clone + Eq + NonStatic> Future for CollectionPublisher<D> {
     type Item = ();
     type Error = Error;
-    
+
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         // step 1: check for collection updates
         let updates = match self.source.poll() {
@@ -153,7 +151,7 @@ impl<D: Abomonation + Any + Clone + Eq + NonStatic> Future for CollectionPublish
 }
 
 pub struct Mutator<D> {
-    sink: queue::Sender<Vec<(D, i32)>, Void>
+    sink: queue::Sender<Vec<(D, i32)>, Void>,
 }
 
 impl<D> Mutator<D> {

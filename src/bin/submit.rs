@@ -29,7 +29,9 @@ fn usage(opts: Options, err: Option<String>) -> ! {
 
 fn parse_placement(m: Matches, executors: Vec<Executor>) -> Result<Placement, String> {
     fn fmt_err<E: ToString>(opt: &str, err: E) -> String {
-        format!("failed to parse argument for '{}': {}", opt, err.to_string())
+        format!("failed to parse argument for '{}': {}",
+                opt,
+                err.to_string())
     }
 
     let workers = if let Some(w) = m.opt_str("w") {
@@ -42,7 +44,7 @@ fn parse_placement(m: Matches, executors: Vec<Executor>) -> Result<Placement, St
         (Some(r), None, None) => {
             let executors = r.parse().map_err(|e| fmt_err("random", e))?;
             Placement::Random(executors, workers)
-        },
+        }
         (None, Some(f), None) => {
             let mut fixed = vec![];
             for num in f.split(",") {
@@ -58,35 +60,38 @@ fn parse_placement(m: Matches, executors: Vec<Executor>) -> Result<Placement, St
                 if let Some(executor) = executor.next() {
                     fixed.push(executor.id);
                 } else {
-                    return Err(format!("unknown executor '{}'", name))
+                    return Err(format!("unknown executor '{}'", name));
                 }
             }
             Placement::Fixed(fixed, workers)
         }
-        (None, None, None) => {
-            Placement::Random(1, workers)
-        }
+        (None, None, None) => Placement::Random(1, workers),
         _ => {
             let err = "Options 'random', 'fixed', and 'hosts' are mutually exclusive";
             return Err(String::from(err));
         }
     };
-    
+
     Ok(placement)
 }
 
 fn main() {
     drop(env_logger::init());
-    
+
     let args: Vec<String> = env::args().skip(1).collect();
     let mut options = Options::new();
-    options
-        .parsing_style(ParsingStyle::StopAtFirstFree)
+    options.parsing_style(ParsingStyle::StopAtFirstFree)
         .optflag("h", "help", "display this help and exit")
         .optopt("p", "program", "path to the query binary", "FILE")
         .optopt("c", "coordinator", "address of the coordinator", "ADDR")
-        .optopt("w", "workers", "number of per-process worker threads", "NUM")
-        .optopt("r", "random", "number of executors selected randomly", "NUM")
+        .optopt("w",
+                "workers",
+                "number of per-process worker threads",
+                "NUM")
+        .optopt("r",
+                "random",
+                "number of executors selected randomly",
+                "NUM")
         .optopt("f", "fixed", "comma-separated list of executor ids", "LIST")
         .optopt("n", "hosts", "comma-separated executor hostnames", "LIST")
         .optopt("d", "desc", "optional query description", "DESC")
@@ -94,13 +99,13 @@ fn main() {
 
     let m = match options.parse(&args) {
         Ok(m) => m,
-        Err(f) => usage(options, Some(f.to_string()))
+        Err(f) => usage(options, Some(f.to_string())),
     };
 
     if m.opt_present("h") {
         usage(options, None);
     }
-    
+
     if !m.opt_present("p") {
         usage(options, Some(format!("missing 'program' argument'")));
     }
@@ -151,6 +156,6 @@ fn main() {
 
     let id = submitter.submit(query, desc, placement).wait_unwrap();
     println!("spawned query: {:?}", id);
-    
+
     drop(upload)
 }

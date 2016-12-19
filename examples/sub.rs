@@ -13,25 +13,26 @@ fn main() {
     drop(env_logger::init());
 
     timely_query::execute(|root, coord| {
-        let mut input = root.scoped::<i32,_,_>(|scope| {
-            let (input, stream) = scope.new_unordered_input();
-            stream
-                .filter(|&(_, x)| x % 10 != 0)
-                .inspect(|x| println!("sub: {:?}", x));
-            
-            input
-        });
+            let mut input = root.scoped::<i32, _, _>(|scope| {
+                let (input, stream) = scope.new_unordered_input();
+                stream.filter(|&(_, x)| x % 10 != 0)
+                    .inspect(|x| println!("sub: {:?}", x));
 
-        let subscriber = coord.blocking_subscribe::<(i32, i32), _>("foo")
-            .wait().unwrap()
-            .into_iter()
-            .flat_map(|vec| vec);
+                input
+            });
 
-        for (item, ts) in subscriber.zip(1..) {
-            input.send(item);
-            input.advance_to(ts);
-            root.step();
-        }
+            let subscriber = coord.blocking_subscribe::<(i32, i32), _>("foo")
+                .wait()
+                .unwrap()
+                .into_iter()
+                .flat_map(|vec| vec);
 
-    }).unwrap();
+            for (item, ts) in subscriber.zip(1..) {
+                input.send(item);
+                input.advance_to(ts);
+                root.step();
+            }
+
+        })
+        .unwrap();
 }

@@ -33,9 +33,7 @@ pub fn read<R: Read>(reader: &mut R) -> io::Result<Option<MessageBuf>> {
     let length = match reader.read_u32::<NetworkEndian>() {
         Ok(length) => length,
         // special case: remote host disconneced without sending any new message
-        Err(ref err) if err.kind() == ErrorKind::UnexpectedEof => {
-            return Ok(None)
-        },
+        Err(ref err) if err.kind() == ErrorKind::UnexpectedEof => return Ok(None),
         Err(err) => return Err(err),
     };
 

@@ -27,15 +27,15 @@ fn usage(opts: Options, err: Option<String>) -> ! {
 fn print_status(coord: &str) -> Result<()> {
     let network = Network::init()?;
     let submitter = Submitter::new(&network, &*coord)?;
-    
+
     let executors = submitter.executors()?;
     let queries = submitter.queries()?;
     let publications = submitter.publications()?;
     let subscriptions = submitter.subscriptions()?;
     let topics = submitter.topics()?
-                    .into_iter()
-                    .map(|t| (t.id, t))
-                    .collect::<BTreeMap<_, _>>();
+        .into_iter()
+        .map(|t| (t.id, t))
+        .collect::<BTreeMap<_, _>>();
 
     println!("Coordinator: {}", coord);
     for executor in executors {
@@ -43,41 +43,45 @@ fn print_status(coord: &str) -> Result<()> {
         println!(" Executor {}: host={:?}", id, executor.host);
         for query in queries.iter().filter(|q| q.executors.contains(&executor.id)) {
             let id = query.id.0;
-            let name = query.name.as_ref()
-                            .map(|n| format!("{:?}", n))
-                            .unwrap_or_else(|| String::from("<unnamed>"));
+            let name = query.name
+                .as_ref()
+                .map(|n| format!("{:?}", n))
+                .unwrap_or_else(|| String::from("<unnamed>"));
 
             println!("  Query {}: name={}, workers={}", id, name, query.workers);
-            
+
             for publication in publications.iter().filter(|p| p.0 == query.id) {
                 let topic = &topics[&publication.1];
                 println!("   Publication on Topic {}: name={:?}, schema={}",
-                    topic.id.0, topic.name, topic.schema);
+                         topic.id.0,
+                         topic.name,
+                         topic.schema);
             }
-            
+
             for subscription in subscriptions.iter().filter(|p| p.0 == query.id) {
                 let topic = &topics[&subscription.1];
                 println!("   Subscription on Topic {}: name={:?}, schema={}",
-                    topic.id.0, topic.name, topic.schema);
+                         topic.id.0,
+                         topic.name,
+                         topic.schema);
             }
         }
     }
-    
+
     Ok(())
 }
 
 fn main() {
-    drop(env_logger::init());   
+    drop(env_logger::init());
 
     let args: Vec<String> = env::args().skip(1).collect();
     let mut options = Options::new();
-    options
-        .optflag("h", "help", "display this help and exit")
+    options.optflag("h", "help", "display this help and exit")
         .optopt("c", "coordinator", "address of the coordinator", "ADDR");
 
     let matches = match options.parse(&args) {
         Ok(m) => m,
-        Err(f) => usage(options, Some(f.to_string()))
+        Err(f) => usage(options, Some(f.to_string())),
     };
 
     if matches.opt_present("h") {
@@ -90,7 +94,10 @@ fn main() {
     let coord = matches.opt_str("c").unwrap_or(String::from("localhost:9189"));
 
     if let Err(err) = print_status(&coord) {
-        writeln!(io::stderr(), "Failed to communicate with coordinator at {:?}", coord).ok();
+        writeln!(io::stderr(),
+                 "Failed to communicate with coordinator at {:?}",
+                 coord)
+            .ok();
         writeln!(io::stderr(), "{}", err).ok();
         process::exit(1);
     }

@@ -32,11 +32,9 @@ impl Network {
     }
 
     pub fn init() -> Result<Self> {
-        Ok(Network {
-            external: Arc::new(Self::external()),
-        })
+        Ok(Network { external: Arc::new(Self::external()) })
     }
-    
+
     pub fn hostname(&self) -> String {
         (*self.external).clone()
     }
@@ -120,7 +118,7 @@ impl Receiver {
                         Err(err)
                     }
                 };
-                
+
                 tx = match tx.send(message).wait() {
                     Ok(tx) => tx,
                     Err(_) => break,
@@ -163,7 +161,7 @@ fn accept<T, F>(listener: TcpListener, mut f: F) -> stream::Receiver<T, Error>
         }
         debug!("listener thread is exiting");
     });
-    
+
     rx
 }
 

@@ -43,9 +43,7 @@ impl Abomonation for TopicSchema {
 impl fmt::Display for TopicSchema {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            TopicSchema::Collection(ref d) => {
-                write!(f, "Collection(item={:?})", d.name)
-            }
+            TopicSchema::Collection(ref d) => write!(f, "Collection(item={:?})", d.name),
             TopicSchema::Stream(ref d, ref t) => {
                 write!(f, "Stream(timestamp={:?}, data={:?})", t.name, d.name)
             }
@@ -98,18 +96,16 @@ unsafe_abomonate!(Subscription);
 impl TopicSchema {
     pub fn is_collection<D: Any>(&self) -> bool {
         match *self {
-            TopicSchema::Collection(ref d) => {
-                d.id == TypeId::of::<D>()
-            },
+            TopicSchema::Collection(ref d) => d.id == TypeId::of::<D>(),
             _ => false,
         }
     }
-    
+
     pub fn is_stream<T: Any, D: Any>(&self) -> bool {
         match *self {
             TopicSchema::Stream(ref d, ref t) => {
                 d.id == TypeId::of::<D>() && t.id == TypeId::of::<T>()
-            },
+            }
             _ => false,
         }
     }

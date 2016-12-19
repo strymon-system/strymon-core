@@ -26,7 +26,7 @@ struct ExecutorState {
 
 impl ExecutorState {
     fn new(tx: Outgoing, ports: (u16, u16)) -> Self {
-        let ports = (ports.0 .. (ports.1 + 1)).collect();
+        let ports = (ports.0..(ports.1 + 1)).collect();
         ExecutorState {
             tx: tx,
             ports: ports,
@@ -129,9 +129,9 @@ impl Coordinator {
                     (selected, num_executors, num_workers)
                 }
                 Placement::Fixed(executor_ids, num_workers) => {
-                    let num_executors = executor_ids.len();    
+                    let num_executors = executor_ids.len();
                     let mut selected = vec![];
-                    
+
                     for executor in executors {
                         for &id in &executor_ids {
                             if executor.id == id {
@@ -159,12 +159,12 @@ impl Coordinator {
                 let id = executor.id;
                 let executor = executor_res.get_mut(&id).unwrap();
                 (id, executor.allocate_port())
-            }).collect();
-
-        let hostlist: Vec<String> = executors.iter().zip(ports.iter())
-            .map(|(executor, &(_, port))| {
-                format!("{}:{}", executor.host, port)
             })
+            .collect();
+
+        let hostlist: Vec<String> = executors.iter()
+            .zip(ports.iter())
+            .map(|(executor, &(_, port))| format!("{}:{}", executor.host, port))
             .collect();
 
         let executor_ids = executors.iter().map(|e| e.id).collect();
@@ -179,7 +179,7 @@ impl Coordinator {
             query: query.clone(),
             hostlist: hostlist,
         };
-   
+
         // step 4: send requests to the selected coordinators
         debug!("selected executors for {:?}:{:?}", query.id, executors);
         for executor in &executors {
@@ -234,9 +234,10 @@ impl Coordinator {
         }
     }
 
-    fn add_worker_group(&mut self, id: QueryId, _group: usize)
-        -> Promise<QueryToken, WorkerGroupError>
-    {
+    fn add_worker_group(&mut self,
+                        id: QueryId,
+                        _group: usize)
+                        -> Promise<QueryToken, WorkerGroupError> {
         let (tx, rx) = promise();
         let query = self.queries.get_mut(&id);
 
@@ -253,13 +254,13 @@ impl Coordinator {
             QueryState::Spawning { ref mut waiting, .. } => {
                 waiting.push(tx);
                 waiting.len()
-            },
+            }
             QueryState::Running | QueryState::Terminating => {
                 tx.complete(Err(WorkerGroupError::InvalidWorkerGroup));
                 return rx;
             }
         };
-        
+
         // check if we need to wait for others to arrive
         debug!("{:?}: {} of {} are connected", id, connected, query.count);
         if connected < query.count {
@@ -272,7 +273,7 @@ impl Coordinator {
             QueryState::Spawning { submitter, waiting, query } => {
                 (submitter, waiting, query)
             }
-            _ => unreachable!()
+            _ => unreachable!(),
         };
 
         // step 4: add query to catalog
@@ -357,13 +358,16 @@ impl Coordinator {
         result
     }
 
-    fn unpublish(&mut self, query_id: QueryId, topic_id: TopicId) -> Result<(), UnpublishError>  {
+    fn unpublish(&mut self,
+                 query_id: QueryId,
+                 topic_id: TopicId)
+                 -> Result<(), UnpublishError> {
         self.catalog.unpublish(query_id, topic_id)
     }
 
-    fn subscribe(&mut self, req: Subscribe)
-        -> Box<Future<Item=Topic, Error=SubscribeError>>
-    {
+    fn subscribe(&mut self,
+                 req: Subscribe)
+                 -> Box<Future<Item = Topic, Error = SubscribeError>> {
         let query = req.token.id;
 
         if let Some(topic) = self.catalog.lookup(&req.name) {
@@ -372,15 +376,16 @@ impl Coordinator {
         } else if req.blocking {
             debug!("inserting blocking lookup for topic: {:?}", &req.name);
             let (lookup, result) = promise();
-            
+
             let handle = self.handle();
             let result = result.and_then(move |topic: Topic| {
-                handle.borrow_mut().catalog.subscribe(query, topic.id);
-                Ok(topic)
-            }).map_err(|err| match err {
-                Ok(err) => err,
-                Err(_) => SubscribeError::TopicNotFound,
-            });
+                    handle.borrow_mut().catalog.subscribe(query, topic.id);
+                    Ok(topic)
+                })
+                .map_err(|err| match err {
+                    Ok(err) => err,
+                    Err(_) => SubscribeError::TopicNotFound,
+                });
 
             self.lookups.entry(req.name).or_insert(Vec::new()).push(lookup);
 
@@ -390,14 +395,17 @@ impl Coordinator {
         }
     }
 
-    fn unsubscribe(&mut self, query_id: QueryId, topic_id: TopicId) -> Result<(), UnsubscribeError>  {
+    fn unsubscribe(&mut self,
+                   query_id: QueryId,
+                   topic_id: TopicId)
+                   -> Result<(), UnsubscribeError> {
         self.catalog.unsubscribe(query_id, topic_id)
     }
 
-    fn lookup(&self, name: &str) -> Result<Topic, ()>  {
+    fn lookup(&self, name: &str) -> Result<Topic, ()> {
         match self.catalog.lookup(name) {
             Some(topic) => Ok(topic),
-            None => Err(())
+            None => Err(()),
         }
     }
 }
@@ -418,7 +426,7 @@ impl State {
             subscription: Vec::new(),
         }
     }
-    
+
     fn authenticate(&self, auth: &QueryToken) -> bool {
         self.query.iter().any(|token| auth == token)
     }
@@ -437,10 +445,12 @@ impl CoordinatorRef {
         }
     }
 
-    pub fn submission(&self, req: Submission)
-        -> Box<Future<Item=QueryId, Error=SubmissionError>>
-    {
-        self.coord.borrow_mut().submission(req)
+    pub fn submission(&self,
+                      req: Submission)
+                      -> Box<Future<Item = QueryId, Error = SubmissionError>> {
+        self.coord
+            .borrow_mut()
+            .submission(req)
             .map_err(|err| err.expect("submission canceled?!"))
             .boxed()
     }
@@ -451,16 +461,20 @@ impl CoordinatorRef {
         id
     }
 
-    pub fn add_worker_group(&mut self, id: QueryId, group: usize)
-        -> Box<Future<Item=QueryToken, Error=WorkerGroupError>>
-    {
+    pub fn add_worker_group
+        (&mut self,
+         id: QueryId,
+         group: usize)
+         -> Box<Future<Item = QueryToken, Error = WorkerGroupError>> {
         let state = self.state.clone();
-        let future = self.coord.borrow_mut().add_worker_group(id, group)
+        let future = self.coord
+            .borrow_mut()
+            .add_worker_group(id, group)
             .then(move |res| match res {
                 Ok(token) => {
                     state.borrow_mut().query.push(token);
                     Ok(token)
-                },
+                }
                 Err(Ok(err)) => Err(err),
                 Err(Err(_)) => panic!("promise canceled"),
             });
@@ -471,10 +485,12 @@ impl CoordinatorRef {
     pub fn publish(&mut self, req: Publish) -> Result<Topic, PublishError> {
         let query = req.token;
         if !self.state.borrow().authenticate(&query) {
-            return Err(PublishError::AuthenticationFailure)
+            return Err(PublishError::AuthenticationFailure);
         }
 
-        self.coord.borrow_mut().publish(req)
+        self.coord
+            .borrow_mut()
+            .publish(req)
             .and_then(|topic| {
                 let topic_id = topic.id;
                 let query_id = query.id;
@@ -482,14 +498,19 @@ impl CoordinatorRef {
                 Ok(topic)
             })
     }
-    
-    pub fn unpublish(&mut self, query: QueryToken, topic_id: TopicId) -> Result<(), UnpublishError> {
+
+    pub fn unpublish(&mut self,
+                     query: QueryToken,
+                     topic_id: TopicId)
+                     -> Result<(), UnpublishError> {
         if !self.state.borrow().authenticate(&query) {
-            return Err(UnpublishError::AuthenticationFailure)
+            return Err(UnpublishError::AuthenticationFailure);
         }
 
         let query_id = query.id;
-        self.coord.borrow_mut().unpublish(query_id, topic_id)
+        self.coord
+            .borrow_mut()
+            .unpublish(query_id, topic_id)
             .and_then(|_| {
                 let to_remove = (query_id, topic_id);
                 self.state.borrow_mut().publication.retain(|&p| p != to_remove);
@@ -497,16 +518,18 @@ impl CoordinatorRef {
             })
     }
 
-    pub fn subscribe(&mut self, req: Subscribe)
-        -> Box<Future<Item=Topic, Error=SubscribeError>>
-    {
+    pub fn subscribe(&mut self,
+                     req: Subscribe)
+                     -> Box<Future<Item = Topic, Error = SubscribeError>> {
         let query = req.token;
         if !self.state.borrow().authenticate(&query) {
-            return futures::failed(SubscribeError::AuthenticationFailure).boxed()
+            return futures::failed(SubscribeError::AuthenticationFailure).boxed();
         }
 
         let state = self.state.clone();
-        let future = self.coord.borrow_mut().subscribe(req)
+        let future = self.coord
+            .borrow_mut()
+            .subscribe(req)
             .and_then(move |topic| {
                 let topic_id = topic.id;
                 let query_id = query.id;
@@ -515,18 +538,25 @@ impl CoordinatorRef {
             });
         Box::new(future)
     }
-    
-    pub fn unsubscribe(&mut self, query: QueryToken, topic_id: TopicId) -> Result<(), UnsubscribeError> {
+
+    pub fn unsubscribe(&mut self,
+                       query: QueryToken,
+                       topic_id: TopicId)
+                       -> Result<(), UnsubscribeError> {
         if !self.state.borrow().authenticate(&query) {
-            return Err(UnsubscribeError::AuthenticationFailure)
+            return Err(UnsubscribeError::AuthenticationFailure);
         }
 
         let query_id = query.id;
-        self.coord.borrow_mut().unsubscribe(query_id, topic_id)
+        self.coord
+            .borrow_mut()
+            .unsubscribe(query_id, topic_id)
             .and_then(|_| {
                 let to_remove = (query_id, topic_id);
                 let mut state = self.state.borrow_mut();
-                if let Some(pos) = state.subscription.iter().position(|&p| p == to_remove) {
+                if let Some(pos) = state.subscription
+                    .iter()
+                    .position(|&p| p == to_remove) {
                     state.subscription.swap_remove(pos);
                 } else {
                     warn!("cannot find state to remove for subscription?!")

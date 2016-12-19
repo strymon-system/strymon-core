@@ -63,7 +63,14 @@ impl ExecutorService {
         let executable = self.fetch(&query.program.source)?;
         let args = &*query.program.args;
         let id = query.id;
-        executable::spawn(&executable, id,args, threads, process, &*hostlist, &self.coord, &self.host)?;
+        executable::spawn(&executable,
+                          id,
+                          args,
+                          threads,
+                          process,
+                          &*hostlist,
+                          &self.coord,
+                          &self.host)?;
 
         Ok(())
     }

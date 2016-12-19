@@ -1,4 +1,4 @@
-use std::io::{Result};
+use std::io::Result;
 use std::any::Any;
 use std::marker::PhantomData;
 use std::collections::BTreeMap;
@@ -25,11 +25,12 @@ impl<D: Abomonation + Any + Clone + NonStatic> Publisher<D> {
             (host.to_string(), port)
         };
 
-        Ok((addr, Publisher {
-            server: PollServer::from(server),
-            subscribers: BTreeMap::new(),
-            marker: PhantomData,
-        }))
+        Ok((addr,
+            Publisher {
+                server: PollServer::from(server),
+                subscribers: BTreeMap::new(),
+                marker: PhantomData,
+            }))
     }
 
     pub fn publish(&mut self, item: &Vec<D>) -> Result<()> {
@@ -56,4 +57,3 @@ impl<D: Abomonation + Any + Clone + NonStatic> Publisher<D> {
         Ok(())
     }
 }
-

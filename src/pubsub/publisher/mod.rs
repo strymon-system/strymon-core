@@ -42,7 +42,7 @@ impl PublisherServer {
     pub fn external_addr(&self) -> (&str, u16) {
         (&self.addr.0, self.addr.1)
     }
-    
+
     fn poll_listener(&mut self) -> Result<()> {
         while let Async::Ready(Some((tx, rx))) = self.listener.poll()? {
             self.next_id += 1;
@@ -107,7 +107,7 @@ pub enum SubscriberEvent {
 impl Stream for PublisherServer {
     type Item = Vec<SubscriberEvent>;
     type Error = Error;
-    
+
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         // these functions populate self.events
         if !self.listener.is_done() {
@@ -132,7 +132,7 @@ impl Stream for PublisherServer {
 
 struct Nop;
 impl Unpark for Nop {
-    fn unpark(&self) { }
+    fn unpark(&self) {}
 }
 
 struct PollServer {
@@ -145,7 +145,9 @@ impl PollServer {
         match self.server.poll_stream(self.unpark.clone())? {
             Async::Ready(Some(events)) => Ok(events),
             Async::NotReady => Ok(Vec::new()),
-            Async::Ready(None) => Err(Error::new(ErrorKind::NotConnected, "server closed")),
+            Async::Ready(None) => {
+                Err(Error::new(ErrorKind::NotConnected, "server closed"))
+            }
         }
     }
 }

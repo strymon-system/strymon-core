@@ -8,7 +8,7 @@ use timely_query::publish::Partition;
 
 fn main() {
     timely_query::execute(|root, coord| {
-        root.scoped::<u64, _, _>(|scope| {
+            root.scoped::<u64, _, _>(|scope| {
             let n = scope.peers();
             let numbers = (n * 100 .. (n+1) * 100).to_stream(scope);
             // results in `n` topics: "numbers.0", "numbers.1", ...
@@ -24,5 +24,6 @@ fn main() {
                  .expect("failed to publish topic");
 */
         });
-    }).unwrap();
+        })
+        .unwrap();
 }

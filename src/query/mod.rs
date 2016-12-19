@@ -24,7 +24,10 @@ pub struct Coordinator {
     tx: Outgoing,
 }
 
-fn initialize(id: QueryId, process: usize, coord: String) -> Result<Coordinator, IoError> {
+fn initialize(id: QueryId,
+              process: usize,
+              coord: String)
+              -> Result<Coordinator, IoError> {
     let network = Network::init()?;
     let (tx, _) = network.client(&*coord)?;
 
@@ -34,10 +37,12 @@ fn initialize(id: QueryId, process: usize, coord: String) -> Result<Coordinator,
     });
 
     let token = announce.wait()
-        .map_err(|err| err.and_then::<(), _>(|err| {
-            let err = format!("failed to register: {:?}", err);
-            Err(IoError::new(ErrorKind::Other, err))
-        }))
+        .map_err(|err| {
+            err.and_then::<(), _>(|err| {
+                let err = format!("failed to register: {:?}", err);
+                Err(IoError::new(ErrorKind::Other, err))
+            })
+        })
         .map_err(Result::unwrap_err)?;
 
     Ok(Coordinator {
@@ -52,15 +57,20 @@ pub fn execute<T, F>(func: F) -> Result<WorkerGuards<T>, String>
           F: Fn(&mut Root<Allocator>, Coordinator) -> T,
           F: Send + Sync + 'static
 {
-    let config = NativeExecutable::from_env()
-        .map_err(|err| {
-            format!(concat!("Failed to parse data from executor. ", 
-                    "Has this binary been launched by an executor?", '\n', "{:?}"), err)
+    let config = NativeExecutable::from_env().map_err(|err| {
+            format!(concat!("Failed to parse data from executor. ",
+                            "Has this binary been launched by an executor?",
+                            '\n',
+                            "{:?}"),
+                    err)
         })?;
 
     // create timely configuration
     let timely_conf = if config.hostlist.len() > 1 {
-        info!("Configuration:Cluster({}, {}/{})", config.threads, config.process, config.hostlist.len());
+        info!("Configuration:Cluster({}, {}/{})",
+              config.threads,
+              config.process,
+              config.hostlist.len());
         Configuration::Cluster(config.threads, config.process, config.hostlist, true)
     } else if config.threads > 1 {
         info!("Configuration:Process({})", config.threads);

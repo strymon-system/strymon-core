@@ -26,12 +26,16 @@ impl Submitter {
         let (tx, _) = network.client(addr)?;
         Ok(Submitter {
             tx: tx,
-            network: network.clone()
+            network: network.clone(),
         })
     }
 
-    pub fn submit<N>(&self, query: QueryProgram, name: N, placement: Placement)
-        -> Response<Submission> where N: Into<Option<String>>
+    pub fn submit<N>(&self,
+                     query: QueryProgram,
+                     name: N,
+                     placement: Placement)
+                     -> Response<Submission>
+        where N: Into<Option<String>>
     {
         let submission = Submission {
             query: query,
@@ -41,7 +45,7 @@ impl Submitter {
 
         self.tx.request(&submission)
     }
-    
+
     fn lookup(&self, name: &str) -> Result<Topic> {
         self.tx
             .request(&Lookup { name: name.into() })
@@ -51,23 +55,25 @@ impl Submitter {
             })
             .wait()
     }
-    
+
     fn get_collection<D>(&self, name: &str) -> Result<Vec<D>>
         where D: Abomonation + Any + Clone + NonStatic
     {
         let topic = self.lookup(name)?;
         assert_eq!(topic.schema, TopicSchema::Collection(TopicType::of::<D>()));
-        
+
         let sub = CollectionSubscriber::<D>::connect(&topic, &self.network)?;
 
         match sub.into_future().wait() {
             Ok((Some(vec), _)) => {
-                Ok(vec.into_iter().flat_map(|(item, n)| repeat(item).take(n as usize)).collect())
+                Ok(vec.into_iter()
+                    .flat_map(|(item, n)| repeat(item).take(n as usize))
+                    .collect())
             }
             Ok((None, _)) => {
                 Err(Error::new(ErrorKind::Other, "subscriber stopped unexpectedly"))
             }
-            Err((err, _)) => Err(err) 
+            Err((err, _)) => Err(err),
         }
     }
 

@@ -13,7 +13,7 @@ use coordinator::requests::*;
 use async;
 
 use network::Network;
-use network::message::abomonate::{NonStatic};
+use network::message::abomonate::NonStatic;
 use pubsub::publisher::collection::{CollectionPublisher, Mutator};
 
 use super::util::Generator;
@@ -56,7 +56,8 @@ impl Catalog {
         topics.insert(topic.id, topic);
 
         let id = generator.generate();
-        let (topic, subs) = Collection::<Subscription>::new(network, id, "$subscriptions")?;
+        let (topic, subs) =
+            Collection::<Subscription>::new(network, id, "$subscriptions")?;
         directory.insert(topic.name.clone(), topic.id);
         topics.insert(topic.id, topic);
 
@@ -124,15 +125,18 @@ impl Catalog {
             }
         }
     }
-    
-    pub fn unpublish(&mut self, query_id: QueryId, topic: TopicId) -> Result<(), UnpublishError> {
+
+    pub fn unpublish(&mut self,
+                     query_id: QueryId,
+                     topic: TopicId)
+                     -> Result<(), UnpublishError> {
         let publication = Publication(query_id, topic);
         debug!("unpublish: {:?}", publication);
 
         if let Some(name) = self.topics.get(&topic).map(|t| &*t.name) {
             self.directory.remove(name);
         }
-        
+
         self.topics.remove(&topic);
         self.publications.remove(publication);
         Ok(())
@@ -152,7 +156,10 @@ impl Catalog {
         self.subscriptions.insert(subscription);
     }
 
-    pub fn unsubscribe(&mut self, query_id: QueryId, topic: TopicId) -> Result<(), UnsubscribeError> {
+    pub fn unsubscribe(&mut self,
+                       query_id: QueryId,
+                       topic: TopicId)
+                       -> Result<(), UnsubscribeError> {
         let subscription = Subscription(query_id, topic);
         debug!("unsubscribe: {:?}", subscription);
         self.subscriptions.remove(subscription);
@@ -166,25 +173,29 @@ struct MapCollection<K, V> {
 }
 
 impl<K: Ord, V: Abomonation + Any + Clone + Eq + NonStatic> MapCollection<K, V> {
-    fn new(network: &Network, topic_id: TopicId, name: &'static str) -> IoResult<(Topic, Self)> {
+    fn new(network: &Network,
+           topic_id: TopicId,
+           name: &'static str)
+           -> IoResult<(Topic, Self)> {
         let (addr, mutator, publisher) = CollectionPublisher::new(network)?;
         let topic = Topic {
             id: topic_id,
             name: String::from(name),
             addr: addr,
-            schema: TopicSchema::Collection(TopicType::of::<V>())
+            schema: TopicSchema::Collection(TopicType::of::<V>()),
         };
 
         async::spawn(publisher.map_err(|err| {
             error!("failure in catalog publisher: {:?}", err)
         }));
 
-        Ok((topic, MapCollection {
-            inner: BTreeMap::new(),
-            mutator: mutator,
-        }))
+        Ok((topic,
+            MapCollection {
+                inner: BTreeMap::new(),
+                mutator: mutator,
+            }))
     }
-    
+
     fn insert(&mut self, key: K, value: V) {
         self.inner.insert(key, value.clone());
         self.mutator.insert(value);
@@ -211,23 +222,27 @@ struct Collection<T> {
 }
 
 impl<T: Abomonation + Any + Clone + Eq + Hash + NonStatic> Collection<T> {
-    fn new(network: &Network, topic_id: TopicId, name: &'static str) -> IoResult<(Topic, Self)> {
+    fn new(network: &Network,
+           topic_id: TopicId,
+           name: &'static str)
+           -> IoResult<(Topic, Self)> {
         let (addr, mutator, publisher) = CollectionPublisher::new(network)?;
         let topic = Topic {
             id: topic_id,
             name: String::from(name),
             addr: addr,
-            schema: TopicSchema::Collection(TopicType::of::<T>())
+            schema: TopicSchema::Collection(TopicType::of::<T>()),
         };
 
         async::spawn(publisher.map_err(|err| {
             error!("failure in catalog publisher: {:?}", err)
         }));
 
-        Ok((topic, Collection {
-            inner: HashMap::new(),
-            mutator: mutator,
-        }))
+        Ok((topic,
+            Collection {
+                inner: HashMap::new(),
+                mutator: mutator,
+            }))
     }
 
     fn insert(&mut self, item: T) {

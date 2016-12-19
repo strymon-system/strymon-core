@@ -23,18 +23,20 @@ fn usage(opts: Options, err: Option<String>) -> ! {
 }
 
 fn main() {
-    drop(env_logger::init());   
+    drop(env_logger::init());
 
     let args: Vec<String> = env::args().skip(1).collect();
     let mut options = Options::new();
-    options
-        .optflag("h", "help", "display this help and exit")
-        .optopt("e", "external", "externally reachable hostname of this machine", "HOSTNAME")
+    options.optflag("h", "help", "display this help and exit")
+        .optopt("e",
+                "external",
+                "externally reachable hostname of this machine",
+                "HOSTNAME")
         .optopt("p", "port", "port to listen on", "PORT");
 
     let matches = match options.parse(&args) {
         Ok(m) => m,
-        Err(f) => usage(options, Some(f.to_string()))
+        Err(f) => usage(options, Some(f.to_string())),
     };
 
     if matches.opt_present("h") {
@@ -50,7 +52,8 @@ fn main() {
     if let Some(port) = matches.opt_str("p") {
         let parsed = port.parse::<u16>();
         if let Err(err) = parsed {
-            usage(options, Some(format!("Unable to parse port {:?}: {}", port, err)))
+            usage(options,
+                  Some(format!("Unable to parse port {:?}: {}", port, err)))
         }
 
         coordinator.port(parsed.unwrap());

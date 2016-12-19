@@ -200,14 +200,14 @@ impl Outgoing {
     pub fn request<R: Request>(&self, r: &R) -> Response<R> {
         let token = self.next_token();
         let (tx, rx) = futures::oneshot();
-        
+
         // step 1: create request packet
         let mut msg = MessageBuf::empty();
         msg.push::<Type, _>(&Type::Request).unwrap();
         msg.push::<Token, _>(&token).unwrap();
         msg.push::<Name, &'static str>(&R::name()).unwrap();
         msg.push::<Abomonate, R>(r).unwrap();
-        
+
         // step 2: add completion handle for pending responses
         {
             let mut pending = self.pending.lock().expect("request thread panicked");
@@ -216,7 +216,7 @@ impl Outgoing {
 
         // step 3: send packet to network
         self.sender.send(msg);
-        
+
         // step 4: prepare response decoder
         let rx = rx.map_err(|_| Err(IoError::new(ErrorKind::Other, "request canceled")));
         let rx = rx.and_then(|mut msg| {
@@ -284,7 +284,7 @@ impl Resolver {
                 }
             }
         }
-        
+
         Ok(())
     }
 
@@ -296,7 +296,7 @@ impl Resolver {
                     Ok(None) => break,
                     Err(err) => Err(err),
                 };
-                
+
                 // make sure to announce any decoding errors to client
                 if let Err(err) = res {
                     let _ = self.incoming.send(Err(err));
@@ -349,7 +349,7 @@ fn multiplex(stream: TcpStream) -> IoResult<(Outgoing, Incoming)> {
     let instream = stream.try_clone()?;
     let outstream = stream;
 
-    let (incoming_tx, incoming_rx) = queue::channel(); 
+    let (incoming_tx, incoming_rx) = queue::channel();
     let pending = Arc::new(Mutex::new(HashMap::new()));
     let sender = Sender::new(outstream);
 
@@ -359,16 +359,14 @@ fn multiplex(stream: TcpStream) -> IoResult<(Outgoing, Incoming)> {
         incoming: incoming_tx,
         stream: instream,
     };
-    
+
     let outgoing = Outgoing {
         token: Default::default(),
         pending: pending,
         sender: sender,
     };
 
-    let incoming = Incoming {
-        receiver: incoming_rx,
-    };
+    let incoming = Incoming { receiver: incoming_rx };
 
     resolver.dispatch();
 
@@ -376,10 +374,12 @@ fn multiplex(stream: TcpStream) -> IoResult<(Outgoing, Incoming)> {
 }
 
 impl Network {
-    pub fn client<E: ToSocketAddrs>(&self, endpoint: E) -> IoResult<(Outgoing, Incoming)> {
+    pub fn client<E: ToSocketAddrs>(&self,
+                                    endpoint: E)
+                                    -> IoResult<(Outgoing, Incoming)> {
         multiplex(TcpStream::connect(endpoint)?)
     }
-    
+
     pub fn server<P: Into<Option<u16>>>(&self, port: P) -> IoResult<Server> {
         Server::new(self.clone(), port.into().unwrap_or(0))
     }
@@ -428,8 +428,7 @@ mod tests {
             let server = network.server(None)?;
 
             let (tx, _) = network.client(server.external_addr())?;
-            let server = 
-                server.do_while(|(_, rx)| {
+            let server = server.do_while(|(_, rx)| {
                     let handler = rx.do_while(move |req| {
                             assert_eq!(req.name(), "Ping");
                             let (req, resp) = req.decode::<Ping>().unwrap();

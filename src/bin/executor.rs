@@ -23,19 +23,21 @@ fn usage(opts: Options, err: Option<String>) -> ! {
 }
 
 fn main() {
-    drop(env_logger::init());   
+    drop(env_logger::init());
 
     let args: Vec<String> = env::args().skip(1).collect();
     let mut options = Options::new();
-    options
-        .optflag("h", "help", "display this help and exit")
+    options.optflag("h", "help", "display this help and exit")
         .optopt("c", "coordinator", "address of the coordinator", "ADDR")
-        .optopt("e", "external", "externally reachable hostname of this machine", "HOSTNAME")
+        .optopt("e",
+                "external",
+                "externally reachable hostname of this machine",
+                "HOSTNAME")
         .optopt("p", "ports", "port range of spawned queries", "MIN..MAX");
 
     let matches = match options.parse(&args) {
         Ok(m) => m,
-        Err(f) => usage(options, Some(f.to_string()))
+        Err(f) => usage(options, Some(f.to_string())),
     };
 
     if matches.opt_present("h") {

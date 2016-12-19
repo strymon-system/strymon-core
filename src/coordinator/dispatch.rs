@@ -35,7 +35,8 @@ impl Dispatch {
                 async::spawn(submission);
             }
             "AddWorkerGroup" => {
-                let (AddWorkerGroup { query, group }, resp) = req.decode::<AddWorkerGroup>()?;
+                let (AddWorkerGroup { query, group }, resp) =
+                    req.decode::<AddWorkerGroup>()?;
                 let response = self.coord
                     .add_worker_group(query, group)
                     .then(|res| Ok(resp.respond(res)));
@@ -45,21 +46,22 @@ impl Dispatch {
                 let (req, resp) = req.decode::<AddExecutor>()?;
                 let id = self.coord.add_executor(req, self.tx.clone());
                 resp.respond(Ok((id)));
-            },
+            }
             "Publish" => {
                 let (req, resp) = req.decode::<Publish>()?;
                 resp.respond(self.coord.publish(req));
-            },
+            }
             "Unpublish" => {
                 let (Unpublish { token, topic }, resp) = req.decode::<Unpublish>()?;
                 resp.respond(self.coord.unpublish(token, topic));
             }
             "Subscribe" => {
                 let (req, resp) = req.decode::<Subscribe>()?;
-                let subscribe = self.coord.subscribe(req)
+                let subscribe = self.coord
+                    .subscribe(req)
                     .then(|res| Ok(resp.respond(res)));
                 async::spawn(subscribe);
-            },
+            }
             "Unsubscribe" => {
                 let (Unsubscribe { token, topic }, resp) = req.decode::<Unsubscribe>()?;
                 resp.respond(self.coord.unsubscribe(token, topic));

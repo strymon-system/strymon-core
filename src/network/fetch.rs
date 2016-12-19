@@ -28,7 +28,7 @@ impl Drop for Handle {
     }
 }
 
-#[cfg(unix)]   
+#[cfg(unix)]
 fn fix_permissions<P: AsRef<Path>>(path: P) -> Result<()> {
     use std::os::unix::fs::PermissionsExt;
     let mut perm = fs::metadata(&path)?.permissions();
@@ -38,7 +38,7 @@ fn fix_permissions<P: AsRef<Path>>(path: P) -> Result<()> {
 }
 
 #[cfg(windows)]
-fn fix_permissions<P: AsRef<Path>>(_: P) { }
+fn fix_permissions<P: AsRef<Path>>(_: P) {}
 
 impl Network {
     pub fn upload<P: AsRef<Path>>(&self, path: P) -> Result<Handle> {
@@ -61,7 +61,7 @@ impl Network {
                 });
             }
         });
-        
+
         Ok(Handle {
             url: format!("tcp://{}:{}", self.external, port),
             listener: interrupt,
@@ -70,7 +70,8 @@ impl Network {
 
     pub fn download(&self, url: &str) -> Result<PathBuf> {
         if !url.starts_with("tcp://") {
-            return Err(Error::new(ErrorKind::InvalidInput, "url doesn't start with tcp://'"))
+            return Err(Error::new(ErrorKind::InvalidInput,
+                                  "url doesn't start with tcp://'"));
         }
 
         let addr = &url[6..];
@@ -84,7 +85,7 @@ impl Network {
         debug!("downloading file from tcp://{} to {:?}", addr, path);
 
         copy(&mut stream, &mut file)?;
-        
+
         Ok(path)
     }
 }

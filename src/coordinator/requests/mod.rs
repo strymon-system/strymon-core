@@ -116,7 +116,7 @@ pub enum UnsubscribeError {
 impl Request for Unsubscribe {
     type Success = ();
     type Error = UnsubscribeError;
-    
+
     fn name() -> &'static str {
         "Unsubscribe"
     }
@@ -139,7 +139,7 @@ pub enum PublishError {
 impl Request for Publish {
     type Success = Topic;
     type Error = PublishError;
-    
+
     fn name() -> &'static str {
         "Publish"
     }
@@ -160,7 +160,7 @@ pub enum UnpublishError {
 impl Request for Unpublish {
     type Success = ();
     type Error = UnpublishError;
-    
+
     fn name() -> &'static str {
         "Unpublish"
     }

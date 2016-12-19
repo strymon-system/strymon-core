@@ -36,9 +36,7 @@ impl Builder {
 
 impl Default for Builder {
     fn default() -> Self {
-        Builder {
-            port: 9189,
-        }
+        Builder { port: 9189 }
     }
 }
 
@@ -69,5 +67,3 @@ impl Builder {
         async::finish(coordinate)
     }
 }
-
-

@@ -1,4 +1,4 @@
-use std::io::{Result};
+use std::io::Result;
 use std::any::Any;
 use std::marker::PhantomData;
 use std::collections::BTreeMap;
@@ -28,11 +28,12 @@ impl<T, D> TimelyPublisher<T, D>
             (host.to_string(), port)
         };
 
-        Ok((addr, TimelyPublisher {
-            server: PollServer::from(server),
-            subscribers: BTreeMap::new(),
-            marker: PhantomData,
-        }))
+        Ok((addr,
+            TimelyPublisher {
+                server: PollServer::from(server),
+                subscribers: BTreeMap::new(),
+                marker: PhantomData,
+            }))
     }
 
     pub fn publish(&mut self, frontier: &[T], time: &T, item: &Vec<D>) -> Result<()> {

@@ -54,7 +54,7 @@ impl Abomonation for SubmissionError {
     unsafe fn embalm(&mut self) {
         match *self {
             SubmissionError::ExecutorsNotFound |
-            SubmissionError::ExecutorUnreachable  => (),
+            SubmissionError::ExecutorUnreachable => (),
             SubmissionError::SpawnError(ref mut e) => e.embalm(),
         }
     }
@@ -62,7 +62,7 @@ impl Abomonation for SubmissionError {
     unsafe fn entomb(&self, bytes: &mut Vec<u8>) {
         match *self {
             SubmissionError::ExecutorsNotFound |
-            SubmissionError::ExecutorUnreachable  => (),
+            SubmissionError::ExecutorUnreachable => (),
             SubmissionError::SpawnError(ref e) => e.entomb(bytes),
         }
     }
@@ -70,7 +70,7 @@ impl Abomonation for SubmissionError {
     unsafe fn exhume<'a, 'b>(&'a mut self, bytes: &'b mut [u8]) -> Option<&'b mut [u8]> {
         match *self {
             SubmissionError::ExecutorsNotFound |
-            SubmissionError::ExecutorUnreachable  => Some(bytes),
+            SubmissionError::ExecutorUnreachable => Some(bytes),
             SubmissionError::SpawnError(ref mut e) => e.exhume(bytes),
         }
     }
