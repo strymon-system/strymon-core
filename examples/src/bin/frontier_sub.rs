@@ -11,7 +11,7 @@ fn main() {
             let (mut input, cap) = root.scoped::<i32, _, _>(|scope| {
                 let (input, stream) = scope.new_unordered_input();
                 stream.unary_notify(Pipeline,
-                                    "example",
+                                    "frontier",
                                     Vec::new(),
                                     |input, output, notificator| {
                     input.for_each(|time, data| {
