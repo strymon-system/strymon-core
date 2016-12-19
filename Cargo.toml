@@ -1,6 +1,6 @@
 [package]
 authors = ["Sebastian Wicki <swicki@student.ethz.ch>"]
-name = "timely-query"
+name = "timely-system"
 version = "0.1.0"
 
 [[bin]]
@@ -36,4 +36,4 @@ rev = "aa2d0971"
 git = "https://github.com/frankmcsherry/abomonation"
 
 [workspace]
-members = ["evaluation/sessionize", "evaluation/sensor"]
+members = ["lib", "evaluation/sessionize", "evaluation/sensor"]

@@ -1,4 +1,4 @@
-extern crate timely_query;
+extern crate timely_system;
 extern crate env_logger;
 extern crate getopts;
 
@@ -8,8 +8,8 @@ use std::io::{self, Write, Result};
 use std::collections::BTreeMap;
 
 use getopts::Options;
-use timely_query::network::Network;
-use timely_query::submit::Submitter;
+use timely_system::network::Network;
+use timely_system::submit::Submitter;
 
 fn usage(opts: Options, err: Option<String>) -> ! {
     let program = env::args().next().unwrap_or(String::from("executor"));

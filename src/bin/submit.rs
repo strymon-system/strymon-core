@@ -1,4 +1,4 @@
-extern crate timely_query;
+extern crate timely_system;
 extern crate env_logger;
 extern crate getopts;
 
@@ -9,10 +9,10 @@ use std::process;
 
 use getopts::{Options, Matches, ParsingStyle};
 
-use timely_query::coordinator::requests::*;
-use timely_query::model::*;
-use timely_query::network::Network;
-use timely_query::submit::Submitter;
+use timely_system::coordinator::requests::*;
+use timely_system::model::*;
+use timely_system::network::Network;
+use timely_system::submit::Submitter;
 
 fn usage(opts: Options, err: Option<String>) -> ! {
     let program = env::args().next().unwrap_or(String::from("executor"));
@@ -84,6 +84,10 @@ fn main() {
         .optflag("h", "help", "display this help and exit")
         .optopt("p", "program", "path to the query binary", "FILE")
         .optopt("c", "coordinator", "address of the coordinator", "ADDR")
+        .optopt("e",
+                "external",
+                "externally reachable hostname of this machine",
+                "HOSTNAME")
         .optopt("w",
                 "workers",
                 "number of per-process worker threads",
@@ -127,6 +131,11 @@ fn main() {
     let coord = m.opt_str("c").unwrap_or(String::from("localhost:9189"));
     let desc = m.opt_str("d");
     let args = m.free.clone();
+
+    // external hostname
+    if let Some(host) = m.opt_str("e") {
+        env::set_var("TIMELY_QUERY_HOSTNAME", host);
+    }
 
     let network = Network::init().unwrap();
     let submitter = Submitter::new(&network, &*coord)

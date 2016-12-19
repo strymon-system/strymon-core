@@ -59,9 +59,8 @@ pub fn execute<T, F>(func: F) -> Result<WorkerGuards<T>, String>
 {
     let config = NativeExecutable::from_env().map_err(|err| {
             format!(concat!("Failed to parse data from executor. ",
-                            "Has this binary been launched by an executor?",
-                            '\n',
-                            "{:?}"),
+                            "Has this binary been launched by an executor? ",
+                            "Error: {:?}"),
                     err)
         })?;
 

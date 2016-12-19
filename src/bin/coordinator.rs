@@ -1,4 +1,4 @@
-extern crate timely_query;
+extern crate timely_system;
 extern crate env_logger;
 extern crate getopts;
 
@@ -7,7 +7,7 @@ use std::env;
 use std::process;
 
 use getopts::Options;
-use timely_query::coordinator;
+use timely_system::coordinator;
 
 fn usage(opts: Options, err: Option<String>) -> ! {
     let program = env::args().next().unwrap_or(String::from("coordinator"));

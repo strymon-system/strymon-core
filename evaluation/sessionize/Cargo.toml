@@ -21,4 +21,4 @@ path = "../trace-analyzer/amadeus/sessionize"
 path = "../trace-analyzer/timely-contrib"
 
 [dependencies.timely-query]
-path = "../.."
+path = "../../lib"
