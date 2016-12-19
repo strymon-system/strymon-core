@@ -9,7 +9,7 @@ use std::thread;
 use std::time::Duration;
 
 use timely::dataflow::Scope;
-use timely::dataflow::operators::{Input, Map};
+use timely::dataflow::operators::Input;
 
 use timely_query::publish::Partition;
 
@@ -18,37 +18,39 @@ type SensorData = (u64, (f32, i32, i32, i32, f32));
 
 fn main() {
     timely_query::execute(|root, coord| {
-        let mut input = root.scoped::<u64, _, _>(|scope| {
-            let (input, stream) = scope.new_input();
+            let mut input = root.scoped::<u64, _, _>(|scope| {
+                let (input, stream) = scope.new_input();
 
-            coord.publish("sensor", &stream, Partition::Merge).expect("failed to publish");
+                coord.publish("sensor", &stream, Partition::Merge)
+                    .expect("failed to publish");
 
-            input
-        });
+                input
+            });
 
-        let n = root.index() + 1;
-        let path = ::std::env::args().skip(1).next().expect("require path argument");
+            let n = root.index() + 1;
+            let path = ::std::env::args().skip(1).next().expect("require path argument");
 
-        let sensor = Sensor::read(format!("{}/sensor{}.csv", path, n));
-        for (ts, data) in sensor {
-            if &ts > input.epoch() {
-                input.advance_to(ts);
+            let sensor = Sensor::read(format!("{}/sensor{}.csv", path, n));
+            for (ts, data) in sensor {
+                if &ts > input.epoch() {
+                    input.advance_to(ts);
+                }
+                input.send(data);
+                root.step();
             }
-            input.send(data);
-            root.step();
-        }
-    }).unwrap();
+        })
+        .unwrap();
 }
 
 struct Sensor {
-    source: Box<Iterator<Item=SensorData>>,
+    source: Box<Iterator<Item = SensorData>>,
 }
 
 impl Sensor {
     fn read<P: AsRef<Path>>(path: P) -> Self {
         let f = File::open(path).expect("failed to open file");
         let r = BufReader::new(f);
-        
+
         let lines = r.lines().skip(1).map(|r| r.expect("failed to read line"));
         let iter = lines.map(|l| {
             let mut data = l.split(",");
@@ -61,7 +63,7 @@ impl Sensor {
 
             thread::sleep(Duration::from_millis(1));
 
-            (ts, (hum, pir, motion, mic, temp))           
+            (ts, (hum, pir, motion, mic, temp))
         });
 
         Sensor { source: Box::new(iter) }

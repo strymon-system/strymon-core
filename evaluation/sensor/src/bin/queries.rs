@@ -7,31 +7,32 @@ use timely::dataflow::operators::*;
 use timely_query::model::Query;
 
 fn main() {
-    timely_query::execute(|root, coord| {    
-        let mut input = root.scoped::<i32,_,_>(|scope| {
-            let (input, stream) = scope.new_input();
+    timely_query::execute(|root, coord| {
+            let mut input = root.scoped::<i32, _, _>(|scope| {
+                let (input, stream) = scope.new_input();
 
-            stream.inspect(|&(ref query, delta): &(Query, i32)| {
-                if delta > 0 {
-                    println!("Added {:#?}", query)
-                } else {
-                    println!("Removed Query {:?}", query.name)
-                }
+                stream.inspect(|&(ref query, delta): &(Query, i32)| {
+                    if delta > 0 {
+                        println!("Added {:#?}", query)
+                    } else {
+                        println!("Removed Query {:?}", query.name)
+                    }
+                });
+
+                input
             });
 
-            input
-        });
+            let subscriber = coord.subscribe_collection::<(Query, i32)>("$queries")
+                .unwrap()
+                .into_iter()
+                .flat_map(|vec| vec);
 
-        let subscriber = coord.subscribe_collection::<(Query, i32), _>("$queries")
-            .unwrap()
-            .into_iter()
-            .flat_map(|vec| vec);
+            for (item, ts) in subscriber.zip(1..) {
+                input.send(item);
+                input.advance_to(ts);
+                root.step();
+            }
 
-        for (item, ts) in subscriber.zip(1..) {
-            input.send(item);
-            input.advance_to(ts);
-            root.step();
-        }
-
-    }).unwrap();
+        })
+        .unwrap();
 }
