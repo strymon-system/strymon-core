@@ -21,12 +21,12 @@ pub struct Network {
 impl Network {
     fn external() -> String {
         // try to guess external hostname
-        if let Ok(hostname) = env::var("TIMELY_QUERY_HOSTNAME") {
+        if let Ok(hostname) = env::var("TIMELY_SYSTEM_HOSTNAME") {
             return hostname;
         }
 
         warn!("unable to retrieve external hostname of machine.");
-        warn!("falling back to 'localhost', set TIMELY_QUERY_HOSTNAME to override");
+        warn!("falling back to 'localhost', set TIMELY_SYSTEM_HOSTNAME to override");
 
         String::from("localhost")
     }

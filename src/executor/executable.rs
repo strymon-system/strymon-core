@@ -13,7 +13,7 @@ pub const THREADS: &'static str = "TIMELY_EXEC_CONF_THREADS";
 pub const PROCESS: &'static str = "TIMELY_EXEC_CONF_PROCESS";
 pub const HOSTLIST: &'static str = "TIMELY_EXEC_CONF_HOSTLIST";
 pub const COORD: &'static str = "TIMELY_EXEC_CONF_COORD";
-pub const HOST: &'static str = "TIMELY_QUERY_HOSTNAME";
+pub const HOST: &'static str = "TIMELY_SYSTEM_HOSTNAME";
 
 #[derive(Debug)]
 pub struct NativeExecutable {

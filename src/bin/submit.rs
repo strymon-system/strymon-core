@@ -134,7 +134,7 @@ fn main() {
 
     // external hostname
     if let Some(host) = m.opt_str("e") {
-        env::set_var("TIMELY_QUERY_HOSTNAME", host);
+        env::set_var("TIMELY_SYSTEM_HOSTNAME", host);
     }
 
     let network = Network::init().unwrap();

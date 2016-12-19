@@ -98,7 +98,7 @@ pub struct Builder {
 
 impl Builder {
     pub fn host(&mut self, host: String) {
-        env::set_var("TIMELY_QUERY_HOSTNAME", host);
+        env::set_var("TIMELY_SYSTEM_HOSTNAME", host);
     }
 
     pub fn coordinator(&mut self, coord: String) {
