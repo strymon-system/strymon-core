@@ -2,7 +2,6 @@ use std::io::{Result};
 use std::any::Any;
 use std::marker::PhantomData;
 use std::collections::BTreeMap;
-use std::env;
 
 use abomonation::Abomonation;
 

@@ -1,16 +1,14 @@
 use std::io::{Error as IoError, ErrorKind};
 use std::sync::Mutex;
-use std::thread;
 
 use timely_communication::{Allocator, WorkerGuards};
 use timely::{self, Configuration};
 use timely::dataflow::scopes::Root;
 
 use futures::Future;
-use futures::stream::Stream;
 
-use network::{Network};
-use network::reqrep::{self, Outgoing};
+use network::Network;
+use network::reqrep::Outgoing;
 
 use executor::executable::NativeExecutable;
 use model::QueryId;
@@ -55,7 +53,10 @@ pub fn execute<T, F>(func: F) -> Result<WorkerGuards<T>, String>
           F: Send + Sync + 'static
 {
     let config = NativeExecutable::from_env()
-        .map_err(|err| format!("parse failure. not running on an executor?"))?;
+        .map_err(|err| {
+            format!(concat!("Failed to parse data from executor. ", 
+                    "Has this binary been launched by an executor?", '\n', "{:?}"), err)
+        })?;
 
     // create timely configuration
     let timely_conf = if config.hostlist.len() > 1 {

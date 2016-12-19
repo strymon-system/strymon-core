@@ -11,10 +11,9 @@ use coordinator::requests::*;
 use network::message::abomonate::NonStatic;
 
 use pubsub::subscriber::{Subscriber, TimelySubscriber};
-use model::{Topic, TopicType};
+use model::{Topic, TopicId};
 use query::Coordinator;
 
-// TODO(swicki) impl drop
 pub struct Subscription<D: Data + NonStatic> {
     sub: Subscriber<D>,
     topic: Topic,
@@ -43,7 +42,9 @@ impl<D: Data + NonStatic> IntoIterator for Subscription<D> {
 
 impl<D: Data + NonStatic> Drop for Subscription<D> {
     fn drop(&mut self) {
-
+        if let Err(err) = self.coord.unsubscribe(self.topic.id) {
+            warn!("failed to unsubscribe: {:?}", err)
+        }
     }
 }
 
@@ -60,7 +61,6 @@ impl<S: Stream> Iterator for IntoIter<S> {
 }
 
 
-// TODO(swicki) unsubscribe on drop
 pub struct TimelySubscription<T: Timestamp + NonStatic, D: Data + NonStatic> {
     sub: TimelySubscriber<T, D>,
     topic: Topic,
@@ -115,10 +115,19 @@ impl<T: Timestamp + NonStatic, D: Data + NonStatic> IntoIterator for TimelySubsc
     }
 }
 
+impl<T: Timestamp + NonStatic, D: Data + NonStatic> Drop for TimelySubscription<T, D> {
+    fn drop(&mut self) {
+        if let Err(err) = self.coord.unsubscribe(self.topic.id) {
+            warn!("failed to unsubscribe: {:?}", err)
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum SubscriptionError {
     TopicNotFound,
     TypeIdMismatch,
+    AuthenticationFailure,
     IoError(IoError)
 }
 
@@ -126,7 +135,16 @@ impl From<SubscribeError> for SubscriptionError {
     fn from(err: SubscribeError) -> Self {
         match err {
             SubscribeError::TopicNotFound => SubscriptionError::TopicNotFound,
-            err => panic!("failed to subscribe: {:?}", err),
+            SubscribeError::AuthenticationFailure => SubscriptionError::AuthenticationFailure,
+        }
+    }
+}
+
+impl From<UnsubscribeError> for SubscriptionError {
+    fn from(err: UnsubscribeError) -> Self {
+        match err {
+            UnsubscribeError::InvalidTopicId => SubscriptionError::TopicNotFound,
+            UnsubscribeError::AuthenticationFailure => SubscriptionError::AuthenticationFailure,
         }
     }
 }
@@ -137,7 +155,25 @@ impl From<IoError> for SubscriptionError {
     }
 }
 
+impl<T, E> From<Result<T, E>> for SubscriptionError where T: Into<SubscriptionError>, E: Into<SubscriptionError> {
+    fn from(err: Result<T, E>) -> Self {
+        match err {
+            Ok(err) => err.into(),
+            Err(err) => err.into(),
+        }
+    }
+}
+
 impl Coordinator {
+    fn unsubscribe(&self, topic: TopicId) -> Result<(), SubscriptionError> {
+        self.tx.request(&Unsubscribe {
+            topic: topic,
+            token: self.token,
+        })
+        .map_err(SubscriptionError::from)
+        .wait()
+    }
+
     fn timely<T, D>(&self, name: String, root: Capability<T>, blocking: bool) -> Result<TimelySubscription<T, D>, SubscriptionError>
         where T: Timestamp + NonStatic, D: Data + NonStatic {
         let name = name.to_string();
@@ -146,12 +182,13 @@ impl Coordinator {
             name: name,
             token: self.token,
             blocking: blocking,
-        }).map_err(|err| {
-            match err {
-                Ok(err) => SubscriptionError::from(err),
-                Err(err) => SubscriptionError::from(err),
+        })
+        .map_err(SubscriptionError::from)
+        .and_then(move |topic| {
+            if !topic.schema.is_stream::<T, D>() {
+                return Err(SubscriptionError::TypeIdMismatch)
             }
-        }).and_then(move |topic| {
+        
             let sub = TimelySubscriber::<T, D>::connect(&topic, &coord.network)?;
             Ok(TimelySubscription {
                 sub: sub,
@@ -159,7 +196,8 @@ impl Coordinator {
                 coord: coord,
                 frontier: vec![root],
             })
-        }).wait()
+        })
+        .wait()
     }
 
     pub fn subscribe<T, D>(&self, name: &str, root: Capability<T>) -> Result<TimelySubscription<T, D>, SubscriptionError>
@@ -180,19 +218,21 @@ impl Coordinator {
             name: name,
             token: self.token,
             blocking: blocking,
-        }).map_err(|err| {
-            match err {
-                Ok(err) => SubscriptionError::from(err),
-                Err(err) => SubscriptionError::from(err),
+        })
+        .map_err(SubscriptionError::from)
+        .and_then(move |topic| {
+            if !topic.schema.is_collection::<D>() {
+                return Err(SubscriptionError::TypeIdMismatch)
             }
-        }).and_then(move |topic| {
+
             let sub = Subscriber::<D>::connect(&topic, &coord.network)?;
             Ok(Subscription {
                 sub: sub,
                 topic: topic,
                 coord: coord,
             })
-        }).wait()
+        })
+        .wait()
     }
 
     pub fn subscribe_collection<D>(&self, name: &str) -> Result<Subscription<D>, SubscriptionError>

@@ -2,7 +2,6 @@ use std::io::{Result, Error};
 use std::any::Any;
 use std::collections::BTreeMap;
 use std::sync::Arc;
-use std::hash::Hash;
 
 use abomonation::Abomonation;
 use futures::{Future, Poll, Async};

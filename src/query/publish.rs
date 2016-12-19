@@ -8,19 +8,20 @@ use timely::dataflow::stream::Stream;
 use timely::dataflow::operators::Unary;
 use timely::dataflow::channels::pact::{Exchange, ParallelizationContract, Pipeline};
 use timely_communication::{Allocate, Pull, Push};
-use futures::{Future, self};
+use futures::Future;
 
+use query::Coordinator;
 use coordinator::requests::*;
+use model::{Topic, TopicId, TopicType, TopicSchema};
 use network::message::abomonate::NonStatic;
-
 use pubsub::publisher::timely::TimelyPublisher;
 use pubsub::publisher::collection::CollectionPublisher;
-use model::{Topic, TopicType, TopicSchema};
-use query::Coordinator;
 
 #[derive(Debug)]
 pub enum PublicationError {
     TopicAlreadyExists,
+    TopicNotFound,
+    AuthenticationFailure,
     TypeIdMismatch,
     IoError(IoError)
 }
@@ -37,6 +38,24 @@ impl From<PublishError> for PublicationError {
 impl From<IoError> for PublicationError {
     fn from(err: IoError) -> Self {
         PublicationError::IoError(err)
+    }
+}
+
+impl From<UnpublishError> for PublicationError {
+    fn from(err: UnpublishError) -> Self {
+        match err {
+            UnpublishError::InvalidTopicId => PublicationError::TopicNotFound,
+            UnpublishError::AuthenticationFailure => PublicationError::AuthenticationFailure,
+        }
+    }
+}
+
+impl<T, E> From<Result<T, E>> for PublicationError where T: Into<PublicationError>, E: Into<PublicationError> {
+    fn from(err: Result<T, E>) -> Self {
+        match err {
+            Ok(err) => err.into(),
+            Err(err) => err.into(),
+        }
     }
 }
 
@@ -75,19 +94,32 @@ impl Partition {
     }
 }
 
+struct Publication {
+    topic: Topic,
+    coord: Coordinator,
+}
+
+impl Drop for Publication {
+    fn drop(&mut self) {
+        if let Err(err) = self.coord.unpublish(self.topic.id) {
+            warn!("failed to unpublish: {:?}", err)
+        }
+    }
+}
+
 impl Coordinator {
-    fn publish_request(&self, name: String, schema: TopicSchema, addr: (String, u16)) -> Result<Topic, PublicationError> {
-        self.tx.request(&Publish {
+    fn publish_request(&self, name: String, schema: TopicSchema, addr: (String, u16)) -> Result<Publication, PublicationError> {
+        let topic = self.tx.request(&Publish {
             name: name,
             token: self.token,
             schema: schema,
             addr: addr,
-        }).map_err(|err| {
-            match err {
-                Ok(err) => PublicationError::from(err),
-                Err(err) => PublicationError::from(err),
-            }
-        }).wait()
+        }).map_err(PublicationError::from).wait()?;
+        
+        Ok(Publication {
+            topic: topic,
+            coord: self.clone(),
+        })
     }
 
     pub fn publish<S, D>(&self, name: &str, stream: &Stream<S, D>, partition: Partition) -> Result<Stream<S, D>, PublicationError>
@@ -103,15 +135,22 @@ impl Coordinator {
             (None, None)
         };
 
-        if name.is_some() {
+        let publication = if name.is_some() {
             // local worker hosts a publication
             let item = TopicType::of::<D>();
             let time = TopicType::of::<S::Timestamp>();
             let schema = TopicSchema::Stream(item, time);
-            self.publish_request(name.unwrap(), schema, addr.unwrap())?;
-        }
+
+            Some(self.publish_request(name.unwrap(), schema, addr.unwrap())?)
+        } else {
+            None
+        };
 
         let output = stream.unary_notify(partition, "timelypublisher", Vec::new(), move |input, output, notif| {
+            // ensure publication handle is moved into the closure/operator
+            let ref _guard = publication;
+
+            // publish data on input 
             let frontier = notif.frontier(0);
             input.for_each(|time, data| {
                 if let Some(ref mut publisher) = publisher {
@@ -120,7 +159,7 @@ impl Coordinator {
                 output.session(&time).give_content(data);
             });
         });
-        
+
         Ok(output)
     }
 
@@ -137,14 +176,20 @@ impl Coordinator {
             (None, None, None)
         };
 
-        if name.is_some() {
+        let publication = if name.is_some() {
             // local worker hosts a publication
             let item = TopicType::of::<D>();
             let schema = TopicSchema::Collection(item);
-            self.publish_request(name.unwrap(), schema, addr.unwrap())?;
-        }
+            Some(self.publish_request(name.unwrap(), schema, addr.unwrap())?)
+        } else {
+            None
+        };
 
         let output = stream.unary_stream(partition, "collectionpublisher", move |input, output| {
+            // ensure publication handle is moved into the closure/operator
+            let ref _guard = publication;
+
+            // publication logic
             input.for_each(|time, data| {
                 if let Some(ref mut mutator) = mutator {
                     mutator.update_from(data.clone().into_typed());
@@ -152,11 +197,21 @@ impl Coordinator {
                 output.session(&time).give_content(data);
             });
             
+            // ensure publisher future is polled
             if let Some(ref mut publisher) = publisher {
                 publisher.poll().unwrap();
             }
         });
 
         Ok(output)
+    }
+
+    fn unpublish(&self, topic: TopicId) -> Result<(), PublicationError> {
+        self.tx.request(&Unpublish {
+            topic: topic,
+            token: self.token,
+        })
+        .map_err(PublicationError::from)
+        .wait()
     }
 }

@@ -94,3 +94,23 @@ impl From<u64> for ExecutorId {
 
 unsafe_abomonate!(Publication);
 unsafe_abomonate!(Subscription);
+
+impl TopicSchema {
+    pub fn is_collection<D: Any>(&self) -> bool {
+        match *self {
+            TopicSchema::Collection(ref d) => {
+                d.id == TypeId::of::<D>()
+            },
+            _ => false,
+        }
+    }
+    
+    pub fn is_stream<T: Any, D: Any>(&self) -> bool {
+        match *self {
+            TopicSchema::Stream(ref d, ref t) => {
+                d.id == TypeId::of::<D>() && t.id == TypeId::of::<T>()
+            },
+            _ => false,
+        }
+    }
+}

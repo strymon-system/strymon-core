@@ -7,7 +7,6 @@ use futures::stream::Stream;
 use async;
 use async::do_while::DoWhileExt;
 use network::Network;
-use network::reqrep;
 
 use self::handler::Coordinator;
 use self::dispatch::Dispatch;

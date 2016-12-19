@@ -3,14 +3,12 @@ use std::env;
 use std::path::PathBuf;
 
 use futures::{self, Future};
-use futures::stream::Stream;
 
 use async;
 use async::do_while::{DoWhileExt, Stop};
-use async::queue;
 
 use network::Network;
-use network::reqrep::{self, RequestBuf};
+use network::reqrep::RequestBuf;
 
 use model::*;
 

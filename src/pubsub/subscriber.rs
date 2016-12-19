@@ -1,7 +1,6 @@
 use std::io::{Result, Error};
 use std::any::Any;
 use std::marker::PhantomData;
-use std::env;
 
 use futures::{Poll, Async};
 use futures::stream::Stream;

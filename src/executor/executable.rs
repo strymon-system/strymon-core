@@ -1,6 +1,6 @@
 use std::env;
 use std::num;
-use std::process::{Command, Child, Stdio};
+use std::process::{Command, Stdio};
 use std::ffi::OsStr;
 use std::io::{BufRead, BufReader, Error, ErrorKind};
 use std::thread;

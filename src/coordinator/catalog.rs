@@ -13,7 +13,7 @@ use coordinator::requests::*;
 use async;
 
 use network::Network;
-use network::message::abomonate::{Abomonate, NonStatic};
+use network::message::abomonate::{NonStatic};
 use pubsub::publisher::collection::{CollectionPublisher, Mutator};
 
 use super::util::Generator;

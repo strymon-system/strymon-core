@@ -3,7 +3,7 @@ use std::net::ToSocketAddrs;
 use std::any::Any;
 use std::iter::repeat;
 
-use futures::{self, Future};
+use futures::Future;
 use futures::stream::Stream;
 use abomonation::Abomonation;
 
