@@ -22,8 +22,3 @@ path = "../trace-analyzer/timely-contrib"
 
 [dependencies.timely-query]
 path = "../.."
-
-[profile.release]
-# for debugging symbols in perf
-#debug = true
-#lto = false

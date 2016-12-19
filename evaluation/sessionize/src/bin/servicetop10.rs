@@ -47,7 +47,7 @@ fn main() {
         });
 
         let name = format!("sessionize.{}", worker_index);
-        let mut messages = coord.subscribe::<_, Msg>(name, cap).unwrap().into_iter();
+        let mut messages = coord.subscribe::<_, Msg>(&name, cap).unwrap().into_iter();
         loop {
             let input_start = time::precise_time_ns();
             let (time, mut data) = if let Some((time, data)) = messages.next() {
