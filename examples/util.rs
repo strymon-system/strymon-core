@@ -19,7 +19,7 @@ fn main() {
                 input
             });
 
-            let subscriber = coord.subscribe_item::<(Topic, i32), _>("$topics")
+            let subscriber = coord.subscribe_collection::<(Topic, i32)>("$topics")
                 .unwrap()
                 .into_iter()
                 .flat_map(|vec| vec);

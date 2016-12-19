@@ -29,7 +29,7 @@ fn main() {
             });
 
             let mut _default = cap.clone();
-            for round in 0..1000000i32 {
+            for round in 0..10i32 {
                 input.session(cap.clone()).give(round);
                 if round == 5 {
                     _default = cap.delayed(&RootTimestamp::new(10));

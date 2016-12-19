@@ -3,13 +3,12 @@ extern crate timely_query;
 
 use timely::dataflow::operators::*;
 use timely::dataflow::Scope;
-use timely::progress::timestamp::RootTimestamp;
 use timely::dataflow::channels::pact::Pipeline;
 use timely::dataflow::channels::message::Content;
 
 fn main() {
     timely_query::execute(|root, coord| {
-            let (mut input, mut cap) = root.scoped::<i32, _, _>(|scope| {
+            let (mut input, cap) = root.scoped::<i32, _, _>(|scope| {
                 let (input, stream) = scope.new_unordered_input();
                 stream.unary_notify(Pipeline,
                                     "example",
