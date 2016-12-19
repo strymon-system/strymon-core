@@ -14,6 +14,27 @@ use timely_system::model::*;
 use timely_system::network::Network;
 use timely_system::submit::Submitter;
 
+static USAGE_ADDITIONAL: &'static str = "
+The option `--program` is always required when spawning a new query program.
+
+By default, the submitted binary exposed on a randomly selected TCP port. For
+this reason, the external hostname of the local machine must be known. Either
+using the `--external` option, or by setting the TIMELY_SYSTEM_HOSTNAME
+environment variable. This functionality can be disabled by using the `--local`
+option.
+
+The options `--random`, `--fixed`, and `--hosts` are mutually exclusive and
+specify the placement policy. By default, queries will be placed on a single
+randomly selected executor. This is equivalent to `--random 1`. To use a
+specific set of executors, use either `--fixed 0,1,2` to select executors based
+on their executor id, or use `--hosts host1,host2,host3` to specify them by
+hostname.
+
+The number of worker threads per executors (default 1) can set using the
+`--workers` option. The optional query name is given through the `--desc`
+option.
+";
+
 fn usage(opts: Options, err: Option<String>) -> ! {
     let program = env::args().next().unwrap_or(String::from("executor"));
     let brief = format!("Usage: {} [options] -p FILE [<args>...]", program);
@@ -23,6 +44,7 @@ fn usage(opts: Options, err: Option<String>) -> ! {
         process::exit(1);
     } else {
         println!("{}", opts.usage(&brief));
+        print!("{}", USAGE_ADDITIONAL);
         process::exit(0);
     }
 }
