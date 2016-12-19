@@ -36,4 +36,4 @@ rev = "aa2d0971"
 git = "https://github.com/frankmcsherry/abomonation"
 
 [workspace]
-members = ["lib", "evaluation/sessionize", "evaluation/sensor"]
+members = ["lib", "examples", "evaluation/sessionize", "evaluation/sensor"]

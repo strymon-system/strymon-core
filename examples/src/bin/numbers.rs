@@ -18,7 +18,7 @@ fn main() {
                 // filtering performed by each worker
                 let primes = numbers.filter(|x| x % 2 == 1);
 
-                // results in a single topic containing all "primes",
+                // results in a single topic containing all "odds",
                 // published by worker number 0
                 coord.publish("odds", &primes, Partition::Merge)
                     .expect("failed to publish topic");
