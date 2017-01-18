@@ -4,8 +4,10 @@ use std::sync::{mpsc, Arc};
 use std::thread::{self, JoinHandle};
 use std::env;
 
-use futures::{Future, Poll};
-use futures::stream::{self, Stream};
+use futures::{Future, Poll, Async};
+use futures::stream::Stream;
+use futures::sink::Sink;
+use futures::sync::mpsc::{Receiver as BoundedReceiver, channel as bounded};
 
 use network::message::buf::{MessageBuf, read, write};
 
@@ -100,12 +102,12 @@ impl Drop for Sender {
 }
 
 pub struct Receiver {
-    rx: stream::Receiver<MessageBuf, Error>,
+    rx: BoundedReceiver<Result<MessageBuf>>,
 }
 
 impl Receiver {
     fn new(mut instream: TcpStream) -> Self {
-        let (receiver_tx, receiver_rx) = stream::channel();
+        let (receiver_tx, receiver_rx) = bounded(0);
         thread::spawn(move || {
             let mut tx = receiver_tx;
             let mut stop = false;
@@ -132,21 +134,30 @@ impl Receiver {
     }
 }
 
+fn poll_bounded<T, E>(rx: &mut BoundedReceiver<::std::result::Result<T, E>>) -> Poll<Option<T>, E> {
+    match rx.poll().unwrap() {
+        Async::Ready(Some(Ok(e))) => Ok(Async::Ready(Some(e))),
+        Async::Ready(Some(Err(e))) => Err(e),
+        Async::Ready(None) => Ok(Async::Ready(None)),
+        Async::NotReady => Ok(Async::NotReady),
+    }
+}
+
 impl Stream for Receiver {
     type Item = MessageBuf;
     type Error = Error;
 
     fn poll(&mut self) -> Poll<Option<MessageBuf>, Error> {
-        self.rx.poll()
+        poll_bounded(&mut self.rx)
     }
 }
 
-fn accept<T, F>(listener: TcpListener, mut f: F) -> stream::Receiver<T, Error>
+fn accept<T, F>(listener: TcpListener, mut f: F) -> BoundedReceiver<Result<T>>
     where F: FnMut(TcpStream) -> Result<T>,
           F: Send + 'static,
           T: Send + 'static
 {
-    let (tx, rx) = stream::channel();
+    let (tx, rx) = bounded(0);
     thread::spawn(move || {
         let mut tx = tx;
         let mut is_ok = true;
@@ -168,7 +179,7 @@ fn accept<T, F>(listener: TcpListener, mut f: F) -> stream::Receiver<T, Error>
 pub struct Listener {
     external: Arc<String>,
     port: u16,
-    rx: stream::Receiver<(Sender, Receiver), Error>,
+    rx: BoundedReceiver<Result<(Sender, Receiver)>>,
 }
 
 impl Listener {
@@ -196,7 +207,7 @@ impl Stream for Listener {
     type Error = Error;
 
     fn poll(&mut self) -> Poll<Option<(Sender, Receiver)>, Error> {
-        self.rx.poll()
+        poll_bounded(&mut self.rx)
     }
 }
 

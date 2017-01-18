@@ -90,6 +90,9 @@ impl<D: Abomonation + Any + Clone + Eq + NonStatic> Future for CollectionPublish
     type Item = ();
     type Error = Error;
 
+    // TODO(swicki): This warning can be removed once nightly and stable agree on
+    // the habitility of the `Void` type (see Rust Issue #38889)
+    #[allow(unreachable_patterns)]
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         // step 1: check for collection updates
         let updates = match self.source.poll() {

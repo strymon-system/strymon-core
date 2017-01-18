@@ -3,7 +3,6 @@ use std::io::{Error, ErrorKind};
 use futures::Future;
 
 use async;
-use async::do_while::Stop;
 use network::reqrep::{Outgoing, RequestBuf};
 
 use super::handler::CoordinatorRef;
@@ -23,7 +22,7 @@ impl Dispatch {
         }
     }
 
-    pub fn dispatch(&mut self, req: RequestBuf) -> Result<(), Stop<Error>> {
+    pub fn dispatch(&mut self, req: RequestBuf) -> Result<(), Error> {
         debug!("dispatching request {}", req.name());
         match req.name() {
             "Submission" => {
@@ -72,7 +71,7 @@ impl Dispatch {
             }
             _ => {
                 let err = Error::new(ErrorKind::InvalidData, "invalid request");
-                return Err(Stop::Fail(err));
+                return Err(err);
             }
         }
 

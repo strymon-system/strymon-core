@@ -129,14 +129,14 @@ pub fn finish<F: Future + 'static>(f: F) -> Result<F::Item, F::Error> {
 
 #[cfg(test)]
 mod tests {
-    use futures::{self, Future};
-    use futures::stream::{self, Stream};
+    use futures::{self, Future, Stream, Sink};
+    use futures::sync::mpsc;
     use super::*;
 
     #[test]
     fn finish_spawn() {
         finish(futures::lazy(|| {
-                let (tx, rx) = stream::channel::<i32, ()>();
+                let (tx, rx) = mpsc::channel::<i32>(0);
 
                 // receive in parallel
                 spawn(rx.collect().and_then(|res| {
@@ -144,9 +144,9 @@ mod tests {
                     Ok(())
                 }));
 
-                tx.send(Ok(1))
-                    .and_then(|tx| tx.send(Ok(2)))
-                    .and_then(|tx| tx.send(Ok(3)))
+                tx.send(1)
+                    .and_then(|tx| tx.send(2))
+                    .and_then(|tx| tx.send(3))
                     .map(|_| ())
                     .map_err(|err| panic!("sender failed: {:?}", err))
             }))

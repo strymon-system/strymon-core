@@ -1,11 +1,11 @@
 use std::io::Result;
 use std::env;
 
-use futures::{self, Future};
+use futures;
+use futures::future::Future;
 use futures::stream::Stream;
 
 use async;
-use async::do_while::DoWhileExt;
 use network::Network;
 
 use self::handler::Coordinator;
@@ -53,7 +53,7 @@ impl Builder {
             server.for_each(move |(tx, rx)| {
                 // every connection gets its own handle
                 let mut disp = Dispatch::new(coord.clone(), tx);
-                let client = rx.do_while(move |req| disp.dispatch(req))
+                let client = rx.for_each(move |req| disp.dispatch(req))
                     .map_err(|err| {
                         error!("failed to dispatch client: {:?}", err);
                     });

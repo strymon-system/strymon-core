@@ -2,10 +2,11 @@ use std::io::{Error, ErrorKind};
 use std::env;
 use std::path::PathBuf;
 
-use futures::{self, Future};
+use futures;
+use futures::future::Future;
+use futures::stream::Stream;
 
 use async;
-use async::do_while::{DoWhileExt, Stop};
 
 use network::Network;
 use network::reqrep::RequestBuf;
@@ -75,7 +76,7 @@ impl ExecutorService {
         Ok(())
     }
 
-    pub fn dispatch(&mut self, req: RequestBuf) -> Result<(), Stop<Error>> {
+    pub fn dispatch(&mut self, req: RequestBuf) -> Result<(), Error> {
         match req.name() {
             "SpawnQuery" => {
                 let (SpawnQuery { query, hostlist }, resp) = req.decode::<SpawnQuery>()?;
@@ -85,7 +86,7 @@ impl ExecutorService {
             }
             _ => {
                 let err = Error::new(ErrorKind::InvalidData, "invalid request");
-                return Err(Stop::Fail(err));
+                return Err(err);
             }
         }
     }
@@ -138,7 +139,7 @@ impl Builder {
             // once we get results, start the actual executor service
             id.and_then(move |id| {
                 let mut executor = ExecutorService::new(id, coord, network);
-                rx.do_while(move |req| executor.dispatch(req))
+                rx.for_each(move |req| executor.dispatch(req))
             })
         }))
     }

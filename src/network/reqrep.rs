@@ -12,8 +12,10 @@ use abomonation::Abomonation;
 
 use byteorder::{NetworkEndian, ByteOrder};
 
-use futures::{self, Future, Async, Complete, Poll};
-use futures::stream::{self, Stream};
+use futures::{self, Async, Complete, Poll};
+use futures::future::Future;
+use futures::stream::Stream;
+use futures::sync::mpsc::Receiver as BoundedReceiver;
 
 use async::queue;
 use network::message::{Encode, Decode};
@@ -312,7 +314,7 @@ impl Resolver {
 pub struct Server {
     external: Arc<String>,
     port: u16,
-    rx: stream::Receiver<(Outgoing, Incoming), IoError>,
+    rx: BoundedReceiver<IoResult<(Outgoing, Incoming)>>,
 }
 
 impl Server {
@@ -341,7 +343,7 @@ impl Stream for Server {
     type Error = IoError;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        self.rx.poll()
+        super::poll_bounded(&mut self.rx)
     }
 }
 
@@ -396,8 +398,8 @@ fn _assert() {
 mod tests {
     use abomonation::Abomonation;
     use async;
-    use async::do_while::*;
     use futures::{self, Future};
+    use futures::stream::Stream;
     use network::reqrep::Request;
     use network::Network;
 
@@ -428,19 +430,19 @@ mod tests {
             let server = network.server(None)?;
 
             let (tx, _) = network.client(server.external_addr())?;
-            let server = server.do_while(|(_, rx)| {
-                    let handler = rx.do_while(move |req| {
+            let server = server.take(1).for_each(|(_, rx)| {
+                    let handler = rx.take(1).for_each(move |req| {
                             assert_eq!(req.name(), "Ping");
                             let (req, resp) = req.decode::<Ping>().unwrap();
                             resp.respond(Ok(Pong(req.0 + 1)));
 
-                            Err(Stop::Terminate)
+                            Ok(())
                         })
                         .map_err(|e| Err(e).unwrap());
 
                     async::spawn(handler);
 
-                    Err(Stop::Terminate)
+                    Ok(())
                 })
                 .map_err(|e| Err(e).unwrap());
 
