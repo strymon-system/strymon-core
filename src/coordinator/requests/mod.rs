@@ -179,3 +179,42 @@ impl Request for Lookup {
         "Lookup"
     }
 }
+
+#[derive(Clone, Debug)]
+pub struct RegisterKeeper {
+    pub name: String,
+    pub addr: (String, u16),
+}
+
+#[derive(Clone, Debug)]
+pub enum RegisterKeeperError {
+    KeeperAlreadyExists,
+}
+
+impl Request for RegisterKeeper {
+    type Success = ();
+    type Error = RegisterKeeperError;
+
+    fn name() -> &'static str {
+        "RegisterKeeper"
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct LookupKeeper {
+    pub name: String,
+}
+
+#[derive(Clone, Debug)]
+pub enum LookupKeeperError {
+    KeeperNotFound,
+}
+
+impl Request for LookupKeeper {
+    type Success = Keeper;
+    type Error = LookupKeeperError;
+
+    fn name() -> &'static str {
+        "LookupKeeper"
+    }
+}

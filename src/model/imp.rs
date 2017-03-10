@@ -72,6 +72,9 @@ unsafe_abomonate!(ExecutorId);
 unsafe_abomonate!(Executor: id, host, format);
 unsafe_abomonate!(ExecutionFormat);
 
+unsafe_abomonate!(KeeperId);
+unsafe_abomonate!(Keeper: id, name, addr);
+
 impl From<u64> for TopicId {
     fn from(id: u64) -> TopicId {
         TopicId(id)
@@ -87,6 +90,12 @@ impl From<u64> for QueryId {
 impl From<u64> for ExecutorId {
     fn from(id: u64) -> ExecutorId {
         ExecutorId(id)
+    }
+}
+
+impl From<u64> for KeeperId {
+    fn from(id: u64) -> KeeperId {
+        KeeperId(id)
     }
 }
 

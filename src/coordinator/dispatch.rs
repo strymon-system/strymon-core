@@ -69,6 +69,14 @@ impl Dispatch {
                 let (Lookup { name }, resp) = req.decode::<Lookup>()?;
                 resp.respond(self.coord.lookup(&name));
             }
+            "RegisterKeeper" => {
+                let (RegisterKeeper { name, addr }, resp) = req.decode::<RegisterKeeper>()?;
+                resp.respond(self.coord.register_keeper(name, addr));
+            }
+            "LookupKeeper" => {
+                let (LookupKeeper { name }, resp) = req.decode::<LookupKeeper>()?;
+                resp.respond(self.coord.lookup_keeper(&name));
+            }
             _ => {
                 let err = Error::new(ErrorKind::InvalidData, "invalid request");
                 return Err(err);

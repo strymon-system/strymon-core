@@ -65,3 +65,13 @@ pub struct Publication(pub QueryId, pub TopicId);
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Subscription(pub QueryId, pub TopicId);
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct KeeperId(pub u64);
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Keeper {
+    pub id: KeeperId,
+    pub name: String,
+    pub addr: (String, u16),
+}

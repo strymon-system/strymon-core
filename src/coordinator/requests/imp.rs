@@ -25,6 +25,12 @@ unsafe_abomonate!(UnpublishError);
 
 unsafe_abomonate!(Lookup: name);
 
+unsafe_abomonate!(RegisterKeeper: name, addr);
+unsafe_abomonate!(RegisterKeeperError);
+
+unsafe_abomonate!(LookupKeeper: name);
+unsafe_abomonate!(LookupKeeperError);
+
 impl Abomonation for Placement {
     #[inline]
     unsafe fn embalm(&mut self) {

@@ -28,6 +28,10 @@ pub struct Catalog {
 
     publications: Collection<Publication>,
     subscriptions: Collection<Subscription>,
+
+    keeper_id_generator: Generator<KeeperId>,
+    keepers: MapCollection<KeeperId, Keeper>,
+    keepers_directory: HashMap<String, KeeperId>,
 }
 
 impl Catalog {
@@ -61,6 +65,14 @@ impl Catalog {
         directory.insert(topic.name.clone(), topic.id);
         topics.insert(topic.id, topic);
 
+        let id = generator.generate();
+        let (topic, keepers) = MapCollection::new(network, id, "$keepers")?;
+        directory.insert(topic.name.clone(), topic.id);
+        topics.insert(topic.id, topic);
+
+        let keeper_id_generator = Generator::<KeeperId>::new();
+        let keepers_directory = HashMap::<String, KeeperId>::new();
+
         Ok(Catalog {
             generator: generator,
             directory: directory,
@@ -69,6 +81,9 @@ impl Catalog {
             queries: queries,
             publications: pubs,
             subscriptions: subs,
+            keeper_id_generator: keeper_id_generator,
+            keepers: keepers,
+            keepers_directory: keepers_directory,
         })
     }
 
@@ -164,6 +179,46 @@ impl Catalog {
         debug!("unsubscribe: {:?}", subscription);
         self.subscriptions.remove(subscription);
         Ok(())
+    }
+
+    pub fn register_keeper(&mut self,
+                           name: String,
+                           addr: (String, u16))
+                           -> Result<(), RegisterKeeperError> {
+        match self.keepers_directory.entry(name.clone()) {
+            HashEntry::Occupied(_) =>
+                Err(RegisterKeeperError::KeeperAlreadyExists),
+            HashEntry::Vacant(entry) => {
+                let id = self.keeper_id_generator.generate();
+                let keeper = Keeper {
+                    id: id,
+                    name: name,
+                    addr: addr,
+                };
+
+                debug!("registering keeper: {:?}", keeper);
+
+                self.keepers.insert(id, keeper.clone());
+                entry.insert(keeper.id);
+
+                Ok(())
+            }
+        }
+    }
+
+  //  pub fn remove_keeper(&mut self, id: KeeperId) {
+  //      debug!("remove_keeper: {:?}", id);
+  //      let name = self.keepers.get(&id).name.clone();
+  //      self.keepers.remove(&id);
+  //      self.keepers_directory.remove(&name);
+  //  }
+
+    pub fn lookup_keeper(&self, name: &str) -> Option<Keeper> {
+        if let Some(id) = self.keepers_directory.get(name) {
+            self.keepers.get(&id).cloned()
+        } else {
+            None
+        }
     }
 }
 

@@ -16,6 +16,7 @@ use coordinator::requests::{AddWorkerGroup, QueryToken};
 
 pub mod subscribe;
 pub mod publish;
+pub mod keepers;
 
 #[derive(Clone)]
 pub struct Coordinator {

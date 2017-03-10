@@ -408,6 +408,20 @@ impl Coordinator {
             None => Err(()),
         }
     }
+
+    fn register_keeper(&mut self,
+                       name: String,
+                       addr: (String, u16))
+                       -> Result<(), RegisterKeeperError> {
+        self.catalog.register_keeper(name, addr)
+    }
+
+    fn lookup_keeper(&self, name: &str) -> Result<Keeper, LookupKeeperError> {
+        match self.catalog.lookup_keeper(name) {
+            Some(keeper) => Ok(keeper),
+            None => Err(LookupKeeperError::KeeperNotFound),
+        }
+    }
 }
 
 struct State {
@@ -567,6 +581,17 @@ impl CoordinatorRef {
 
     pub fn lookup(&self, name: &str) -> Result<Topic, ()> {
         self.coord.borrow().lookup(name)
+    }
+
+    pub fn register_keeper(&mut self,
+                           name: String,
+                           addr: (String, u16))
+                           -> Result<(), RegisterKeeperError> {
+        self.coord.borrow_mut().register_keeper(name, addr)
+    }
+
+    pub fn lookup_keeper(&self, name: &str) -> Result<Keeper, LookupKeeperError> {
+        self.coord.borrow().lookup_keeper(name)
     }
 }
 
