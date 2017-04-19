@@ -37,7 +37,7 @@ fn fix_permissions<P: AsRef<Path>>(path: P) -> Result<()> {
 }
 
 #[cfg(windows)]
-fn fix_permissions<P: AsRef<Path>>(_: P) {}
+fn fix_permissions<P: AsRef<Path>>(_: P) -> Result<()> { Ok(()) }
 
 impl Network {
     pub fn upload<P: AsRef<Path>>(&self, path: P) -> Result<Handle> {
