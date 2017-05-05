@@ -1,6 +1,6 @@
 use std::io::Error as IoError;
 
-use timely::Data;
+use timely::ExchangeData;
 use timely::progress::Timestamp;
 use timely::dataflow::channels::Content;
 use timely::dataflow::scopes::Scope;
@@ -73,7 +73,7 @@ pub enum Partition {
 
 const PUBLISH_WORKER_ID: u64 = 0;
 
-impl<T: Timestamp, D: Data> ParallelizationContract<T, D> for Partition {
+impl<T: Timestamp, D: ExchangeData> ParallelizationContract<T, D> for Partition {
     fn connect<A: Allocate>
         (self,
          allocator: &mut A,
@@ -140,7 +140,7 @@ impl Coordinator {
                          stream: &Stream<S, D>,
                          partition: Partition)
                          -> Result<Stream<S, D>, PublicationError>
-        where D: Data + Serialize,
+        where D: ExchangeData + Serialize,
               S: Scope,
               S::Timestamp: PubSubTimestamp
     {
@@ -195,7 +195,7 @@ impl Coordinator {
                                     stream: &Stream<S, (D, i32)>,
                                     partition: Partition)
                                     -> Result<Stream<S, (D, i32)>, PublicationError>
-        where D: Data + Eq + Serialize,
+        where D: ExchangeData + Eq + Serialize,
               S: Scope
     {
         let worker_id = stream.scope().index() as u64;

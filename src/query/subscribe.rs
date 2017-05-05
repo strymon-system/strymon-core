@@ -89,13 +89,13 @@ impl<T: PubSubTimestamp, D: Data + DeserializeOwned> Stream for TimelySubscripti
         let mut new_frontier = vec![];
         for cap in self.frontier.iter() {
             // get capability for resulting tuple
-            if time_cap.is_none() && time >= cap.time() {
+            if time_cap.is_none() && cap.time().less_equal(&time) {
                 time_cap = Some(cap.delayed(&time));
             }
 
             // upgrade capability for new frontier
             for t in frontier.iter() {
-                if *t >= cap.time() {
+                if cap.time().less_equal(t) {
                     new_frontier.push(cap.delayed(t));
                 }
             }
