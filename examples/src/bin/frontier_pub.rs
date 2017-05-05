@@ -2,7 +2,6 @@ extern crate timely;
 extern crate timely_query;
 
 use timely::dataflow::operators::*;
-use timely::dataflow::Scope;
 use timely::progress::timestamp::RootTimestamp;
 use timely::dataflow::channels::pact::Pipeline;
 
@@ -10,7 +9,7 @@ use timely_query::publish::Partition as Part;
 
 fn main() {
     timely_query::execute(|root, coord| {
-            let (mut input, mut cap) = root.scoped(|scope| {
+            let (mut input, mut cap) = root.dataflow(|scope| {
                 let (input, stream) = scope.new_unordered_input();
 
                 coord.publish("frontier", &stream, Part::Merge).unwrap();

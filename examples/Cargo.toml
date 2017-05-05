@@ -4,7 +4,7 @@ name = "timely-query-examples"
 version = "0.1.0"
 
 [dependencies]
-timely = "0.1.15"
+timely = "0.2.0"
 
 [dependencies.timely-query]
 path = "../lib"

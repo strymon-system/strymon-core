@@ -1,14 +1,13 @@
 extern crate timely;
 extern crate timely_query;
 
-use timely::dataflow::Scope;
 use timely::dataflow::operators::*;
 
 use timely_query::model::Topic;
 
 fn main() {
     timely_query::execute(|root, coord| {
-            let mut input = root.scoped::<i32, _, _>(|scope| {
+            let mut input = root.dataflow::<i32, _, _>(|scope| {
                 let (input, stream) = scope.new_input();
                 stream.inspect(|x| println!("topic event: {:?}", x));
 
