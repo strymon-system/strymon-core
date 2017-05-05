@@ -1,4 +1,5 @@
 use std::io::Error as IoError;
+use std::net::ToSocketAddrs;
 
 use futures::Future;
 
@@ -9,6 +10,7 @@ use query::Coordinator;
 #[derive(Debug)]
 pub enum KeeperRegistrationError {
     KeeperAlreadyExists,
+    SocketAddrsNotValid,
     IoError(IoError),
 }
 
@@ -73,10 +75,16 @@ impl<T, E> From<Result<T, E>> for KeeperLookupError
 }
 
 impl Coordinator {
-    pub fn register_keeper(&self,
+    /// If addr.to_socket_addrs() returns more than one address, then the first one is used.
+    pub fn register_keeper<A: ToSocketAddrs>(&self,
                            name: &str,
-                           addr: (&str, u16))
+                           addr: A)
                            -> Result<(), KeeperRegistrationError> {
+        let addr = match addr.to_socket_addrs()?.next() {
+            Some(addr) => addr,
+            None => return Err(KeeperRegistrationError::SocketAddrsNotValid),
+        };
+        let addr = (addr.ip().to_string(), addr.port());
         self.tx
             .request(&RegisterKeeper {
                           name: name.to_string(),
