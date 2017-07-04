@@ -1,10 +1,7 @@
 #![feature(core_intrinsics)]
-#![feature(optin_builtin_traits)]
 
 #[macro_use]
 extern crate log;
-#[macro_use]
-extern crate abomonation;
 #[macro_use]
 extern crate futures;
 
@@ -12,8 +9,12 @@ extern crate timely;
 extern crate timely_communication;
 
 extern crate rand;
-extern crate byteorder;
 extern crate void;
+
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
+extern crate strymon_communication;
 
 pub mod model;
 pub mod coordinator;

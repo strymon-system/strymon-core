@@ -4,16 +4,17 @@ use std::collections::hash_map::{HashMap, Entry as HashEntry};
 use std::collections::btree_map::{BTreeMap, Values};
 use std::hash::Hash;
 
-use abomonation::Abomonation;
 use futures::Future;
+
+use strymon_communication::Network;
+use serde::ser::Serialize;
+use serde::de::DeserializeOwned;
 
 use model::*;
 use coordinator::requests::*;
 
 use async;
 
-use network::Network;
-use network::message::abomonate::NonStatic;
 use pubsub::publisher::collection::{CollectionPublisher, Mutator};
 
 use super::util::Generator;
@@ -172,7 +173,7 @@ struct MapCollection<K, V> {
     mutator: Mutator<V>,
 }
 
-impl<K: Ord, V: Abomonation + Any + Clone + Eq + NonStatic> MapCollection<K, V> {
+impl<K: Ord, V: Serialize + DeserializeOwned + Eq + Clone + 'static> MapCollection<K, V> {
     fn new(network: &Network,
            topic_id: TopicId,
            name: &'static str)
@@ -221,7 +222,7 @@ struct Collection<T> {
     mutator: Mutator<T>,
 }
 
-impl<T: Abomonation + Any + Clone + Eq + Hash + NonStatic> Collection<T> {
+impl<T: Serialize + DeserializeOwned + Clone + Eq + Hash + 'static> Collection<T> {
     fn new(network: &Network,
            topic_id: TopicId,
            name: &'static str)

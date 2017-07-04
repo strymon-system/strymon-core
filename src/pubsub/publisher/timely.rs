@@ -3,11 +3,11 @@ use std::any::Any;
 use std::marker::PhantomData;
 use std::collections::BTreeMap;
 
-use abomonation::Abomonation;
+use serde::ser::Serialize;
 
-use network::{Network, Sender};
-use network::message::abomonate::{Abomonate, NonStatic};
-use network::message::MessageBuf;
+use strymon_communication::Network;
+use strymon_communication::transport::Sender;
+use strymon_communication::message::MessageBuf;
 
 use super::{PollServer, PublisherServer, SubscriberId, SubscriberEvent};
 
@@ -18,8 +18,8 @@ pub struct TimelyPublisher<T, D> {
 }
 
 impl<T, D> TimelyPublisher<T, D>
-    where T: Abomonation + Any + Clone + NonStatic,
-          D: Abomonation + Any + Clone + NonStatic
+    where T: Serialize,
+          D: Serialize
 {
     pub fn new(network: &Network) -> Result<((String, u16), Self)> {
         let server = PublisherServer::new(network)?;
@@ -36,7 +36,7 @@ impl<T, D> TimelyPublisher<T, D>
             }))
     }
 
-    pub fn publish(&mut self, frontier: &[T], time: &T, item: &Vec<D>) -> Result<()> {
+    pub fn publish(&mut self, frontier: &[T], time: &T, item: &[D]) -> Result<()> {
         for event in self.server.poll_events()? {
             match event {
                 SubscriberEvent::Accepted(id, tx) => {
@@ -51,9 +51,9 @@ impl<T, D> TimelyPublisher<T, D>
 
         if !self.subscribers.is_empty() {
             let mut buf = MessageBuf::empty();
-            buf.push::<Abomonate, Vec<D>>(item).unwrap();
-            buf.push::<Abomonate, T>(time).unwrap();
-            buf.push::<Abomonate, Vec<T>>(&frontier.to_owned()).unwrap();
+            buf.push::<&[D]>(item).unwrap();
+            buf.push::<&T>(time).unwrap();
+            buf.push::<&[T]>(frontier).unwrap();
 
             for sub in self.subscribers.values() {
                 sub.send(buf.clone())

@@ -7,20 +7,21 @@ use timely::dataflow::operators::Capability;
 use futures::{Future, Poll, Async};
 use futures::stream::{Stream, Wait};
 
+use serde::de::DeserializeOwned;
+
 use coordinator::requests::*;
-use network::message::abomonate::NonStatic;
 
 use pubsub::subscriber::{Subscriber, TimelySubscriber};
 use model::{Topic, TopicId};
 use query::Coordinator;
 
-pub struct Subscription<D: Data + NonStatic> {
+pub struct Subscription<D: Data + DeserializeOwned> {
     sub: Subscriber<D>,
     topic: Topic,
     coord: Coordinator,
 }
 
-impl<D: Data + NonStatic> Stream for Subscription<D> {
+impl<D: Data + DeserializeOwned> Stream for Subscription<D> {
     type Item = Vec<D>;
     type Error = IoError;
 
@@ -29,7 +30,7 @@ impl<D: Data + NonStatic> Stream for Subscription<D> {
     }
 }
 
-impl<D: Data + NonStatic> IntoIterator for Subscription<D> {
+impl<D: Data + DeserializeOwned> IntoIterator for Subscription<D> {
     type Item = Vec<D>;
     type IntoIter = IntoIter<Self>;
 
@@ -38,7 +39,7 @@ impl<D: Data + NonStatic> IntoIterator for Subscription<D> {
     }
 }
 
-impl<D: Data + NonStatic> Drop for Subscription<D> {
+impl<D: Data + DeserializeOwned> Drop for Subscription<D> {
     fn drop(&mut self) {
         if let Err(err) = self.coord.unsubscribe(self.topic.id) {
             warn!("failed to unsubscribe: {:?}", err)
@@ -59,14 +60,14 @@ impl<S: Stream> Iterator for IntoIter<S> {
 }
 
 
-pub struct TimelySubscription<T: Timestamp + NonStatic, D: Data + NonStatic> {
+pub struct TimelySubscription<T: Timestamp + DeserializeOwned, D: Data + DeserializeOwned> {
     sub: TimelySubscriber<T, D>,
     topic: Topic,
     coord: Coordinator,
     frontier: Vec<Capability<T>>,
 }
 
-impl<T: Timestamp + NonStatic, D: Data + NonStatic> Stream for TimelySubscription<T, D> {
+impl<T: Timestamp + DeserializeOwned, D: Data + DeserializeOwned> Stream for TimelySubscription<T, D> {
     type Item = (Capability<T>, Vec<D>);
     type Error = IoError;
 
@@ -103,8 +104,8 @@ impl<T: Timestamp + NonStatic, D: Data + NonStatic> Stream for TimelySubscriptio
 }
 
 impl<T, D> IntoIterator for TimelySubscription<T, D>
-    where T: Timestamp + NonStatic,
-          D: Data + NonStatic
+    where T: Timestamp + DeserializeOwned,
+          D: Data + DeserializeOwned
 {
     type Item = (Capability<T>, Vec<D>);
     type IntoIter = IntoIter<Self>;
@@ -114,7 +115,7 @@ impl<T, D> IntoIterator for TimelySubscription<T, D>
     }
 }
 
-impl<T: Timestamp + NonStatic, D: Data + NonStatic> Drop for TimelySubscription<T, D> {
+impl<T: Timestamp + DeserializeOwned, D: Data + DeserializeOwned> Drop for TimelySubscription<T, D> {
     fn drop(&mut self) {
         if let Err(err) = self.coord.unsubscribe(self.topic.id) {
             warn!("failed to unsubscribe: {:?}", err)
@@ -186,8 +187,8 @@ impl Coordinator {
                     root: Capability<T>,
                     blocking: bool)
                     -> Result<TimelySubscription<T, D>, SubscriptionError>
-        where T: Timestamp + NonStatic,
-              D: Data + NonStatic
+        where T: Timestamp + DeserializeOwned,
+              D: Data + DeserializeOwned
     {
         let name = name.to_string();
         let coord = self.clone();
@@ -199,7 +200,7 @@ impl Coordinator {
             })
             .map_err(SubscriptionError::from)
             .and_then(move |topic| {
-                if !topic.schema.is_stream::<T, D>() {
+                if !topic.schema.is_stream() {
                     return Err(SubscriptionError::TypeIdMismatch);
                 }
 
@@ -218,8 +219,8 @@ impl Coordinator {
                            name: &str,
                            root: Capability<T>)
                            -> Result<TimelySubscription<T, D>, SubscriptionError>
-        where T: Timestamp + NonStatic,
-              D: Data + NonStatic
+        where T: Timestamp + DeserializeOwned,
+              D: Data + DeserializeOwned
     {
         self.timely(name.to_string(), root, true)
     }
@@ -229,8 +230,8 @@ impl Coordinator {
          name: &str,
          root: Capability<T>)
          -> Result<TimelySubscription<T, D>, SubscriptionError>
-        where T: Timestamp + NonStatic,
-              D: Data + NonStatic
+        where T: Timestamp + DeserializeOwned,
+              D: Data + DeserializeOwned
     {
         self.timely(name.to_string(), root, false)
     }
@@ -239,7 +240,7 @@ impl Coordinator {
                      name: String,
                      blocking: bool)
                      -> Result<Subscription<D>, SubscriptionError>
-        where D: Data + NonStatic
+        where D: Data + DeserializeOwned
     {
 
         let coord = self.clone();
@@ -251,7 +252,7 @@ impl Coordinator {
             })
             .map_err(SubscriptionError::from)
             .and_then(move |topic| {
-                if !topic.schema.is_collection::<D>() {
+                if !topic.schema.is_collection() {
                     return Err(SubscriptionError::TypeIdMismatch);
                 }
 
@@ -268,7 +269,7 @@ impl Coordinator {
     pub fn subscribe_collection<D>(&self,
                                    name: &str)
                                    -> Result<Subscription<D>, SubscriptionError>
-        where D: Data + NonStatic
+        where D: Data + DeserializeOwned
     {
         self.collection(name.to_string(), true)
     }
@@ -277,7 +278,7 @@ impl Coordinator {
         (&self,
          name: &str)
          -> Result<Subscription<D>, SubscriptionError>
-        where D: Data + NonStatic
+        where D: Data + DeserializeOwned
     {
         self.collection(name.to_string(), false)
     }

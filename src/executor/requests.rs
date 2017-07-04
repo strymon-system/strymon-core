@@ -1,15 +1,13 @@
-use abomonation::Abomonation;
-
 use model::*;
-use network::reqrep::Request;
+use strymon_communication::rpc::Request;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SpawnQuery {
     pub query: Query,
     pub hostlist: Vec<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SpawnError {
     InvalidRequest,
     FetchFailed,
@@ -24,6 +22,3 @@ impl Request for SpawnQuery {
         "SpawnQuery"
     }
 }
-
-unsafe_abomonate!(SpawnQuery: query, hostlist);
-unsafe_abomonate!(SpawnError);

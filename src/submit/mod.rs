@@ -5,11 +5,11 @@ use std::iter::repeat;
 
 use futures::Future;
 use futures::stream::Stream;
-use abomonation::Abomonation;
 
-use network::Network;
-use network::reqrep::{Outgoing, Response};
-use network::message::abomonate::NonStatic;
+use serde::de::DeserializeOwned;
+
+use strymon_communication::Network;
+use strymon_communication::rpc::{Outgoing, Response};
 
 use pubsub::subscriber::CollectionSubscriber;
 
@@ -57,7 +57,7 @@ impl Submitter {
     }
 
     fn get_collection<D>(&self, name: &str) -> Result<Vec<D>>
-        where D: Abomonation + Any + Clone + NonStatic
+        where D: DeserializeOwned + Clone
     {
         let topic = self.lookup(name)?;
         assert_eq!(topic.schema, TopicSchema::Collection(TopicType::of::<D>()));

@@ -1,22 +1,20 @@
 use model::*;
-use network::reqrep::Request;
+use strymon_communication::rpc::Request;
 
-mod imp;
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Placement {
     Random(usize, usize), // (num executors, num workers)
     Fixed(Vec<ExecutorId>, usize), // (executors, num workers)
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Submission {
     pub query: QueryProgram,
     pub name: Option<String>,
     pub placement: Placement,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum SubmissionError {
     ExecutorsNotFound,
     ExecutorUnreachable,
@@ -32,14 +30,14 @@ impl Request for Submission {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AddExecutor {
     pub host: String,
     pub ports: (u16, u16),
     pub format: ExecutionFormat,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ExecutorError;
 
 impl Request for AddExecutor {
@@ -51,19 +49,19 @@ impl Request for AddExecutor {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct QueryToken {
     pub id: QueryId,
     pub auth: u64,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AddWorkerGroup {
     pub query: QueryId,
     pub group: usize,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum WorkerGroupError {
     InvalidWorkerGroup,
     SpawningAborted,
@@ -79,14 +77,14 @@ impl Request for AddWorkerGroup {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Subscribe {
     pub name: String,
     pub blocking: bool,
     pub token: QueryToken,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum SubscribeError {
     TopicNotFound,
     AuthenticationFailure,
@@ -101,13 +99,13 @@ impl Request for Subscribe {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Unsubscribe {
     pub topic: TopicId,
     pub token: QueryToken,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum UnsubscribeError {
     InvalidTopicId,
     AuthenticationFailure,
@@ -122,7 +120,7 @@ impl Request for Unsubscribe {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Publish {
     pub name: String,
     pub addr: (String, u16),
@@ -130,7 +128,7 @@ pub struct Publish {
     pub token: QueryToken,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum PublishError {
     TopicAlreadyExists,
     AuthenticationFailure,
@@ -145,13 +143,13 @@ impl Request for Publish {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Unpublish {
     pub topic: TopicId,
     pub token: QueryToken,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum UnpublishError {
     InvalidTopicId,
     AuthenticationFailure,
@@ -166,7 +164,7 @@ impl Request for Unpublish {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Lookup {
     pub name: String,
 }

@@ -3,7 +3,8 @@ use std::any::Any;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use abomonation::Abomonation;
+use serde::ser::Serialize;
+
 use futures::{Future, Poll, Async};
 use futures::task::{self, Unpark, Spawn};
 use futures::stream::Stream;
@@ -11,9 +12,9 @@ use void::{self, Void};
 
 use async::queue;
 
-use network::{Network, Sender};
-use network::message::abomonate::{Abomonate, NonStatic};
-use network::message::MessageBuf;
+use strymon_communication::Network;
+use strymon_communication::transport::Sender;
+use strymon_communication::message::MessageBuf;
 
 use super::{Nop, PublisherServer, SubscriberId, SubscriberEvent};
 
@@ -24,7 +25,7 @@ pub struct CollectionPublisher<D> {
     collection: Vec<(D, i32)>,
 }
 
-impl<D: Abomonation + Any + Clone + Eq + NonStatic> CollectionPublisher<D> {
+impl<D: Serialize + Eq + 'static> CollectionPublisher<D> {
     pub fn new(network: &Network) -> Result<((String, u16), Mutator<D>, Self)> {
         let server = PublisherServer::new(network)?;
         let addr = {
@@ -86,7 +87,7 @@ impl SpawnedPublisher {
     }
 }
 
-impl<D: Abomonation + Any + Clone + Eq + NonStatic> Future for CollectionPublisher<D> {
+impl<D: Serialize + Eq + 'static> Future for CollectionPublisher<D> {
     type Item = ();
     type Error = Error;
 
@@ -128,7 +129,7 @@ impl<D: Abomonation + Any + Clone + Eq + NonStatic> Future for CollectionPublish
         if !self.subscribers.is_empty() && updates.is_some() {
             let updates = updates.as_ref().unwrap();
             let mut buf = MessageBuf::empty();
-            buf.push::<Abomonate, Vec<(D, i32)>>(updates).unwrap();
+            buf.push::<&Vec<(D, i32)>>(updates).unwrap();
             for sub in self.subscribers.values() {
                 sub.send(buf.clone())
             }
@@ -142,7 +143,7 @@ impl<D: Abomonation + Any + Clone + Eq + NonStatic> Future for CollectionPublish
         // step 6: inform incoming subscribers about current collection state
         if !accepted.is_empty() {
             let mut buf = MessageBuf::empty();
-            buf.push::<Abomonate, Vec<(D, i32)>>(&self.collection).unwrap();
+            buf.push::<&Vec<(D, i32)>>(&self.collection).unwrap();
             for &(_, ref sub) in accepted.iter() {
                 sub.send(buf.clone())
             }

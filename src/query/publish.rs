@@ -8,12 +8,13 @@ use timely::dataflow::stream::Stream;
 use timely::dataflow::operators::Unary;
 use timely::dataflow::channels::pact::{Exchange, ParallelizationContract, Pipeline};
 use timely_communication::{Allocate, Pull, Push};
+
+use serde::ser::Serialize;
 use futures::Future;
 
 use query::Coordinator;
 use coordinator::requests::*;
 use model::{Topic, TopicId, TopicType, TopicSchema};
-use network::message::abomonate::NonStatic;
 use pubsub::publisher::timely::TimelyPublisher;
 use pubsub::publisher::collection::CollectionPublisher;
 
@@ -139,9 +140,9 @@ impl Coordinator {
                          stream: &Stream<S, D>,
                          partition: Partition)
                          -> Result<Stream<S, D>, PublicationError>
-        where D: Data + NonStatic,
+        where D: Data + Serialize,
               S: Scope,
-              S::Timestamp: NonStatic
+              S::Timestamp: Serialize
     {
         let worker_id = stream.scope().index() as u64;
         let name = partition.name(name, worker_id);
@@ -190,7 +191,7 @@ impl Coordinator {
                                     stream: &Stream<S, (D, i32)>,
                                     partition: Partition)
                                     -> Result<Stream<S, (D, i32)>, PublicationError>
-        where D: Data + Eq + NonStatic,
+        where D: Data + Eq + Serialize,
               S: Scope
     {
         let worker_id = stream.scope().index() as u64;

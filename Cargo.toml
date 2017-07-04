@@ -20,7 +20,7 @@ name = "status"
 path = "src/bin/status.rs"
 
 [dependencies]
-abomonation = "0.4.4"
+abomonation = "0.4.5"
 byteorder = "0.5.3"
 env_logger = "0.3"
 futures = "0.1"
@@ -30,10 +30,11 @@ rand = "0.3.14"
 timely = "0.1.15"
 timely_communication = "0.1.5"
 void = "1.0.2"
+serde = "1.0"
+serde_derive = "1.0"
 
-[replace."abomonation:0.4.4"]
-rev = "aa2d0971"
-git = "https://github.com/frankmcsherry/abomonation"
+[dependencies.strymon_communication]
+path = "./strymon_communication/"
 
 [workspace]
-members = ["lib", "examples", "evaluation/sessionize", "evaluation/sensor"]
+members = ["lib", "examples", "strymon_communication"]

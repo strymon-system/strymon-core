@@ -7,8 +7,7 @@ use std::env;
 
 use rand;
 
-
-use network::Network;
+use Network;
 
 pub struct Handle {
     url: String,
@@ -63,7 +62,7 @@ impl Network {
         });
 
         Ok(Handle {
-            url: format!("tcp://{}:{}", self.external, port),
+            url: format!("tcp://{}:{}", self.hostname, port),
             listener: interrupt,
         })
     }

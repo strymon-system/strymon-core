@@ -3,11 +3,11 @@ use std::any::Any;
 use std::marker::PhantomData;
 use std::collections::BTreeMap;
 
-use abomonation::Abomonation;
+use serde::ser::Serialize;
 
-use network::{Network, Sender};
-use network::message::abomonate::{Abomonate, NonStatic};
-use network::message::MessageBuf;
+use strymon_communication::Network;
+use strymon_communication::transport::Sender;
+use strymon_communication::message::MessageBuf;
 
 use super::{PollServer, PublisherServer, SubscriberId, SubscriberEvent};
 
@@ -17,7 +17,7 @@ pub struct Publisher<D> {
     marker: PhantomData<D>,
 }
 
-impl<D: Abomonation + Any + Clone + NonStatic> Publisher<D> {
+impl<D: Serialize> Publisher<D> {
     pub fn new(network: &Network) -> Result<((String, u16), Self)> {
         let server = PublisherServer::new(network)?;
         let addr = {
@@ -48,7 +48,7 @@ impl<D: Abomonation + Any + Clone + NonStatic> Publisher<D> {
 
         if !self.subscribers.is_empty() {
             let mut buf = MessageBuf::empty();
-            buf.push::<Abomonate, Vec<D>>(item).unwrap();
+            buf.push::<&[D]>(item.as_slice()).unwrap();
             for sub in self.subscribers.values() {
                 sub.send(buf.clone())
             }
