@@ -1,4 +1,5 @@
 extern crate timely_system;
+extern crate strymon_communication;
 extern crate env_logger;
 extern crate getopts;
 
@@ -11,8 +12,9 @@ use getopts::{Options, Matches, ParsingStyle};
 
 use timely_system::coordinator::requests::*;
 use timely_system::model::*;
-use timely_system::network::Network;
 use timely_system::submit::Submitter;
+
+use strymon_communication::Network;
 
 static USAGE_ADDITIONAL: &'static str = "
 The option `--program` is always required when spawning a new query program.

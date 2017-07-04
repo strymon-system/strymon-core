@@ -8,8 +8,8 @@ use futures::stream::Stream;
 
 use async;
 
-use network::Network;
-use network::reqrep::RequestBuf;
+use strymon_communication::Network;
+use strymon_communication::rpc::RequestBuf;
 
 use model::*;
 

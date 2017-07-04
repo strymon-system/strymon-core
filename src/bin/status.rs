@@ -1,4 +1,5 @@
 extern crate timely_system;
+extern crate strymon_communication;
 extern crate env_logger;
 extern crate getopts;
 
@@ -8,7 +9,7 @@ use std::io::{self, Write, Result};
 use std::collections::BTreeMap;
 
 use getopts::Options;
-use timely_system::network::Network;
+use strymon_communication::Network;
 use timely_system::submit::Submitter;
 
 fn usage(opts: Options, err: Option<String>) -> ! {

@@ -6,7 +6,8 @@ use futures::{Poll, Async};
 use futures::stream::{Stream, Fuse};
 use futures::task::{self, Unpark, Spawn};
 
-use network::{Network, Listener, Receiver, Sender};
+use strymon_communication::Network;
+use strymon_communication::transport::{Listener, Receiver, Sender};
 
 pub mod item;
 pub mod timely;

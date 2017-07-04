@@ -9,7 +9,7 @@ use rand;
 
 use async;
 use async::promise::{promise, Promise, Complete};
-use network::reqrep::{Outgoing, Response};
+use strymon_communication::rpc::{Outgoing, Response};
 
 use model::*;
 use executor::requests::*;

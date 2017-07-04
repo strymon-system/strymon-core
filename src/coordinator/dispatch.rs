@@ -3,7 +3,7 @@ use std::io::{Error, ErrorKind};
 use futures::Future;
 
 use async;
-use network::reqrep::{Outgoing, RequestBuf};
+use strymon_communication::rpc::{Outgoing, RequestBuf};
 
 use super::handler::CoordinatorRef;
 use super::requests::*;

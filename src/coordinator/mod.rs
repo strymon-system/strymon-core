@@ -6,7 +6,7 @@ use futures::future::Future;
 use futures::stream::Stream;
 
 use async;
-use network::Network;
+use strymon_communication::Network;
 
 use self::handler::Coordinator;
 use self::dispatch::Dispatch;

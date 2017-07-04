@@ -7,8 +7,8 @@ use timely::dataflow::scopes::Root;
 
 use futures::Future;
 
-use network::Network;
-use network::reqrep::Outgoing;
+use strymon_communication::Network;
+use strymon_communication::rpc::Outgoing;
 
 use executor::executable::NativeExecutable;
 use model::QueryId;
