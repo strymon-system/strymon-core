@@ -1,5 +1,5 @@
 [package]
-authors = ["Sebastian Wicki <swicki@student.ethz.ch>"]
+authors = ["Sebastian Wicki <swicki@inf.ethz.ch>"]
 name = "timely-system"
 version = "0.1.0"
 

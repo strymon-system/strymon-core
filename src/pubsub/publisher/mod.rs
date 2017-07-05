@@ -18,7 +18,7 @@ pub struct SubscriberId(pub u32);
 
 struct PublisherServer {
     listener: Fuse<Listener>,
-    subscribers: Vec<(SubscriberId, Fuse<Receiver>)>,
+    subscribers: Vec<(SubscriberId, Receiver)>,
     events: Vec<SubscriberEvent>,
     next_id: u32,
     addr: (String, u16),
@@ -50,7 +50,7 @@ impl PublisherServer {
             let id = SubscriberId(self.next_id);
 
             self.events.push(SubscriberEvent::Accepted(id, tx));
-            self.subscribers.push((id, rx.fuse()));
+            self.subscribers.push((id, rx));
         }
 
         Ok(())

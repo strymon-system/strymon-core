@@ -90,17 +90,21 @@ impl<D: Serialize + Eq + 'static> Future for CollectionPublisher<D> {
     type Error = Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        // step 1: check for collection updates
-        let updates = match self.source.poll() {
-            // done
-            Ok(Async::Ready(None)) => return Ok(Async::Ready(())),
-            Ok(Async::Ready(updates)) => updates,
-            Ok(Async::NotReady) => None,
-            Err(()) => unreachable!(),
-        };
+        // step 1: drain incoming collection updates
+        let mut all_updates = Vec::new();
+        while let Async::Ready(updates) = self.source.poll().unwrap() {
+            // note that poll on an unbounded receiver cannot fail
+            if let Some(updates) = updates {
+                all_updates.extend(updates);
+            } else {
+                // updates has closed, we are done
+                return Ok(Async::Ready(()));
+            }
+        }
 
         // step 2: check for changes in the subscriber list
         let events = match self.server.poll()? {
+            // server went away, finish this task
             Async::Ready(None) => return Ok(Async::Ready(())),
             Async::Ready(Some(subs)) => subs,
             Async::NotReady => Vec::new(),
@@ -121,19 +125,16 @@ impl<D: Serialize + Eq + 'static> Future for CollectionPublisher<D> {
         }
 
         // step 4: send updates to those who understand them
-        if !self.subscribers.is_empty() && updates.is_some() {
-            let updates = updates.as_ref().unwrap();
+        if !self.subscribers.is_empty() && !all_updates.is_empty() {
             let mut buf = MessageBuf::empty();
-            buf.push::<&Vec<(D, i32)>>(updates).unwrap();
+            buf.push::<&Vec<(D, i32)>>(&all_updates).unwrap();
             for sub in self.subscribers.values() {
                 sub.send(buf.clone())
             }
         }
 
         // step 5: merge updates with local collection copy
-        if let Some(updates) = updates {
-            self.update_from(updates);
-        };
+        self.update_from(all_updates);
 
         // step 6: inform incoming subscribers about current collection state
         if !accepted.is_empty() {

@@ -7,8 +7,7 @@ Dataflow application.
 ## Requirements
 
 A recent nightly of the Rust compiler and Cargo are required to build this
-project. The source makes use of two unstable features (auto trait syntax
-and the type name intrinsic), and the build needs Cargo workspace support.
+project, as the source makes of the type name instrinsic.
 
 ## Getting started
 

@@ -7,7 +7,6 @@ use futures::Future;
 use tokio_core::reactor::Handle;
 use strymon_communication::Network;
 use serde::ser::Serialize;
-use serde::de::DeserializeOwned;
 
 use model::*;
 use coordinator::requests::*;
@@ -170,7 +169,7 @@ struct MapCollection<K, V> {
     mutator: Mutator<V>,
 }
 
-impl<K: Ord, V: Serialize + DeserializeOwned + Eq + Clone + 'static> MapCollection<K, V> {
+impl<K: Ord, V: Serialize + Eq + Clone + 'static> MapCollection<K, V> {
     fn new(network: &Network,
            handle: &Handle,
            topic_id: TopicId,
@@ -220,7 +219,7 @@ struct Collection<T> {
     mutator: Mutator<T>,
 }
 
-impl<T: Serialize + DeserializeOwned + Clone + Eq + Hash + 'static> Collection<T> {
+impl<T: Serialize + Clone + Eq + Hash + 'static> Collection<T> {
     fn new(network: &Network,
            handle: &Handle,
            topic_id: TopicId,

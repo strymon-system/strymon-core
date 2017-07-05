@@ -47,6 +47,10 @@ impl MessageBuf {
         }
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.buf.is_empty()
+    }
+
     /// Create a new message buffer containing the serialized object.
     pub fn new<S: Serialize>(item: S) -> io::Result<Self> {
         // we start with an empty buffer, because if the serialized element
