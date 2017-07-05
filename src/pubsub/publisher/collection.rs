@@ -1,12 +1,11 @@
 use std::io::{Result, Error};
-use std::any::Any;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use serde::ser::Serialize;
 
 use futures::{Future, Poll, Async};
-use futures::task::{self, Unpark, Spawn};
+use futures::executor::{self, Spawn};
 use futures::stream::Stream;
 use futures::sync::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 
@@ -68,20 +67,21 @@ impl<D: Serialize + Eq + 'static> CollectionPublisher<D> {
 
     pub fn spawn(self) -> SpawnedPublisher {
         SpawnedPublisher {
-            publisher: task::spawn(Box::new(self)),
-            unpark: Arc::new(Nop),
+            publisher: executor::spawn(Box::new(self)),
+            notify: Arc::new(Nop),
         }
     }
 }
 
 pub struct SpawnedPublisher {
     publisher: Spawn<Box<Future<Item = (), Error = Error>>>,
-    unpark: Arc<Unpark>,
+    notify: Arc<Nop>,
 }
 
 impl SpawnedPublisher {
     pub fn poll(&mut self) -> Result<()> {
-        self.publisher.poll_future(self.unpark.clone()).map(|_| ())
+        // just poll, ignore the ready state
+        self.publisher.poll_future_notify(&self.notify, 0).map(|_| ())
     }
 }
 

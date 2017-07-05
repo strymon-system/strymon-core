@@ -1,6 +1,5 @@
 use std::io::{Error, Result, ErrorKind};
 use std::net::ToSocketAddrs;
-use std::any::Any;
 use std::iter::repeat;
 
 use futures::Future;

@@ -1,7 +1,6 @@
-use std::io::Error as IoError;
+use std::io;
 
 use timely::Data;
-use timely::progress::Timestamp;
 use timely::dataflow::operators::Capability;
 
 use futures::{Future, Poll, Async};
@@ -23,7 +22,7 @@ pub struct Subscription<D: Data + DeserializeOwned> {
 
 impl<D: Data + DeserializeOwned> Stream for Subscription<D> {
     type Item = Vec<D>;
-    type Error = IoError;
+    type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         self.sub.poll()
@@ -69,7 +68,7 @@ pub struct TimelySubscription<T: PubSubTimestamp, D: Data + DeserializeOwned> {
 
 impl<T: PubSubTimestamp, D: Data + DeserializeOwned> Stream for TimelySubscription<T, D> {
     type Item = (Capability<T>, Vec<D>);
-    type Error = IoError;
+    type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         let next = try_ready!(self.sub.poll());
@@ -134,7 +133,7 @@ pub enum SubscriptionError {
     TopicNotFound,
     TypeIdMismatch,
     AuthenticationFailure,
-    IoError(IoError),
+    IoError(io::Error),
 }
 
 impl From<SubscribeError> for SubscriptionError {
@@ -159,8 +158,8 @@ impl From<UnsubscribeError> for SubscriptionError {
     }
 }
 
-impl From<IoError> for SubscriptionError {
-    fn from(err: IoError) -> Self {
+impl From<io::Error> for SubscriptionError {
+    fn from(err: io::Error) -> Self {
         SubscriptionError::IoError(err)
     }
 }

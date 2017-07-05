@@ -5,7 +5,7 @@ use std::cell::RefCell;
 use std::mem;
 
 use futures::{self, Future};
-use futures::unsync::oneshot::{channel, Sender, Receiver};
+use futures::unsync::oneshot::{channel, Sender};
 use tokio_core::reactor::Handle;
 
 use rand;
@@ -223,9 +223,9 @@ impl Coordinator {
         debug!("canceling pending submission for {:?}", id);
         if let Some(query) = self.queries.remove(&id) {
             if let QueryState::Spawning { submitter, waiting, .. } = query.state {
-                submitter.send(Err(err));
+                let _ = submitter.send(Err(err));
                 for worker in waiting {
-                    worker.send(Err(WorkerGroupError::PeerFailed));
+                    let _ = worker.send(Err(WorkerGroupError::PeerFailed));
                 }
             }
 
@@ -284,10 +284,10 @@ impl Coordinator {
             auth: rand::random::<u64>(),
         };
         for worker in waiting {
-            worker.send(Ok(token));
+            let _ = worker.send(Ok(token));
         }
 
-        submitter.send(Ok(id));
+        let _ = submitter.send(Ok(id));
 
         rx
     }
@@ -350,7 +350,7 @@ impl Coordinator {
             debug!("resolving lookup for topic: {:?}", &topic.name);
             if let Some(pending) = self.lookups.remove(&topic.name) {
                 for tx in pending {
-                    tx.send(Ok(topic.clone()));
+                    let _ = tx.send(Ok(topic.clone()));
                 }
             }
         }

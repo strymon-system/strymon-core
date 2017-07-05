@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use futures::{Poll, Async};
 use futures::stream::{Stream, Fuse};
-use futures::task::{self, Unpark, Spawn};
+use futures::executor::{self, Notify, Spawn};
 
 use strymon_communication::Network;
 use strymon_communication::transport::{Listener, Receiver, Sender};
@@ -132,18 +132,18 @@ impl Stream for PublisherServer {
 }
 
 struct Nop;
-impl Unpark for Nop {
-    fn unpark(&self) {}
+impl Notify for Nop {
+    fn notify(&self, _: usize) {}
 }
 
 struct PollServer {
     server: Spawn<PublisherServer>,
-    unpark: Arc<Unpark>,
+    notify: Arc<Nop>,
 }
 
 impl PollServer {
     fn poll_events(&mut self) -> Result<Vec<SubscriberEvent>> {
-        match self.server.poll_stream(self.unpark.clone())? {
+        match self.server.poll_stream_notify(&self.notify, 0)? {
             Async::Ready(Some(events)) => Ok(events),
             Async::NotReady => Ok(Vec::new()),
             Async::Ready(None) => {
@@ -156,8 +156,8 @@ impl PollServer {
 impl From<PublisherServer> for PollServer {
     fn from(server: PublisherServer) -> Self {
         PollServer {
-            server: task::spawn(server),
-            unpark: Arc::new(Nop),
+            server: executor::spawn(server),
+            notify: Arc::new(Nop),
         }
     }
 }

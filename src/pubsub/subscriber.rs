@@ -1,5 +1,4 @@
 use std::io::{Result, Error};
-use std::any::Any;
 use std::marker::PhantomData;
 
 use futures::{Poll, Async};
@@ -9,7 +8,6 @@ use serde::de::DeserializeOwned;
 
 use strymon_communication::Network;
 use strymon_communication::transport::{Sender, Receiver};
-use strymon_communication::message::MessageBuf;
 
 use model::Topic;
 

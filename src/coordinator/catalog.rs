@@ -1,5 +1,4 @@
-use std::any::Any;
-use std::io::Result as IoResult;
+use std::io;
 use std::collections::hash_map::{HashMap, Entry as HashEntry};
 use std::collections::btree_map::{BTreeMap, Values};
 use std::hash::Hash;
@@ -30,7 +29,7 @@ pub struct Catalog {
 }
 
 impl Catalog {
-    pub fn new(network: &Network, handle: &Handle) -> IoResult<Self> {
+    pub fn new(network: &Network, handle: &Handle) -> io::Result<Self> {
         let mut generator = Generator::<TopicId>::new();
         let mut directory = HashMap::<String, TopicId>::new();
 
@@ -176,7 +175,7 @@ impl<K: Ord, V: Serialize + DeserializeOwned + Eq + Clone + 'static> MapCollecti
            handle: &Handle,
            topic_id: TopicId,
            name: &'static str)
-           -> IoResult<(Topic, Self)> {
+           -> io::Result<(Topic, Self)> {
         let (addr, mutator, publisher) = CollectionPublisher::new(network)?;
         let topic = Topic {
             id: topic_id,
@@ -226,7 +225,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Eq + Hash + 'static> Collection<T
            handle: &Handle,
            topic_id: TopicId,
            name: &'static str)
-           -> IoResult<(Topic, Self)> {
+           -> io::Result<(Topic, Self)> {
         let (addr, mutator, publisher) = CollectionPublisher::new(network)?;
         let topic = Topic {
             id: topic_id,
