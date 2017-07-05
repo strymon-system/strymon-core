@@ -5,15 +5,13 @@ use std::collections::btree_map::{BTreeMap, Values};
 use std::hash::Hash;
 
 use futures::Future;
-
+use tokio_core::reactor::Handle;
 use strymon_communication::Network;
 use serde::ser::Serialize;
 use serde::de::DeserializeOwned;
 
 use model::*;
 use coordinator::requests::*;
-
-use async;
 
 use pubsub::publisher::collection::{CollectionPublisher, Mutator};
 
@@ -32,33 +30,33 @@ pub struct Catalog {
 }
 
 impl Catalog {
-    pub fn new(network: &Network) -> IoResult<Self> {
+    pub fn new(network: &Network, handle: &Handle) -> IoResult<Self> {
         let mut generator = Generator::<TopicId>::new();
         let mut directory = HashMap::<String, TopicId>::new();
 
         let id = generator.generate();
-        let (topic, mut topics) = MapCollection::new(network, id, "$topics")?;
+        let (topic, mut topics) = MapCollection::new(network, handle, id, "$topics")?;
         directory.insert(topic.name.clone(), topic.id);
         topics.insert(topic.id, topic);
 
         let id = generator.generate();
-        let (topic, executors) = MapCollection::new(network, id, "$executors")?;
+        let (topic, executors) = MapCollection::new(network, handle, id, "$executors")?;
         directory.insert(topic.name.clone(), topic.id);
         topics.insert(topic.id, topic);
 
         let id = generator.generate();
-        let (topic, queries) = MapCollection::new(network, id, "$queries")?;
+        let (topic, queries) = MapCollection::new(network, handle, id, "$queries")?;
         directory.insert(topic.name.clone(), topic.id);
         topics.insert(topic.id, topic);
 
         let id = generator.generate();
-        let (topic, pubs) = Collection::<Publication>::new(network, id, "$publications")?;
+        let (topic, pubs) = Collection::<Publication>::new(network, handle, id, "$publications")?;
         directory.insert(topic.name.clone(), topic.id);
         topics.insert(topic.id, topic);
 
         let id = generator.generate();
         let (topic, subs) =
-            Collection::<Subscription>::new(network, id, "$subscriptions")?;
+            Collection::<Subscription>::new(network, handle, id, "$subscriptions")?;
         directory.insert(topic.name.clone(), topic.id);
         topics.insert(topic.id, topic);
 
@@ -175,6 +173,7 @@ struct MapCollection<K, V> {
 
 impl<K: Ord, V: Serialize + DeserializeOwned + Eq + Clone + 'static> MapCollection<K, V> {
     fn new(network: &Network,
+           handle: &Handle,
            topic_id: TopicId,
            name: &'static str)
            -> IoResult<(Topic, Self)> {
@@ -186,7 +185,7 @@ impl<K: Ord, V: Serialize + DeserializeOwned + Eq + Clone + 'static> MapCollecti
             schema: TopicSchema::Collection(TopicType::of::<V>()),
         };
 
-        async::spawn(publisher.map_err(|err| {
+        handle.spawn(publisher.map_err(|err| {
             error!("failure in catalog publisher: {:?}", err)
         }));
 
@@ -224,6 +223,7 @@ struct Collection<T> {
 
 impl<T: Serialize + DeserializeOwned + Clone + Eq + Hash + 'static> Collection<T> {
     fn new(network: &Network,
+           handle: &Handle,
            topic_id: TopicId,
            name: &'static str)
            -> IoResult<(Topic, Self)> {
@@ -235,7 +235,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Eq + Hash + 'static> Collection<T
             schema: TopicSchema::Collection(TopicType::of::<T>()),
         };
 
-        async::spawn(publisher.map_err(|err| {
+        handle.spawn(publisher.map_err(|err| {
             error!("failure in catalog publisher: {:?}", err)
         }));
 

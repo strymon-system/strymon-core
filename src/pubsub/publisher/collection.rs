@@ -8,9 +8,7 @@ use serde::ser::Serialize;
 use futures::{Future, Poll, Async};
 use futures::task::{self, Unpark, Spawn};
 use futures::stream::Stream;
-use void::{self, Void};
-
-use async::queue;
+use futures::sync::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 
 use strymon_communication::Network;
 use strymon_communication::transport::Sender;
@@ -21,7 +19,7 @@ use super::{Nop, PublisherServer, SubscriberId, SubscriberEvent};
 pub struct CollectionPublisher<D> {
     server: PublisherServer,
     subscribers: BTreeMap<SubscriberId, Sender>,
-    source: queue::Receiver<Vec<(D, i32)>, Void>,
+    source: UnboundedReceiver<Vec<(D, i32)>>,
     collection: Vec<(D, i32)>,
 }
 
@@ -33,7 +31,7 @@ impl<D: Serialize + Eq + 'static> CollectionPublisher<D> {
             (host.to_string(), port)
         };
 
-        let (tx, rx) = queue::channel();
+        let (tx, rx) = unbounded();
 
         let sink = Mutator { sink: tx };
 
@@ -91,9 +89,6 @@ impl<D: Serialize + Eq + 'static> Future for CollectionPublisher<D> {
     type Item = ();
     type Error = Error;
 
-    // TODO(swicki): This warning can be removed once nightly and stable agree on
-    // the habitility of the `Void` type (see Rust Issue #38889)
-    #[allow(unreachable_patterns)]
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         // step 1: check for collection updates
         let updates = match self.source.poll() {
@@ -101,7 +96,7 @@ impl<D: Serialize + Eq + 'static> Future for CollectionPublisher<D> {
             Ok(Async::Ready(None)) => return Ok(Async::Ready(())),
             Ok(Async::Ready(updates)) => updates,
             Ok(Async::NotReady) => None,
-            Err(v) => void::unreachable(v),
+            Err(()) => unreachable!(),
         };
 
         // step 2: check for changes in the subscriber list
@@ -155,12 +150,12 @@ impl<D: Serialize + Eq + 'static> Future for CollectionPublisher<D> {
 }
 
 pub struct Mutator<D> {
-    sink: queue::Sender<Vec<(D, i32)>, Void>,
+    sink: UnboundedSender<Vec<(D, i32)>>,
 }
 
 impl<D> Mutator<D> {
     pub fn update_from(&self, updates: Vec<(D, i32)>) {
-        if let Err(_) = self.sink.send(Ok(updates)) {
+        if let Err(_) = self.sink.send(updates) {
             panic!("collection publisher disappeared")
         }
     }

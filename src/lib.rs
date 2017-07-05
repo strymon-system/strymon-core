@@ -4,12 +4,12 @@
 extern crate log;
 #[macro_use]
 extern crate futures;
+extern crate tokio_core;
 
 extern crate timely;
 extern crate timely_communication;
 
 extern crate rand;
-extern crate void;
 
 extern crate serde;
 #[macro_use]
@@ -27,5 +27,3 @@ pub mod executor;
 pub mod query;
 pub mod pubsub;
 pub mod submit;
-
-pub mod async;

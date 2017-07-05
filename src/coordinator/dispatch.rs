@@ -1,8 +1,8 @@
 use std::io::{Error, ErrorKind};
 
-use futures::Future;
+use futures::future::Future;
+use tokio_core::reactor::Handle;
 
-use async;
 use strymon_communication::rpc::{Outgoing, RequestBuf};
 
 use super::handler::CoordinatorRef;
@@ -10,14 +10,16 @@ use super::requests::*;
 
 pub struct Dispatch {
     coord: CoordinatorRef,
+    handle: Handle,
     tx: Outgoing,
 }
 
 impl Dispatch {
-    pub fn new(coord: CoordinatorRef, tx: Outgoing) -> Self {
+    pub fn new(coord: CoordinatorRef, handle: Handle, tx: Outgoing) -> Self {
         debug!("dispatching on new incoming connection");
         Dispatch {
             coord: coord,
+            handle: handle,
             tx: tx,
         }
     }
@@ -31,7 +33,7 @@ impl Dispatch {
                     .submission(req)
                     .then(|res| Ok(resp.respond(res)));
 
-                async::spawn(submission);
+                self.handle.spawn(submission);
             }
             "AddWorkerGroup" => {
                 let (AddWorkerGroup { query, group }, resp) =
@@ -39,7 +41,7 @@ impl Dispatch {
                 let response = self.coord
                     .add_worker_group(query, group)
                     .then(|res| Ok(resp.respond(res)));
-                async::spawn(response)
+                self.handle.spawn(response);
             }
             "AddExecutor" => {
                 let (req, resp) = req.decode::<AddExecutor>()?;
@@ -59,7 +61,7 @@ impl Dispatch {
                 let subscribe = self.coord
                     .subscribe(req)
                     .then(|res| Ok(resp.respond(res)));
-                async::spawn(subscribe);
+                self.handle.spawn(subscribe);
             }
             "Unsubscribe" => {
                 let (Unsubscribe { token, topic }, resp) = req.decode::<Unsubscribe>()?;

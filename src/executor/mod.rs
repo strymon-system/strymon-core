@@ -5,8 +5,7 @@ use std::path::PathBuf;
 use futures;
 use futures::future::Future;
 use futures::stream::Stream;
-
-use async;
+use tokio_core::reactor::Core;
 
 use strymon_communication::Network;
 use strymon_communication::rpc::RequestBuf;
@@ -127,7 +126,8 @@ impl Builder {
         let host = network.hostname();
         let (tx, rx) = network.client(&*coord)?;
 
-        async::finish(futures::lazy(move || {
+        let mut core = Core::new()?;
+        core.run(futures::lazy(move || {
             // announce ourselves at the coordinator
             let id = tx.request(&AddExecutor {
                     host: host,

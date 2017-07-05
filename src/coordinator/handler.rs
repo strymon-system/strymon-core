@@ -5,10 +5,11 @@ use std::cell::RefCell;
 use std::mem;
 
 use futures::{self, Future};
+use futures::unsync::oneshot::{channel, Sender, Receiver};
+use tokio_core::reactor::Handle;
+
 use rand;
 
-use async;
-use async::promise::{promise, Promise, Complete};
 use strymon_communication::rpc::{Outgoing, Response};
 
 use model::*;
@@ -54,8 +55,8 @@ impl ExecutorState {
 enum QueryState {
     Spawning {
         query: Query,
-        submitter: Complete<QueryId, SubmissionError>,
-        waiting: Vec<Complete<QueryToken, WorkerGroupError>>,
+        submitter: Sender<Result<QueryId, SubmissionError>>,
+        waiting: Vec<Sender<Result<QueryToken, WorkerGroupError>>>,
     },
     Running,
     Terminating,
@@ -69,6 +70,7 @@ struct WorkerGroup {
 
 pub struct Coordinator {
     handle: Weak<RefCell<Coordinator>>,
+    reactor: Handle,
     catalog: Catalog,
 
     queryid: Generator<QueryId>,
@@ -76,11 +78,11 @@ pub struct Coordinator {
 
     executors: BTreeMap<ExecutorId, ExecutorState>,
     queries: BTreeMap<QueryId, WorkerGroup>,
-    lookups: HashMap<String, Vec<Complete<Topic, SubscribeError>>>,
+    lookups: HashMap<String, Vec<Sender<Result<Topic, SubscribeError>>>>,
 }
 
 impl Coordinator {
-    pub fn new(catalog: Catalog) -> CoordinatorRef {
+    pub fn new(catalog: Catalog, reactor: Handle) -> CoordinatorRef {
         let coord = Coordinator {
             handle: Weak::new(),
             catalog: catalog,
@@ -89,6 +91,7 @@ impl Coordinator {
             executors: BTreeMap::new(),
             queries: BTreeMap::new(),
             lookups: HashMap::new(),
+            reactor: reactor,
         };
 
         // we use weak references to avoid cycles
@@ -101,9 +104,7 @@ impl Coordinator {
         self.handle.upgrade().expect("`self` has been deallocated?!")
     }
 
-    fn submission(&mut self, req: Submission) -> Promise<QueryId, SubmissionError> {
-        let (tx, rx) = promise();
-
+    fn submission(&mut self, req: Submission) -> Box<Future<Item=QueryId, Error=SubmissionError>> {
         // workaround: prevent closures borrowing `self`
         let handle = self.handle();
         let executor_res = &mut self.executors;
@@ -146,8 +147,7 @@ impl Coordinator {
 
             // step 2.3: check if we actually have enough executors
             if executors.len() != num_executors {
-                tx.complete(Err(SubmissionError::ExecutorsNotFound));
-                return rx;
+                return futures::failed(SubmissionError::ExecutorsNotFound).boxed();
             }
 
             (executors, num_executors, num_workers)
@@ -197,11 +197,12 @@ impl Coordinator {
                     handle.borrow_mut().cancel_submission(queryid, err);
                 });
 
-            async::spawn(response);
+            self.reactor.spawn(response);
         }
 
         // TODO(swicki) add a timeout that triggers SpawnFailed here
         debug!("add pending submission for {:?}", query.id);
+        let (tx, rx) = channel();
         let state = QueryState::Spawning {
             query: query,
             submitter: tx,
@@ -215,16 +216,16 @@ impl Coordinator {
         };
         self.queries.insert(queryid, worker_group);
 
-        return rx;
+        Box::new(rx.then(|res| res.expect("submission canceled?!")))
     }
 
     fn cancel_submission(&mut self, id: QueryId, err: SubmissionError) {
         debug!("canceling pending submission for {:?}", id);
         if let Some(query) = self.queries.remove(&id) {
             if let QueryState::Spawning { submitter, waiting, .. } = query.state {
-                submitter.complete(Err(err));
+                submitter.send(Err(err));
                 for worker in waiting {
-                    worker.complete(Err(WorkerGroupError::PeerFailed));
+                    worker.send(Err(WorkerGroupError::PeerFailed));
                 }
             }
 
@@ -234,30 +235,28 @@ impl Coordinator {
         }
     }
 
-    fn add_worker_group(&mut self,
-                        id: QueryId,
-                        _group: usize)
-                        -> Promise<QueryToken, WorkerGroupError> {
-        let (tx, rx) = promise();
+    fn add_worker_group(&mut self, id: QueryId,_group: usize)
+        -> Box<Future<Item=QueryToken, Error=WorkerGroupError>>
+    {
         let query = self.queries.get_mut(&id);
 
         // step 1: check if we actually know about this query
         let query = if query.is_none() {
-            tx.complete(Err(WorkerGroupError::SpawningAborted));
-            return rx;
+            return futures::failed(WorkerGroupError::SpawningAborted).boxed();
         } else {
             query.unwrap()
         };
 
         // step 2: add current request to waiting workers
-        let connected = match query.state {
+        let (connected, rx) = match query.state {
             QueryState::Spawning { ref mut waiting, .. } => {
+                let (tx, rx) = channel();
+                let rx = rx.then(|res| res.expect("spawning worker group failed"));
                 waiting.push(tx);
-                waiting.len()
+                (waiting.len(), Box::new(rx))
             }
             QueryState::Running | QueryState::Terminating => {
-                tx.complete(Err(WorkerGroupError::InvalidWorkerGroup));
-                return rx;
+                return futures::failed(WorkerGroupError::InvalidWorkerGroup).boxed()
             }
         };
 
@@ -285,10 +284,10 @@ impl Coordinator {
             auth: rand::random::<u64>(),
         };
         for worker in waiting {
-            worker.complete(Ok(token));
+            worker.send(Ok(token));
         }
 
-        submitter.complete(Ok(id));
+        submitter.send(Ok(id));
 
         rx
     }
@@ -351,7 +350,7 @@ impl Coordinator {
             debug!("resolving lookup for topic: {:?}", &topic.name);
             if let Some(pending) = self.lookups.remove(&topic.name) {
                 for tx in pending {
-                    tx.complete(Ok(topic.clone()));
+                    tx.send(Ok(topic.clone()));
                 }
             }
         }
@@ -375,19 +374,18 @@ impl Coordinator {
             return futures::finished(topic).boxed();
         } else if req.blocking {
             debug!("inserting blocking lookup for topic: {:?}", &req.name);
-            let (lookup, result) = promise();
+            let (lookup, result) = channel();
+            self.lookups.entry(req.name).or_insert(Vec::new()).push(lookup);
 
-            let handle = self.handle();
-            let result = result.and_then(move |topic: Topic| {
+            let handle = self.handle();            
+            let result = result
+                .then(|res| {
+                    res.unwrap_or(Err(SubscribeError::TopicNotFound))
+                })
+                .and_then(move |topic: Topic| {
                     handle.borrow_mut().catalog.subscribe(query, topic.id);
                     Ok(topic)
-                })
-                .map_err(|err| match err {
-                    Ok(err) => err,
-                    Err(_) => SubscribeError::TopicNotFound,
                 });
-
-            self.lookups.entry(req.name).or_insert(Vec::new()).push(lookup);
 
             return Box::new(result);
         } else {
@@ -448,11 +446,7 @@ impl CoordinatorRef {
     pub fn submission(&self,
                       req: Submission)
                       -> Box<Future<Item = QueryId, Error = SubmissionError>> {
-        self.coord
-            .borrow_mut()
-            .submission(req)
-            .map_err(|err| err.expect("submission canceled?!"))
-            .boxed()
+        self.coord.borrow_mut().submission(req)
     }
 
     pub fn add_executor(&mut self, req: AddExecutor, tx: Outgoing) -> ExecutorId {
@@ -461,22 +455,16 @@ impl CoordinatorRef {
         id
     }
 
-    pub fn add_worker_group
-        (&mut self,
-         id: QueryId,
-         group: usize)
-         -> Box<Future<Item = QueryToken, Error = WorkerGroupError>> {
+    pub fn add_worker_group(&mut self, id: QueryId, group: usize)
+         -> Box<Future<Item = QueryToken, Error = WorkerGroupError>>
+    {
         let state = self.state.clone();
         let future = self.coord
             .borrow_mut()
             .add_worker_group(id, group)
-            .then(move |res| match res {
-                Ok(token) => {
-                    state.borrow_mut().query.push(token);
-                    Ok(token)
-                }
-                Err(Ok(err)) => Err(err),
-                Err(Err(_)) => panic!("promise canceled"),
+            .and_then(move |token| {
+                state.borrow_mut().query.push(token);
+                Ok(token)
             });
 
         Box::new(future)

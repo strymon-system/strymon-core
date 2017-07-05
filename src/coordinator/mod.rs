@@ -4,8 +4,8 @@ use std::env;
 use futures;
 use futures::future::Future;
 use futures::stream::Stream;
+use tokio_core::reactor::Core;
 
-use async;
 use strymon_communication::Network;
 
 use self::handler::Coordinator;
@@ -45,25 +45,27 @@ impl Builder {
         let network = Network::init()?;
         let server = network.server(self.port)?;
 
+        let mut core = Core::new()?;
+        let handle = core.handle();
         let coordinate = futures::lazy(move || {
             // TODO(swicki) we should return an I/O error instead
-            let catalog = Catalog::new(&network).expect("failed to create catalog");
-            let coord = Coordinator::new(catalog);
+            let catalog = Catalog::new(&network, &handle).expect("failed to create catalog");
+            let coord = Coordinator::new(catalog, handle.clone());
 
             server.for_each(move |(tx, rx)| {
                 // every connection gets its own handle
-                let mut disp = Dispatch::new(coord.clone(), tx);
+                let mut disp = Dispatch::new(coord.clone(), handle.clone(), tx);
                 let client = rx.for_each(move |req| disp.dispatch(req))
                     .map_err(|err| {
                         error!("failed to dispatch client: {:?}", err);
                     });
 
                 // handle client asynchronously
-                async::spawn(client);
+                handle.spawn(client);
                 Ok(())
             })
         });
 
-        async::finish(coordinate)
+        core.run(coordinate)
     }
 }
