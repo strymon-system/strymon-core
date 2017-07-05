@@ -1,7 +1,7 @@
 use std::fmt;
 use std::intrinsics::type_name;
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Abomonation)]
 pub struct TopicId(pub u64);
 
 impl From<u64> for TopicId {
@@ -10,7 +10,7 @@ impl From<u64> for TopicId {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Abomonation)]
 pub struct TopicType {
     pub name: String,
 }
@@ -23,7 +23,7 @@ impl TopicType {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Abomonation)]
 pub enum TopicSchema {
     Collection(TopicType),
     Stream(TopicType, TopicType),
@@ -56,7 +56,7 @@ impl fmt::Display for TopicSchema {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Abomonation)]
 pub struct Topic {
     pub id: TopicId,
     pub name: String,
@@ -64,7 +64,7 @@ pub struct Topic {
     pub schema: TopicSchema,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Abomonation)]
 pub struct QueryId(pub u64);
 
 impl From<u64> for QueryId {
@@ -73,7 +73,7 @@ impl From<u64> for QueryId {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Abomonation)]
 pub struct Query {
     pub id: QueryId,
     pub name: Option<String>,
@@ -82,20 +82,20 @@ pub struct Query {
     pub executors: Vec<ExecutorId>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Abomonation)]
 pub struct QueryProgram {
     pub format: ExecutionFormat,
     pub source: String, // TODO(swicki) use Url crate for this?
     pub args: Vec<String>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Abomonation)]
 pub enum ExecutionFormat {
     NativeExecutable,
     Other,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Abomonation)]
 pub struct ExecutorId(pub u64);
 
 impl From<u64> for ExecutorId {
@@ -104,15 +104,15 @@ impl From<u64> for ExecutorId {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Abomonation)]
 pub struct Executor {
     pub id: ExecutorId,
     pub host: String,
     pub format: ExecutionFormat,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Abomonation)]
 pub struct Publication(pub QueryId, pub TopicId);
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Abomonation)]
 pub struct Subscription(pub QueryId, pub TopicId);

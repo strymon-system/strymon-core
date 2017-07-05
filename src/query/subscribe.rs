@@ -13,7 +13,7 @@ use coordinator::requests::*;
 
 use pubsub::subscriber::{Subscriber, TimelySubscriber};
 use model::{Topic, TopicId};
-use query::Coordinator;
+use query::{Coordinator, PubSubTimestamp};
 
 pub struct Subscription<D: Data + DeserializeOwned> {
     sub: Subscriber<D>,
@@ -60,14 +60,14 @@ impl<S: Stream> Iterator for IntoIter<S> {
 }
 
 
-pub struct TimelySubscription<T: Timestamp + DeserializeOwned, D: Data + DeserializeOwned> {
-    sub: TimelySubscriber<T, D>,
+pub struct TimelySubscription<T: PubSubTimestamp, D: Data + DeserializeOwned> {
+    sub: TimelySubscriber<T::Converted, D>,
     topic: Topic,
     coord: Coordinator,
     frontier: Vec<Capability<T>>,
 }
 
-impl<T: Timestamp + DeserializeOwned, D: Data + DeserializeOwned> Stream for TimelySubscription<T, D> {
+impl<T: PubSubTimestamp, D: Data + DeserializeOwned> Stream for TimelySubscription<T, D> {
     type Item = (Capability<T>, Vec<D>);
     type Error = IoError;
 
@@ -79,6 +79,12 @@ impl<T: Timestamp + DeserializeOwned, D: Data + DeserializeOwned> Stream for Tim
         } else {
             return Ok(Async::Ready(None));
         };
+
+        // convert frontier and timestamp
+        let time = PubSubTimestamp::from_pubsub(time);
+        let frontier: Vec<_> = frontier.into_iter()
+            .map(PubSubTimestamp::from_pubsub)
+            .collect();
 
         let mut time_cap = None;
         let mut new_frontier = vec![];
@@ -104,7 +110,7 @@ impl<T: Timestamp + DeserializeOwned, D: Data + DeserializeOwned> Stream for Tim
 }
 
 impl<T, D> IntoIterator for TimelySubscription<T, D>
-    where T: Timestamp + DeserializeOwned,
+    where T: PubSubTimestamp,
           D: Data + DeserializeOwned
 {
     type Item = (Capability<T>, Vec<D>);
@@ -115,7 +121,7 @@ impl<T, D> IntoIterator for TimelySubscription<T, D>
     }
 }
 
-impl<T: Timestamp + DeserializeOwned, D: Data + DeserializeOwned> Drop for TimelySubscription<T, D> {
+impl<T: PubSubTimestamp, D: Data + DeserializeOwned> Drop for TimelySubscription<T, D> {
     fn drop(&mut self) {
         if let Err(err) = self.coord.unsubscribe(self.topic.id) {
             warn!("failed to unsubscribe: {:?}", err)
@@ -187,7 +193,7 @@ impl Coordinator {
                     root: Capability<T>,
                     blocking: bool)
                     -> Result<TimelySubscription<T, D>, SubscriptionError>
-        where T: Timestamp + DeserializeOwned,
+        where T: PubSubTimestamp,
               D: Data + DeserializeOwned
     {
         let name = name.to_string();
@@ -204,7 +210,7 @@ impl Coordinator {
                     return Err(SubscriptionError::TypeIdMismatch);
                 }
 
-                let sub = TimelySubscriber::<T, D>::connect(&topic, &coord.network)?;
+                let sub = TimelySubscriber::<T::Converted, D>::connect(&topic, &coord.network)?;
                 Ok(TimelySubscription {
                     sub: sub,
                     topic: topic,
@@ -219,7 +225,7 @@ impl Coordinator {
                            name: &str,
                            root: Capability<T>)
                            -> Result<TimelySubscription<T, D>, SubscriptionError>
-        where T: Timestamp + DeserializeOwned,
+        where T: PubSubTimestamp,
               D: Data + DeserializeOwned
     {
         self.timely(name.to_string(), root, true)
@@ -230,7 +236,7 @@ impl Coordinator {
          name: &str,
          root: Capability<T>)
          -> Result<TimelySubscription<T, D>, SubscriptionError>
-        where T: Timestamp + DeserializeOwned,
+        where T: PubSubTimestamp,
               D: Data + DeserializeOwned
     {
         self.timely(name.to_string(), root, false)

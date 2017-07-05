@@ -14,6 +14,11 @@ extern crate void;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
+
+extern crate abomonation;
+#[macro_use]
+extern crate abomonation_derive;
+
 extern crate strymon_communication;
 
 pub mod model;

@@ -12,7 +12,7 @@ use timely_communication::{Allocate, Pull, Push};
 use serde::ser::Serialize;
 use futures::Future;
 
-use query::Coordinator;
+use query::{Coordinator, PubSubTimestamp};
 use coordinator::requests::*;
 use model::{Topic, TopicId, TopicType, TopicSchema};
 use pubsub::publisher::timely::TimelyPublisher;
@@ -142,14 +142,14 @@ impl Coordinator {
                          -> Result<Stream<S, D>, PublicationError>
         where D: Data + Serialize,
               S: Scope,
-              S::Timestamp: Serialize
+              S::Timestamp: PubSubTimestamp
     {
         let worker_id = stream.scope().index() as u64;
         let name = partition.name(name, worker_id);
 
         let (addr, mut publisher) = if name.is_some() {
             let (addr, publisher) =
-                TimelyPublisher::<S::Timestamp, D>::new(&self.network)?;
+                TimelyPublisher::<<S::Timestamp as PubSubTimestamp>::Converted, D>::new(&self.network)?;
             (Some(addr), Some(publisher))
         } else {
             (None, None)
@@ -174,10 +174,14 @@ impl Coordinator {
             let ref _guard = publication;
 
             // publish data on input
-            let frontier = notif.frontier(0);
+            let frontier: Vec<_> = notif
+                .frontier(0).iter()
+                .map(|t| t.to_pubsub())
+                .collect();
             input.for_each(|time, data| {
+                let pubsub_time = time.time().to_pubsub();
                 if let Some(ref mut publisher) = publisher {
-                    publisher.publish(frontier, &time, data).unwrap();
+                    publisher.publish(&frontier, &pubsub_time, data).unwrap();
                 }
                 output.session(&time).give_content(data);
             });
