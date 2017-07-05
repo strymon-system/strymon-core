@@ -6,7 +6,7 @@ use serde::de::{Deserialize, DeserializeOwned};
 use rmp_serde::{encode, decode, from_slice};
 
 use byteorder::{NetworkEndian, ReadBytesExt, WriteBytesExt};
-use bytes::{BufMut, BytesMut};
+use bytes::BytesMut;
 
 /// MessageBuf is a convenience wrapper around BytesMut. It represents a
 /// contiguous buffer of [MessagePack](https://msgpack.org/) encoded objects.
@@ -14,6 +14,28 @@ use bytes::{BufMut, BytesMut};
 #[derive(Clone, Debug)]
 pub struct MessageBuf {
     buf: BytesMut,
+}
+
+/// Custom writer which extends the buffer on each call to write
+struct Writer<'a> {
+    buf: &'a mut BytesMut,
+}
+
+impl<'a> Write for Writer<'a> {
+    fn write(&mut self, src: &[u8]) -> io::Result<usize> {
+        self.buf.extend_from_slice(src);
+        Ok(src.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+impl<'a> Writer<'a> {
+    fn new(buf: &'a mut BytesMut) -> Writer<'a> {
+        Writer { buf }
+    }
 }
 
 impl MessageBuf {
@@ -37,7 +59,7 @@ impl MessageBuf {
 
     /// Append an item to the message buffer.
     pub fn push<S: Serialize>(&mut self, item: S) -> io::Result<()> {
-        let mut writer = (&mut self.buf).writer();
+        let mut writer = Writer::new(&mut self.buf);
         encode::write(&mut writer, &item)
             .map_err(|err| io::Error::new(ErrorKind::Other, err))
     }
