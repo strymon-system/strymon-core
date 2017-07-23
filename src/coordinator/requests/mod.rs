@@ -180,41 +180,65 @@ impl Request for Lookup {
     }
 }
 
+/// Add a worker of a Keeper.
 #[derive(Clone, Debug)]
-pub struct RegisterKeeper {
+pub struct AddKeeperWorker {
     pub name: String,
+    pub worker_num: usize,
     pub addr: (String, u16),
 }
 
 #[derive(Clone, Debug)]
-pub enum RegisterKeeperError {
-    KeeperAlreadyExists,
+pub enum AddKeeperWorkerError {
+    WorkerAlreadyExists,
 }
 
-impl Request for RegisterKeeper {
+impl Request for AddKeeperWorker {
     type Success = ();
-    type Error = RegisterKeeperError;
+    type Error = AddKeeperWorkerError;
 
     fn name() -> &'static str {
-        "RegisterKeeper"
+        "AddKeeperWorker"
     }
 }
 
 #[derive(Clone, Debug)]
-pub struct LookupKeeper {
+pub struct GetKeeperAddress {
     pub name: String,
 }
 
 #[derive(Clone, Debug)]
-pub enum LookupKeeperError {
+pub enum GetKeeperAddressError {
     KeeperNotFound,
+    KeeperHasNoWorkers,
 }
 
-impl Request for LookupKeeper {
-    type Success = Keeper;
-    type Error = LookupKeeperError;
+impl Request for GetKeeperAddress {
+    type Success = (String, u16);
+    type Error = GetKeeperAddressError;
 
     fn name() -> &'static str {
-        "LookupKeeper"
+        "GetKeeperAddress"
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct RemoveKeeperWorker {
+    pub name: String,
+    pub worker_num: usize,
+}
+
+#[derive(Clone, Debug)]
+pub enum RemoveKeeperWorkerError {
+    KeeperDoesntExist,
+    KeeperWorkerDoesntExist,
+}
+
+impl Request for RemoveKeeperWorker {
+    type Success = ();
+    type Error = RemoveKeeperWorkerError;
+
+    fn name() -> &'static str {
+        "RemoveKeeperWorker"
     }
 }

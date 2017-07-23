@@ -29,9 +29,7 @@ pub struct Catalog {
     publications: Collection<Publication>,
     subscriptions: Collection<Subscription>,
 
-    keeper_id_generator: Generator<KeeperId>,
     keepers: MapCollection<KeeperId, Keeper>,
-    keepers_directory: HashMap<String, KeeperId>,
 }
 
 impl Catalog {
@@ -70,21 +68,16 @@ impl Catalog {
         directory.insert(topic.name.clone(), topic.id);
         topics.insert(topic.id, topic);
 
-        let keeper_id_generator = Generator::<KeeperId>::new();
-        let keepers_directory = HashMap::<String, KeeperId>::new();
-
         Ok(Catalog {
-            generator: generator,
-            directory: directory,
-            topics: topics,
-            executors: executors,
-            queries: queries,
-            publications: pubs,
-            subscriptions: subs,
-            keeper_id_generator: keeper_id_generator,
-            keepers: keepers,
-            keepers_directory: keepers_directory,
-        })
+               generator: generator,
+               directory: directory,
+               topics: topics,
+               executors: executors,
+               queries: queries,
+               publications: pubs,
+               subscriptions: subs,
+               keepers: keepers,
+           })
     }
 
     pub fn add_executor(&mut self, executor: Executor) {
@@ -181,44 +174,25 @@ impl Catalog {
         Ok(())
     }
 
-    pub fn register_keeper(&mut self,
-                           name: String,
-                           addr: (String, u16))
-                           -> Result<(), RegisterKeeperError> {
-        match self.keepers_directory.entry(name.clone()) {
-            HashEntry::Occupied(_) =>
-                Err(RegisterKeeperError::KeeperAlreadyExists),
-            HashEntry::Vacant(entry) => {
-                let id = self.keeper_id_generator.generate();
-                let keeper = Keeper {
-                    id: id,
-                    name: name,
-                    addr: addr,
-                };
-
-                debug!("registering keeper: {:?}", keeper);
-
-                self.keepers.insert(id, keeper.clone());
-                entry.insert(keeper.id);
-
-                Ok(())
-            }
-        }
+    pub fn add_keeper(&mut self, keeper: Keeper) {
+        self.keepers.insert(keeper.id, keeper);
     }
 
-  //  pub fn remove_keeper(&mut self, id: KeeperId) {
-  //      debug!("remove_keeper: {:?}", id);
-  //      let name = self.keepers.get(&id).name.clone();
-  //      self.keepers.remove(&id);
-  //      self.keepers_directory.remove(&name);
-  //  }
+    pub fn add_keeper_worker(&mut self,
+                             keeper_id: &KeeperId,
+                             worker_num: usize,
+                             addr: (String, u16)) -> Result<(), String> {
+        let mut keeper = match self.keepers.remove(keeper_id) {
+            Some(keeper) => keeper,
+            None => return Err("No such Keeper".to_string()),
+        };
+        keeper.workers.push((worker_num, addr));
+        self.keepers.insert(keeper.id, keeper);
+        Ok(())
+    }
 
-    pub fn lookup_keeper(&self, name: &str) -> Option<Keeper> {
-        if let Some(id) = self.keepers_directory.get(name) {
-            self.keepers.get(&id).cloned()
-        } else {
-            None
-        }
+    pub fn remove_keeper(&mut self, id: &KeeperId) -> Option<Keeper> {
+        self.keepers.remove(id)
     }
 }
 
@@ -256,10 +230,12 @@ impl<K: Ord, V: Abomonation + Any + Clone + Eq + NonStatic> MapCollection<K, V> 
         self.mutator.insert(value);
     }
 
-    fn remove(&mut self, key: &K) {
+    fn remove(&mut self, key: &K) -> Option<V> {
         if let Some(value) = self.inner.remove(key) {
-            self.mutator.remove(value);
+            self.mutator.remove(value.clone());
+            return Some(value);
         }
+        None
     }
 
     fn get(&self, key: &K) -> Option<&V> {

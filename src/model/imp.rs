@@ -73,7 +73,7 @@ unsafe_abomonate!(Executor: id, host, format);
 unsafe_abomonate!(ExecutionFormat);
 
 unsafe_abomonate!(KeeperId);
-unsafe_abomonate!(Keeper: id, name, addr);
+unsafe_abomonate!(Keeper: id, name, workers);
 
 impl From<u64> for TopicId {
     fn from(id: u64) -> TopicId {

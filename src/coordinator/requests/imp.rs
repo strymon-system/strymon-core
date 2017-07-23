@@ -25,11 +25,14 @@ unsafe_abomonate!(UnpublishError);
 
 unsafe_abomonate!(Lookup: name);
 
-unsafe_abomonate!(RegisterKeeper: name, addr);
-unsafe_abomonate!(RegisterKeeperError);
+unsafe_abomonate!(AddKeeperWorker: name, worker_num, addr);
+unsafe_abomonate!(AddKeeperWorkerError);
 
-unsafe_abomonate!(LookupKeeper: name);
-unsafe_abomonate!(LookupKeeperError);
+unsafe_abomonate!(RemoveKeeperWorker: name, worker_num);
+unsafe_abomonate!(RemoveKeeperWorkerError);
+
+unsafe_abomonate!(GetKeeperAddress: name);
+unsafe_abomonate!(GetKeeperAddressError);
 
 impl Abomonation for Placement {
     #[inline]

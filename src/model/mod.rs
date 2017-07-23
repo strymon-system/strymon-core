@@ -73,5 +73,6 @@ pub struct KeeperId(pub u64);
 pub struct Keeper {
     pub id: KeeperId,
     pub name: String,
-    pub addr: (String, u16),
+    /// Worker id -> worker address
+    pub workers: Vec<(usize, (String, u16))>,
 }

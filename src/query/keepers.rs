@@ -4,35 +4,34 @@ use std::net::ToSocketAddrs;
 use futures::Future;
 
 use coordinator::requests::*;
-use model::Keeper;
 use query::Coordinator;
 
 #[derive(Debug)]
-pub enum KeeperRegistrationError {
-    KeeperAlreadyExists,
+pub enum KeeperWorkerRegistrationError {
+    KeeperWorkerAlreadyExists,
     SocketAddrsNotValid,
     IoError(IoError),
 }
 
-impl From<RegisterKeeperError> for KeeperRegistrationError {
-    fn from(err: RegisterKeeperError) -> Self {
+impl From<AddKeeperWorkerError> for KeeperWorkerRegistrationError {
+    fn from(err: AddKeeperWorkerError) -> Self {
         match err {
-            RegisterKeeperError::KeeperAlreadyExists => {
-                KeeperRegistrationError::KeeperAlreadyExists
+            AddKeeperWorkerError::WorkerAlreadyExists => {
+                KeeperWorkerRegistrationError::KeeperWorkerAlreadyExists
             }
         }
     }
 }
 
-impl From<IoError> for KeeperRegistrationError {
+impl From<IoError> for KeeperWorkerRegistrationError {
     fn from(err: IoError) -> Self {
-        KeeperRegistrationError::IoError(err)
+        KeeperWorkerRegistrationError::IoError(err)
     }
 }
 
-impl<T, E> From<Result<T, E>> for KeeperRegistrationError
-    where T: Into<KeeperRegistrationError>,
-          E: Into<KeeperRegistrationError>
+impl<T, E> From<Result<T, E>> for KeeperWorkerRegistrationError
+    where T: Into<KeeperWorkerRegistrationError>,
+          E: Into<KeeperWorkerRegistrationError>
 {
     fn from(err: Result<T, E>) -> Self {
         match err {
@@ -45,13 +44,17 @@ impl<T, E> From<Result<T, E>> for KeeperRegistrationError
 #[derive(Debug)]
 pub enum KeeperLookupError {
     KeeperNotFound,
+    KeeperHasNoWorkers,
     IoError(IoError),
 }
 
-impl From<LookupKeeperError> for KeeperLookupError {
-    fn from(err: LookupKeeperError) -> Self {
+impl From<GetKeeperAddressError> for KeeperLookupError {
+    fn from(err: GetKeeperAddressError) -> Self {
         match err {
-            LookupKeeperError::KeeperNotFound => KeeperLookupError::KeeperNotFound,
+            GetKeeperAddressError::KeeperNotFound => KeeperLookupError::KeeperNotFound,
+            GetKeeperAddressError::KeeperHasNoWorkers => {
+                KeeperLookupError::KeeperHasNoWorkers
+            }
         }
     }
 }
@@ -74,32 +77,88 @@ impl<T, E> From<Result<T, E>> for KeeperLookupError
     }
 }
 
+#[derive(Debug)]
+pub enum WorkerDeregistrationError {
+    KeeperDoesntExist,
+    WorkerDoesntExist,
+    IoError(IoError),
+}
+
+impl From<RemoveKeeperWorkerError> for WorkerDeregistrationError {
+    fn from(err: RemoveKeeperWorkerError) -> Self {
+        match err {
+            RemoveKeeperWorkerError::KeeperDoesntExist => {
+                WorkerDeregistrationError::KeeperDoesntExist
+            }
+            RemoveKeeperWorkerError::KeeperWorkerDoesntExist => {
+                WorkerDeregistrationError::WorkerDoesntExist
+            }
+        }
+    }
+}
+
+impl From<IoError> for WorkerDeregistrationError {
+    fn from(err: IoError) -> Self {
+        WorkerDeregistrationError::IoError(err)
+    }
+}
+
+impl<T, E> From<Result<T, E>> for WorkerDeregistrationError
+    where T: Into<WorkerDeregistrationError>,
+          E: Into<WorkerDeregistrationError>
+{
+    fn from(err: Result<T, E>) -> Self {
+        match err {
+            Ok(err) => err.into(),
+            Err(err) => err.into(),
+        }
+    }
+}
+
 impl Coordinator {
     /// If addr.to_socket_addrs() returns more than one address, then the first one is used.
-    pub fn register_keeper<A: ToSocketAddrs>(&self,
-                           name: &str,
-                           addr: A)
-                           -> Result<(), KeeperRegistrationError> {
+    pub fn add_keeper_worker<A: ToSocketAddrs>
+        (&self,
+         name: &str,
+         worker_num: usize,
+         addr: A)
+         -> Result<(), KeeperWorkerRegistrationError> {
         let addr = match addr.to_socket_addrs()?.next() {
             Some(addr) => addr,
-            None => return Err(KeeperRegistrationError::SocketAddrsNotValid),
+            None => return Err(KeeperWorkerRegistrationError::SocketAddrsNotValid),
         };
         let addr = (addr.ip().to_string(), addr.port());
         self.tx
-            .request(&RegisterKeeper {
+            .request(&AddKeeperWorker {
                           name: name.to_string(),
-                          addr: (addr.0.to_string(), addr.1),
+                          worker_num: worker_num,
+                          addr: addr,
                       })
-            .map_err(KeeperRegistrationError::from)
+            .map_err(KeeperWorkerRegistrationError::from)
             .wait()
     }
 
-    pub fn lookup_keeper(&self,
-                         name: &str)
-                         -> Result<Keeper, KeeperLookupError> {
+    /// Returns the address of the requested Keeper.
+    pub fn get_keeper_address(&self,
+                              name: &str)
+                              -> Result<(String, u16), KeeperLookupError> {
         self.tx
-            .request(&LookupKeeper { name: name.to_string() })
+            .request(&GetKeeperAddress { name: name.to_string() })
             .map_err(KeeperLookupError::from)
+            .wait()
+    }
+
+    /// To be called when unregistering.
+    pub fn remove_keeper_worker(&self,
+                                name: &str,
+                                worker_num: usize)
+                                -> Result<(), WorkerDeregistrationError> {
+        self.tx
+            .request(&RemoveKeeperWorker {
+                          name: name.to_string(),
+                          worker_num: worker_num,
+                      })
+            .map_err(WorkerDeregistrationError::from)
             .wait()
     }
 }

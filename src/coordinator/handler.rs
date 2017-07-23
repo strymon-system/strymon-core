@@ -67,16 +67,25 @@ struct WorkerGroup {
     ports: Vec<(ExecutorId, u16)>,
 }
 
+struct KeeperState {
+    /// Used for load balancing.
+    workers: Vec<(usize, (String, u16))>,
+    next_worker: usize,
+}
+
 pub struct Coordinator {
     handle: Weak<RefCell<Coordinator>>,
     catalog: Catalog,
 
     queryid: Generator<QueryId>,
     executorid: Generator<ExecutorId>,
+    keeperid: Generator<KeeperId>,
 
     executors: BTreeMap<ExecutorId, ExecutorState>,
     queries: BTreeMap<QueryId, WorkerGroup>,
     lookups: HashMap<String, Vec<Complete<Topic, SubscribeError>>>,
+    keepers: BTreeMap<KeeperId, KeeperState>,
+    keepers_directory: HashMap<String, KeeperId>,
 }
 
 impl Coordinator {
@@ -86,9 +95,12 @@ impl Coordinator {
             catalog: catalog,
             queryid: Generator::new(),
             executorid: Generator::new(),
+            keeperid: Generator::new(),
             executors: BTreeMap::new(),
             queries: BTreeMap::new(),
             lookups: HashMap::new(),
+            keepers: BTreeMap::new(),
+            keepers_directory: HashMap::new(),
         };
 
         // we use weak references to avoid cycles
@@ -409,18 +421,107 @@ impl Coordinator {
         }
     }
 
-    fn register_keeper(&mut self,
-                       name: String,
-                       addr: (String, u16))
-                       -> Result<(), RegisterKeeperError> {
-        self.catalog.register_keeper(name, addr)
+    fn add_keeper_worker(&mut self,
+                         name: String,
+                         worker_num: usize,
+                         addr: (String, u16))
+                         -> Result<(), AddKeeperWorkerError> {
+        let keeper_id = match self.keepers_directory.get(&name).map(|x| x.clone())  {
+            Some(id) => id,
+            None => {
+                let id = self.keeperid.generate();
+                self.keepers_directory.insert(name.clone(), id.clone());
+                self.catalog.add_keeper(Keeper {
+                                            id: id.clone(),
+                                            name: name.clone(),
+                                            workers: Vec::new(),
+                                        });
+                id
+            }
+        };
+
+        let mut keeper_state =
+            self.keepers.entry(keeper_id.clone()).or_insert_with(|| {
+                KeeperState {
+                    workers: Vec::new(),
+                    next_worker: 0,
+                }
+            });
+
+        for &(ref num, _) in &keeper_state.workers {
+            if *num == worker_num {
+                return Err(AddKeeperWorkerError::WorkerAlreadyExists);
+            }
+        }
+
+        keeper_state.workers.push((worker_num, addr.clone()));
+
+        self.catalog.add_keeper_worker(&keeper_id, worker_num, addr)
+            .expect("Invariant broken: keeper is present in coordinator but not in its catalog.");
+
+        Ok(())
     }
 
-    fn lookup_keeper(&self, name: &str) -> Result<Keeper, LookupKeeperError> {
-        match self.catalog.lookup_keeper(name) {
-            Some(keeper) => Ok(keeper),
-            None => Err(LookupKeeperError::KeeperNotFound),
+    fn get_keeper_address(&mut self,
+                          name: String)
+                          -> Result<(String, u16), GetKeeperAddressError> {
+        let keeper_id = match self.keepers_directory.get(&name) {
+            Some(id) => id,
+            None => return Err(GetKeeperAddressError::KeeperNotFound),
+        };
+        let mut keeper_state =
+            self.keepers.get_mut(keeper_id).expect("Invariant broken: \
+                    keeper_id present in keepers_directory but not in keepers.");
+        let workers_len = keeper_state.workers.len();
+        if workers_len == 0 {
+            return Err(GetKeeperAddressError::KeeperHasNoWorkers);
         }
+        let addr = keeper_state.workers[keeper_state.next_worker].1.clone();
+        keeper_state.next_worker += 1;
+        keeper_state.next_worker %= workers_len;
+        Ok(addr)
+    }
+
+    fn remove_keeper_worker(&mut self,
+                            name: String,
+                            worker_num: usize)
+                            -> Result<(), RemoveKeeperWorkerError> {
+        let keeper_id = match self.keepers_directory.get(&name) {
+            Some(id) => id,
+            None => return Err(RemoveKeeperWorkerError::KeeperDoesntExist),
+        }.clone();
+
+        let old_workers_len;
+        let workers_len;
+
+        {
+            let mut keeper_state = self.keepers.get_mut(&keeper_id)
+            .expect("Invariant broken: keeper_id present in keepers_directory but not in keepers.");
+
+            old_workers_len = keeper_state.workers.len();
+            keeper_state.workers.retain(|ref x| x.0 != worker_num);
+            workers_len = keeper_state.workers.len();
+            if old_workers_len == workers_len {
+                return Err(RemoveKeeperWorkerError::KeeperWorkerDoesntExist);
+            }
+            if workers_len != 0 {
+                keeper_state.next_worker %= workers_len;
+            }
+        }
+
+        if workers_len == 0 {
+            self.keepers.remove(&keeper_id);
+            self.keepers_directory.remove(&name);
+        }
+
+        let mut keeper = self.catalog.remove_keeper(&keeper_id)
+            .expect("Invariant broken: keeper present in state but not in catalog");
+        if workers_len > 0 {
+            keeper.workers.retain(|ref x| x.0 != worker_num);
+            self.catalog.add_keeper(keeper);
+        }
+
+        Ok(())
     }
 }
 
@@ -583,15 +684,25 @@ impl CoordinatorRef {
         self.coord.borrow().lookup(name)
     }
 
-    pub fn register_keeper(&mut self,
-                           name: String,
-                           addr: (String, u16))
-                           -> Result<(), RegisterKeeperError> {
-        self.coord.borrow_mut().register_keeper(name, addr)
+    pub fn add_keeper_worker(&mut self,
+                             name: String,
+                             worker_num: usize,
+                             addr: (String, u16))
+                             -> Result<(), AddKeeperWorkerError> {
+        self.coord.borrow_mut().add_keeper_worker(name, worker_num, addr)
     }
 
-    pub fn lookup_keeper(&self, name: &str) -> Result<Keeper, LookupKeeperError> {
-        self.coord.borrow().lookup_keeper(name)
+    pub fn get_keeper_address(&mut self,
+                              name: String)
+                              -> Result<(String, u16), GetKeeperAddressError> {
+        self.coord.borrow_mut().get_keeper_address(name)
+    }
+
+    pub fn remove_keeper_worker(&mut self,
+                                name: String,
+                                worker_num: usize)
+                                -> Result<(), RemoveKeeperWorkerError> {
+        self.coord.borrow_mut().remove_keeper_worker(name, worker_num)
     }
 }
 
