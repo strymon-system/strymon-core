@@ -5,6 +5,8 @@ members = [
     "src/strymon_cli"
 ]
 
+exclude = ["examples"]
+
 [replace."timely_communication:0.1.8"]
 git = "ssh://git@gitlab.inf.ethz.ch/PROJECT-STRYMON/timely-dataflow.git"
 branch = "0.1.7"
