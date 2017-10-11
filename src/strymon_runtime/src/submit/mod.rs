@@ -88,6 +88,10 @@ impl Submitter {
         self.get_collection("$queries")
     }
 
+    pub fn keepers(&self) -> Result<Vec<Query>> {
+        self.get_collection("$keepers")
+    }
+
     pub fn publications(&self) -> Result<Vec<Publication>> {
         self.get_collection("$publications")
     }

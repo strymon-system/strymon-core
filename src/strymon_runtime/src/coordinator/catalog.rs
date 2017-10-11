@@ -25,6 +25,8 @@ pub struct Catalog {
 
     publications: Collection<Publication>,
     subscriptions: Collection<Subscription>,
+
+    keepers: MapCollection<KeeperId, Keeper>,
 }
 
 impl Catalog {
@@ -58,15 +60,21 @@ impl Catalog {
         directory.insert(topic.name.clone(), topic.id);
         topics.insert(topic.id, topic);
 
+        let id = generator.generate();
+        let (topic, keepers) = MapCollection::new(network, handle, id, "$keepers")?;
+        directory.insert(topic.name.clone(), topic.id);
+        topics.insert(topic.id, topic);
+
         Ok(Catalog {
-            generator: generator,
-            directory: directory,
-            topics: topics,
-            executors: executors,
-            queries: queries,
-            publications: pubs,
-            subscriptions: subs,
-        })
+               generator: generator,
+               directory: directory,
+               topics: topics,
+               executors: executors,
+               queries: queries,
+               publications: pubs,
+               subscriptions: subs,
+               keepers: keepers,
+           })
     }
 
     pub fn add_executor(&mut self, executor: Executor) {
@@ -162,6 +170,27 @@ impl Catalog {
         self.subscriptions.remove(subscription);
         Ok(())
     }
+
+    pub fn add_keeper(&mut self, keeper: Keeper) {
+        self.keepers.insert(keeper.id, keeper);
+    }
+
+    pub fn add_keeper_worker(&mut self,
+                             keeper_id: &KeeperId,
+                             worker_num: usize,
+                             addr: (String, u16)) -> Result<(), String> {
+        let mut keeper = match self.keepers.remove(keeper_id) {
+            Some(keeper) => keeper,
+            None => return Err("No such Keeper".to_string()),
+        };
+        keeper.workers.push((worker_num, addr));
+        self.keepers.insert(keeper.id, keeper);
+        Ok(())
+    }
+
+    pub fn remove_keeper(&mut self, id: &KeeperId) -> Option<Keeper> {
+        self.keepers.remove(id)
+    }
 }
 
 struct MapCollection<K, V> {
@@ -199,10 +228,12 @@ impl<K: Ord, V: Serialize + Eq + Clone + 'static> MapCollection<K, V> {
         self.mutator.insert(value);
     }
 
-    fn remove(&mut self, key: &K) {
+    fn remove(&mut self, key: &K) -> Option<V> {
         if let Some(value) = self.inner.remove(key) {
-            self.mutator.remove(value);
+            self.mutator.remove(value.clone());
+            return Some(value);
         }
+        None
     }
 
     fn get(&self, key: &K) -> Option<&V> {

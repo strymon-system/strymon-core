@@ -116,3 +116,20 @@ pub struct Publication(pub QueryId, pub TopicId);
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Abomonation)]
 pub struct Subscription(pub QueryId, pub TopicId);
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Abomonation)]
+pub struct KeeperId(pub u64);
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Abomonation)]
+pub struct Keeper {
+    pub id: KeeperId,
+    pub name: String,
+    /// Worker id -> worker address
+    pub workers: Vec<(usize, (String, u16))>,
+}
+
+impl From<u64> for KeeperId {
+    fn from(id: u64) -> KeeperId {
+        KeeperId(id)
+    }
+}
