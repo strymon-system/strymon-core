@@ -159,7 +159,7 @@ impl Coordinator {
 
             // step 2.3: check if we actually have enough executors
             if executors.len() != num_executors {
-                return futures::failed(SubmissionError::ExecutorsNotFound).boxed();
+                return Box::new(futures::failed(SubmissionError::ExecutorsNotFound));
             }
 
             (executors, num_executors, num_workers)
@@ -254,7 +254,7 @@ impl Coordinator {
 
         // step 1: check if we actually know about this query
         let query = if query.is_none() {
-            return futures::failed(WorkerGroupError::SpawningAborted).boxed();
+            return Box::new(futures::failed(WorkerGroupError::SpawningAborted));
         } else {
             query.unwrap()
         };
@@ -268,7 +268,7 @@ impl Coordinator {
                 (waiting.len(), Box::new(rx))
             }
             QueryState::Running | QueryState::Terminating => {
-                return futures::failed(WorkerGroupError::InvalidWorkerGroup).boxed()
+                return Box::new(futures::failed(WorkerGroupError::InvalidWorkerGroup))
             }
         };
 
@@ -383,7 +383,7 @@ impl Coordinator {
 
         if let Some(topic) = self.catalog.lookup(&req.name) {
             self.catalog.subscribe(query, topic.id);
-            return futures::finished(topic).boxed();
+            return Box::new(futures::finished(topic));
         } else if req.blocking {
             debug!("inserting blocking lookup for topic: {:?}", &req.name);
             let (lookup, result) = channel();
@@ -401,7 +401,7 @@ impl Coordinator {
 
             return Box::new(result);
         } else {
-            return futures::failed(SubscribeError::TopicNotFound).boxed();
+            return Box::new(futures::failed(SubscribeError::TopicNotFound));
         }
     }
 
@@ -438,7 +438,7 @@ impl Coordinator {
             }
         };
 
-        let mut keeper_state =
+        let keeper_state =
             self.keepers.entry(keeper_id.clone()).or_insert_with(|| {
                 KeeperState {
                     workers: Vec::new(),
@@ -467,7 +467,7 @@ impl Coordinator {
             Some(id) => id,
             None => return Err(GetKeeperAddressError::KeeperNotFound),
         };
-        let mut keeper_state =
+        let keeper_state =
             self.keepers.get_mut(keeper_id).expect("Invariant broken: \
                     keeper_id present in keepers_directory but not in keepers.");
         let workers_len = keeper_state.workers.len();
@@ -493,7 +493,7 @@ impl Coordinator {
         let workers_len;
 
         {
-            let mut keeper_state = self.keepers.get_mut(&keeper_id)
+            let keeper_state = self.keepers.get_mut(&keeper_id)
             .expect("Invariant broken: keeper_id present in keepers_directory but not in keepers.");
 
             old_workers_len = keeper_state.workers.len();
@@ -626,7 +626,7 @@ impl CoordinatorRef {
                      -> Box<Future<Item = Topic, Error = SubscribeError>> {
         let query = req.token;
         if !self.state.borrow().authenticate(&query) {
-            return futures::failed(SubscribeError::AuthenticationFailure).boxed();
+            return Box::new(futures::failed(SubscribeError::AuthenticationFailure));
         }
 
         let state = self.state.clone();

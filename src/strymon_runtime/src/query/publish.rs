@@ -74,15 +74,22 @@ pub enum Partition {
 const PUBLISH_WORKER_ID: u64 = 0;
 
 impl<T: Timestamp, D: ExchangeData> ParallelizationContract<T, D> for Partition {
+    type Pusher = Box<Push<(T, Content<D>)>>;
+    type Puller = Box<Pull<(T, Content<D>)>>;
+
     fn connect<A: Allocate>
         (self,
          allocator: &mut A,
          identifier: usize)
          -> (Box<Push<(T, Content<D>)>>, Box<Pull<(T, Content<D>)>>) {
         match self {
-            Partition::PerWorker => Pipeline.connect(allocator, identifier),
+            Partition::PerWorker => {
+                let (push, pull) = Pipeline.connect(allocator, identifier);
+                (Box::new(push), Box::new(pull))
+            }
             Partition::Merge => {
-                Exchange::new(|_| PUBLISH_WORKER_ID).connect(allocator, identifier)
+                let (push, pull) = Exchange::new(|_| PUBLISH_WORKER_ID).connect(allocator, identifier);
+               (push, Box::new(pull))
             }
         }
     }

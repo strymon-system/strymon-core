@@ -26,7 +26,7 @@ pub mod start {
 
     pub fn main(args: &ArgMatches) -> Result<()> {
         let mut coordinator = coordinator::Builder::default();
-    
+
         if let Some(port) = args.value_of("port") {
             let parsed = port.parse::<u16>()
                 .chain_err(|| "unable to parse port number")?;
@@ -38,6 +38,6 @@ pub mod start {
             coordinator.host(host.to_owned());
         }
 
-        coordinator.run().chain_err(|| "failed to run coordinator")
+        coordinator.run().chain_err(|| "Failed to run coordinator")
     }
 }

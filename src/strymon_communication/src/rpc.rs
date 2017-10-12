@@ -214,7 +214,7 @@ impl Resolver {
                 };
 
                 // try to send to receiver
-                if self.incoming.send(Ok(buf)).is_err() {
+                if self.incoming.unbounded_send(Ok(buf)).is_err() {
                     error!("incoming request queue dropped, ignoring request");
                 }
             }
@@ -253,7 +253,7 @@ impl Resolver {
 
                 // make sure to announce any network errors to client
                 if let Err(err) = res {
-                    let _ = self.incoming.send(Err(err));
+                    let _ = self.incoming.unbounded_send(Err(err));
                     break;
                 }
             }

@@ -48,8 +48,8 @@ pub mod start {
             let split: Vec<&str> = ports.split("..").collect();
             let min = split.get(0).and_then(|m| m.parse::<u16>().ok());
             let max = split.get(1).and_then(|m| m.parse::<u16>().ok());
-            if split.len() != 2 || min.is_none() || max.is_none() {
-                return Err("Invalid port range: {}".into())
+            if split.len() != 2 || min.is_none() || max.is_none() || min >= max {
+                bail!("Invalid port range: {}", ports)
             }
 
             executor.ports(min.unwrap(), max.unwrap());

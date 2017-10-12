@@ -156,7 +156,7 @@ pub struct Mutator<D> {
 
 impl<D> Mutator<D> {
     pub fn update_from(&self, updates: Vec<(D, i32)>) {
-        if let Err(_) = self.sink.send(updates) {
+        if let Err(_) = self.sink.unbounded_send(updates) {
             panic!("collection publisher disappeared")
         }
     }
