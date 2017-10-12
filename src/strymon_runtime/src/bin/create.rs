@@ -11,7 +11,7 @@ pub fn usage<'a, 'b>() -> App<'a, 'b> {
 }
 
 pub fn main(args: &ArgMatches) -> Result<()> {
-    let path = Path::new(args.value_of("path").unwrap());
+    let _path = Path::new(args.value_of("path").unwrap());
 
     Err("not yet implemented")?
 }

@@ -1,4 +1,4 @@
-use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
+use clap::{App, AppSettings, ArgMatches, SubCommand};
 
 mod coordinator;
 mod executor;

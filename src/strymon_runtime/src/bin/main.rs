@@ -12,7 +12,7 @@ mod manage;
 
 use std::env;
 
-use clap::{App, AppSettings, Arg, SubCommand};
+use clap::{App, AppSettings, Arg};
 use env_logger::{LogBuilder, LogTarget};
 
 use errors::*;
