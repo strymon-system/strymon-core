@@ -17,6 +17,9 @@ pub struct TopicType {
 
 impl TopicType {
     pub fn of<T>() -> Self {
+        // TODO(swicki): This currently required unstable Rust, we really
+        // should either use NamedType instead or figure out if we can derive
+        // a schema from serde instead
         TopicType {
             name: unsafe { type_name::<T>() }.to_string(),
         }

@@ -29,8 +29,8 @@ fn build_binary(path: Option<&Path>, args: &ArgMatches) -> Result<String> {
     }
     if args.is_present("all-features") {
         cargo.arg("--all-features");
-    } else if let Some(list) = args.value_of("features") {
-        cargo.args(&["--features", list]);
+    } else if let Some(list) = args.values_of("features") {
+        cargo.arg("--features").arg(list.collect::<Vec<_>>().join(" "));
     };
 
     if let Some(name) = args.value_of("bin") {
@@ -114,10 +114,12 @@ pub fn usage<'a, 'b>() -> App<'a, 'b> {
         .arg(Arg::with_name("features")
                 .long("features")
                 .takes_value(true)
+                .multiple(true)
+                .require_delimiter(true)
                 .value_name("FEATURES")
                 .conflicts_with("all-features")
                 .display_order(101)
-                .help("Space-separated list of features to activate"))
+                .help("Comma-separated list of features to activate"))
         .arg(Arg::with_name("all-features")
                 .long("all-features")
                 .conflicts_with("features")
@@ -173,16 +175,20 @@ pub fn usage<'a, 'b>() -> App<'a, 'b> {
                 .possible_values(&["fixed", "random"])
                 .display_order(302)
                 .help("Job placement strategy"))
-        .arg(Arg::with_name("fixed-ids")
+        .arg(Arg::with_name("placement-fixed-id")
                 .long("fixed-ids")
                 .takes_value(true)
+                .multiple(true)
+                .require_delimiter(true)
                 .display_order(303)
-                .help("List of executor ids for `fixed` placement"))
-        .arg(Arg::with_name("fixed-hosts")
+                .help("Comma-separated list of executor ids for `fixed` placement"))
+        .arg(Arg::with_name("placement-fixed-host")
                 .long("fixed-hosts")
                 .takes_value(true)
+                .multiple(true)
+                .require_delimiter(true)
                 .display_order(304)
-                .help("List of executor host names for `fixed` placement"))
+                .help("Comma-separated list of executor host names for `fixed` placement"))
 }
 
 pub fn main(args: &ArgMatches) -> Result<()> {
