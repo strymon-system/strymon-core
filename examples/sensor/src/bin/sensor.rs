@@ -1,5 +1,5 @@
 extern crate timely;
-extern crate timely_query;
+extern crate strymon_runtime;
 
 use std::io::prelude::*;
 use std::io::BufReader;
@@ -11,14 +11,14 @@ use std::time::Duration;
 use timely::dataflow::Scope;
 use timely::dataflow::operators::Input;
 
-use timely_query::publish::Partition;
+use strymon_runtime::query::publish::Partition;
 
 // timestamp,humidity,pir,motion,mic,temperature
 type SensorData = (u64, (f32, i32, i32, i32, f32));
 
 fn main() {
-    timely_query::execute(|root, coord| {
-            let mut input = root.scoped::<u64, _, _>(|scope| {
+    strymon_runtime::query::execute(|root, coord| {
+            let mut input = root.dataflow::<u64, _, _>(|scope| {
                 let (input, stream) = scope.new_input();
 
                 coord.publish("sensor", &stream, Partition::Merge)

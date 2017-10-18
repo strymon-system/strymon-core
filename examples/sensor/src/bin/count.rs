@@ -1,17 +1,17 @@
 extern crate timely;
-extern crate timely_query;
+extern crate strymon_runtime;
 
 use timely::dataflow::Scope;
 use timely::dataflow::operators::{Inspect, Accumulate, UnorderedInput};
 
-use timely_query::publish::Partition;
+use strymon_runtime::query::publish::Partition;
 use timely::dataflow::channels::message::Content;
 
 type SensorData = (f32, i32, i32, i32, f32);
 
 fn main() {
-    timely_query::execute(|root, coord| {
-            let (mut input, cap) = root.scoped::<u64, _, _>(|scope| {
+    strymon_runtime::query::execute(|root, coord| {
+            let (mut input, cap) = root.dataflow::<u64, _, _>(|scope| {
                 let (input, stream) = scope.new_unordered_input();
 
                 let count = stream.inspect_batch(|t, xs| {
