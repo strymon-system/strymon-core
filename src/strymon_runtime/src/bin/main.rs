@@ -8,6 +8,7 @@ extern crate serde;
 extern crate serde_json;
 
 extern crate strymon_runtime;
+extern crate strymon_communication;
 
 mod errors;
 mod create;
@@ -41,7 +42,7 @@ fn dispatch() -> Result<()> {
 
     // configure env_logger
     let mut logger = LogBuilder::new();
-    logger.target(LogTarget::Stdout);
+    logger.target(LogTarget::Stderr);
     if let Some(s) = matches.value_of("log-level") {
         logger.parse(s);
     } else if let Ok(s) = env::var("RUST_LOG") {
