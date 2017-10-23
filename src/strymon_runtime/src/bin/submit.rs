@@ -4,12 +4,12 @@ use std::path::{Path};
 use std::process::{Command, Stdio};
 
 use serde_json::{Value, Deserializer};
-use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
+use clap::{App, AppSettings, Arg, ArgGroup, ArgMatches, SubCommand};
 use log::LogLevel;
 
 use strymon_communication::Network;
 use strymon_runtime::submit::Submitter;
-use strymon_runtime::model::{QueryProgram, QueryId, ExecutionFormat, Executor};
+use strymon_runtime::model::{QueryProgram, QueryId, ExecutionFormat, Executor, ExecutorId};
 use strymon_runtime::coordinator::requests::Placement;
 
 use errors::*;
@@ -116,12 +116,14 @@ fn parse_placement(args: &ArgMatches, executors: Vec<Executor>) -> Result<Placem
         format!("Failed to parse value of '--{}' option", arg)
     }
 
+    // number of workers per machine
     let workers = if let Some(w) = args.value_of("workers") {
         w.parse().chain_err(|| parse_err("workers"))?
     } else {
         1
     };
 
+    // parse placement strategy and its arguments
     match args.value_of("placement-strategy") {
         Some("random") => {
             let num_executors = args
@@ -129,54 +131,33 @@ fn parse_placement(args: &ArgMatches, executors: Vec<Executor>) -> Result<Placem
                 .expect("missing `num-executors` argument")
                 .parse().chain_err(|| parse_err("num-executors"))?;
             Ok(Placement::Random(num_executors, workers))
-        }
-        _ => Ok(Placement::Random(1, workers))
-    }
-
-    /*let workers = if let Some(w) = args.value_of("workers") {
-        w.parse().chain_err(|| "failed to parse `workers` argument")
-    } else {
-        1
-    };
-
-    //Placement::Random(executors, workers)
-    //Placement::Fixed(fixed, workers)
-    match 
-
-    let placement = match (m.opt_str("r"), m.opt_str("f"), m.opt_str("n")) {
-        (Some(r), None, None) => {
-            let executors = r.parse().map_err(|e| fmt_err("random", e))?;
-            
-        }
-        (None, Some(f), None) => {
-            let mut fixed = vec![];
-            for num in f.split(",") {
-                let id = num.parse::<u64>().map_err(|e| fmt_err("fixed", e))?;
-                fixed.push(ExecutorId(id));
-            }
-
-        }
-        (None, None, Some(n)) => {
-            let mut fixed = vec![];
-            for name in n.split(",") {
-                let mut executor = executors.iter().filter(|e| e.host == name);
-                if let Some(executor) = executor.next() {
-                    fixed.push(executor.id);
-                } else {
-                    return Err(format!("unknown executor '{}'", name));
+        },
+        Some("pinned") => {
+            let mut pinned = vec![];
+            if let Some(ids) = args.values_of("pinned-id") {
+                for num in ids {
+                    let id = num.parse::<u64>().chain_err(|| parse_err("pinned-id"))?;
+                    pinned.push(ExecutorId(id));
                 }
+            } if let Some(hosts) = args.values_of("pinned-host") {
+                for name in hosts {
+                    let executor = executors.iter().find(|e| e.host == name);
+                    if let Some(executor) = executor {
+                        pinned.push(executor.id);
+                    } else {
+                        bail!("Unknown executor host '{}'", name);
+                    }
+                }
+                Ok(Placement::Fixed(pinned, workers))
+            } else {
+                bail!("Missing executors list for pinning")
             }
-            Placement::Fixed(fixed, workers)
-        }
-        (None, None, None) => Placement::Random(1, workers),
+        },
         _ => {
-            let err = "Options 'random', 'fixed', and 'hosts' are mutually exclusive";
-            return Err(String::from(err));
+            // by default choose a random executor
+            Ok(Placement::Random(1, workers))
         }
-    };
-
-    Ok(placement)*/
-
+    }
 }
 
 fn submit_binary(binary: String, args: &ArgMatches) -> Result<QueryId> {
@@ -305,29 +286,42 @@ pub fn usage<'a, 'b>() -> App<'a, 'b> {
         .arg(Arg::with_name("placement-strategy")
                 .long("placement-strategy")
                 .takes_value(true)
+                .value_name("STRATEGY")
                 .possible_values(&["pinned", "random"])
+                .requires_if("pinned", "pinned-group")
+                .requires_if("random", "random-group")
                 .display_order(302)
                 .help("Job placement strategy"))
         .arg(Arg::with_name("pinned-id")
                 .long("pinned-id")
                 .takes_value(true)
+                .value_name("ID")
                 .multiple(true)
                 .require_delimiter(true)
+                .conflicts_with("pinned-host")
                 .display_order(303)
                 .help("Comma-separated list of executor ids for `pinned` placement strategy"))
         .arg(Arg::with_name("pinned-host")
                 .long("pinned-host")
                 .takes_value(true)
+                .value_name("HOST")
                 .multiple(true)
                 .require_delimiter(true)
+                .conflicts_with("pinned-id")
                 .display_order(304)
                 .help("Comma-separated list of executor host names for `pinned` placement strategy"))
         .arg(Arg::with_name("num-executors")
                 .long("num-executors")
-                .required_if("placement-strategy", "random")
                 .takes_value(true)
+                .value_name("NUM")
                 .display_order(303)
-                .help("Comma-separated list of executor ids for `fixed` placement strategy"))
+                .help("Number of executors for `random` placement strategy"))
+        .group(ArgGroup::with_name("pinned-group")
+             .args(&["pinned-host", "pinned-id"])
+             .conflicts_with("random-group"))
+        .group(ArgGroup::with_name("random-group")
+             .args(&["num-executors"])
+             .conflicts_with("pinned-group"))
 }
 
 pub fn main(args: &ArgMatches) -> Result<()> {
