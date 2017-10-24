@@ -9,6 +9,7 @@ pub fn usage<'a, 'b>() -> App<'a, 'b> {
     SubCommand::with_name("manage")
         .about("Manage the Strymon cluster")
         .setting(AppSettings::SubcommandRequiredElseHelp)
+        .setting(AppSettings::Hidden)
         .subcommand(coordinator::start::usage())
         .subcommand(executor::start::usage())
 }
