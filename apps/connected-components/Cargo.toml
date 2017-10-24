@@ -1,0 +1,15 @@
+[package]
+name = "connected_components"
+version = "0.1.0"
+authors = ["Sebastian Wicki <swicki@inf.ethz.ch>"]
+
+[dependencies]
+rand = "0.3.17"
+timely = "0.3.0"
+differential-dataflow = "0.2.0"
+
+[dependencies.strymon_runtime]
+path = "../../src/strymon_runtime"
+
+[dependencies.topology_generator]
+path = "../topology-generator"

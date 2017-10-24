@@ -1,0 +1,15 @@
+[package]
+authors = ["Sebastian Wicki <swicki@inf.ethz.ch>"]
+name = "topology_generator"
+version = "0.1.0"
+
+[dependencies]
+rand = "0.3.17"
+timely = "0.3.0"
+abomonation = "0.4.6"
+abomonation_derive = "0.2.2"
+serde = "1.0"
+serde_derive = "1.0"
+
+[dependencies.strymon_runtime]
+path = "../../src/strymon_runtime"
