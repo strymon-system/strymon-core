@@ -102,7 +102,15 @@ stop_service() {
   host="${2}"
   basedir="${3}"
 
-  # artifacts
-  logfile="${basedir}/${service}_${host}.log"
   pidfile="${basedir}/${service}_${host}.pid"
+
+  if ! [ -e "${pidfile}" ] ; then
+    echo "error: ${service} does not seem to be running on ${host}" >&2
+    exit 1
+  fi
+  
+  pid="$(cat "${pidfile}")"
+
+  cmd="kill ${pid}; rm \"${pidfile}\""
+  remote_cmd "$host" "$cmd"
 }

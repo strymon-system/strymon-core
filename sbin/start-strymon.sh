@@ -70,9 +70,6 @@ BINARY="$(abspath "$(locate_binary)")"
 mkdir -p "${LOGDIR}"
 start_coordinator "${COORDINATOR}" "${LOGDIR}" "${BINARY}"
 while read host; do
-  start_executor "$host" "${LOGDIR}" "${BINARY}"
+  start_executor "${host}" "${LOGDIR}" "${BINARY}"
 done < "${EXECUTORS}"
-
-#nohup my_command > my.log 2>&1 &
-#echo $! > save_pid.txt
 
