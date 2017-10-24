@@ -1,6 +1,6 @@
 [package]
 authors = ["Sebastian Wicki <swicki@inf.ethz.ch>"]
-name = "strymon-runtime"
+name = "strymon_runtime"
 version = "0.1.0"
 
 [[bin]]

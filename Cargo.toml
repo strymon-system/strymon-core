@@ -2,6 +2,7 @@
 members = [
     "src/strymon_communication",
     "src/strymon_runtime",
+    "apps/connected-components",
+    "apps/topology-generator",
+    "apps/deltapath-routing",    
 ]
-
-exclude = ["examples"]

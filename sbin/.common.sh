@@ -16,6 +16,19 @@ abspath() {
     esac
 }
 
+## Locates the path of the strymon command line utility
+locate_binary() {
+  BINARY="${BASEDIR}/../target/release/strymon"
+
+  if ! [ -x "${BINARY}" ] ; then
+    echo "Unable to locate the strymon binary at '${BINARY}'" >&2
+    echo 'Try running `cargo build --all --release` first' >&2
+    exit 1
+  fi
+
+  echo "${BINARY}"
+}
+
 ## Prints the command line usage and quits
 # $0: Name of the script
 # $COORDINATOR, $EXECUTORS, $LOGDIR: Default values

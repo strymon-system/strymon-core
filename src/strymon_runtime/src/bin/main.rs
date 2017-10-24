@@ -11,7 +11,7 @@ extern crate strymon_runtime;
 extern crate strymon_communication;
 
 mod errors;
-mod create;
+mod status;
 mod submit;
 mod manage;
 
@@ -29,7 +29,7 @@ fn dispatch() -> Result<()> {
         .version("0.1")
         .author("Systems Group, ETH Zürich")
         .setting(AppSettings::SubcommandRequiredElseHelp)
-        .subcommand(create::usage())
+        .subcommand(status::usage())
         .subcommand(submit::usage())
         .subcommand(manage::usage())
         .arg(Arg::with_name("log-level")
@@ -51,7 +51,7 @@ fn dispatch() -> Result<()> {
     logger.init().expect("failed to initialize logger");
 
     match matches.subcommand() {
-        ("create", Some(args)) => create::main(args),
+        ("status", Some(args)) => status::main(args),
         ("submit", Some(args)) => submit::main(args),
         ("manage", Some(args)) => manage::main(args),
         _ => unreachable!("invalid subcommand"),

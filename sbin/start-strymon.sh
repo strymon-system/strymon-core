@@ -4,19 +4,6 @@ set -eu -o pipefail
 BASEDIR=$(dirname "$0")
 . "${BASEDIR}/.common.sh"
 
-## Locates the path of the strymon command line utility
-locate_binary() {
-  BINARY="${BASEDIR}/../target/release/strymon"
-
-  if ! [ -x "${BINARY}" ] ; then
-    echo "Unable to locate the strymon binary at '${BINARY}'" >&2
-    echo 'Try running `cargo build --all --release` first' >&2
-    exit 1
-  fi
-
-  echo "${BINARY}"
-}
-
 ## Starts a coordinator process
 # $1: Address of the coordinator to be spawned (e.g. localhost:9189)
 # $2: Working directory for pid and log files
