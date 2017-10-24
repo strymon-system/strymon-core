@@ -233,7 +233,7 @@ impl Coordinator {
                 // publication logic
                 input.for_each(|time, data| {
                     if let Some(ref mut mutator) = mutator {
-                        mutator.update_from(data.clone().into_typed());
+                        mutator.update_from(data.drain(..).collect());
                     }
                     output.session(&time).give_content(data);
                 });
