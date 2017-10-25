@@ -84,10 +84,6 @@ pub fn fat_tree_topology(k: u32, max_weight: u64, verbose: bool) -> Topology {
         core_groups.push(core_group);
     }
 
-    if verbose {
-        println!("Core Switches by core group: {:?}", core_groups);
-    }
-
     // create the pods
     for _i_pod in 0..k {
         // create the edge-switches of the pod
@@ -113,11 +109,6 @@ pub fn fat_tree_topology(k: u32, max_weight: u64, verbose: bool) -> Topology {
                 topo.connections.push((switch_id, core_switch_id, w));
             }
         }
-    }
-
-    if verbose{
-        println!("Topo:");
-        println!("Switches: {}, Links: {}",topo.switches, topo.connections.len());
     }
 
     assert_eq!(n_connections, topo.connections.len() as u32);
