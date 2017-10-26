@@ -96,7 +96,7 @@ spawn_service() {
   pidfile="${basedir}/${service}_${host}.pid"
 
   # basic sanity check
-  if [ -e "${pidfile}" ] ; then
+  if [ -e "${pidfile}" ] && [ -n "$(xargs ps -o pid= -p < ${pidfile})" ] ; then
     echo "error: ${service} seems to be already running on ${host}" >&2
     echo "remove '${pidfile}' to override this check" >&2
     exit 1
