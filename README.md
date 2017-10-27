@@ -1,6 +1,8 @@
 Strymon Core
 ============
 
+[![Build Status](https://travis-ci.org/strymon-system/strymon-core.svg?branch=master)](https://travis-ci.org/strymon-system/strymon-core)
+
 This repository contains the source code of the Strymon core run-time.
 
 ## Usage
