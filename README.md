@@ -18,7 +18,7 @@ Please follow the [documentation](http://strymon-system.github.io/docs/) and gui
 
 ## Contribute
 
- - [Contribution Guide](https://strymon-system.github.io/docs/getting-started)
+ - [Contribution Guide](https://strymon-system.github.io/docs/how-to-contribute)
  - [Mailing list](https://lists.inf.ethz.ch/mailman/listinfo/strymon-users)
 
 ## License
