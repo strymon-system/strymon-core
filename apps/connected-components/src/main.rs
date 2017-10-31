@@ -53,7 +53,7 @@ fn main() {
                         if num_partitions == 1 {
                             println!("All nodes in the graph are now connected.");
                         } else {
-                            println!("The are now {} disconnected partitions in the graph!", num_partitions);
+                            println!("There are now {} disconnected partitions in the graph!", num_partitions);
                         }
                     }
                   })
