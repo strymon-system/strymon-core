@@ -26,7 +26,5 @@ impl Request for SpawnQuery {
     type Success = ();
     type Error = SpawnError;
 
-    fn name() -> &'static str {
-        "SpawnQuery"
-    }
+    const NAME: &'static str = "SpawnQuery";
 }
