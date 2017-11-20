@@ -31,9 +31,7 @@ pub trait Request: Serialize + DeserializeOwned {
     type Success: Serialize + DeserializeOwned;
     type Error: Serialize + DeserializeOwned;
 
-    // TODO(swicki): This should be an associated string, but this feature
-    // is not stable yet (`associated_consts`, rust-lang/rust #29646)
-    fn name() -> &'static str;
+    const NAME: &'static str;
 }
 
 type RequestId = u32;
@@ -160,7 +158,7 @@ impl Outgoing {
         let mut msg = MessageBuf::empty();
         msg.push(Type::Request as u8).unwrap();
         msg.push(id).unwrap();
-        msg.push(R::name()).unwrap();
+        msg.push(R::NAME).unwrap();
         msg.push::<&R>(r).unwrap();
 
         // step 2: add completion handle for pending responses
@@ -375,9 +373,7 @@ mod tests {
         type Success = Pong;
         type Error = ();
 
-        fn name() -> &'static str {
-            "Ping"
-        }
+        const NAME: &'static str = "Ping";
     }
 
     #[test]

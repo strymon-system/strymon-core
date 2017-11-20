@@ -33,9 +33,7 @@ impl Request for Submission {
     type Success = QueryId;
     type Error = SubmissionError;
 
-    fn name() -> &'static str {
-        "Submission"
-    }
+    const NAME: &'static str = "Submission";
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -52,9 +50,7 @@ impl Request for AddExecutor {
     type Success = ExecutorId;
     type Error = ExecutorError;
 
-    fn name() -> &'static str {
-        "AddExecutor"
-    }
+    const NAME: &'static str = "AddExecutor";
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -80,9 +76,7 @@ impl Request for AddWorkerGroup {
     type Success = QueryToken;
     type Error = WorkerGroupError;
 
-    fn name() -> &'static str {
-        "AddWorkerGroup"
-    }
+    const NAME: &'static str = "AddWorkerGroup";
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -102,9 +96,7 @@ impl Request for Subscribe {
     type Success = Topic;
     type Error = SubscribeError;
 
-    fn name() -> &'static str {
-        "Subscribe"
-    }
+    const NAME: &'static str = "Subscribe";
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -123,9 +115,7 @@ impl Request for Unsubscribe {
     type Success = ();
     type Error = UnsubscribeError;
 
-    fn name() -> &'static str {
-        "Unsubscribe"
-    }
+    const NAME: &'static str = "Unsubscribe";
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -146,9 +136,7 @@ impl Request for Publish {
     type Success = Topic;
     type Error = PublishError;
 
-    fn name() -> &'static str {
-        "Publish"
-    }
+    const NAME: &'static str = "Publish";
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -167,9 +155,7 @@ impl Request for Unpublish {
     type Success = ();
     type Error = UnpublishError;
 
-    fn name() -> &'static str {
-        "Unpublish"
-    }
+    const NAME: &'static str = "Unpublish";
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -181,9 +167,7 @@ impl Request for Lookup {
     type Success = Topic;
     type Error = ();
 
-    fn name() -> &'static str {
-        "Lookup"
-    }
+    const NAME: &'static str = "Lookup";
 }
 
 /// Add a worker of a Keeper.
@@ -203,9 +187,7 @@ impl Request for AddKeeperWorker {
     type Success = ();
     type Error = AddKeeperWorkerError;
 
-    fn name() -> &'static str {
-        "AddKeeperWorker"
-    }
+    const NAME: &'static str = "AddKeeperWorker";
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -223,9 +205,7 @@ impl Request for GetKeeperAddress {
     type Success = (String, u16);
     type Error = GetKeeperAddressError;
 
-    fn name() -> &'static str {
-        "GetKeeperAddress"
-    }
+    const NAME: &'static str = "GetKeeperAddress";
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -244,7 +224,5 @@ impl Request for RemoveKeeperWorker {
     type Success = ();
     type Error = RemoveKeeperWorkerError;
 
-    fn name() -> &'static str {
-        "RemoveKeeperWorker"
-    }
+    const NAME: &'static str = "RemoveKeeperWorker";
 }
