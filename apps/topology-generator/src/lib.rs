@@ -13,8 +13,13 @@ extern crate abomonation_derive;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
+extern crate named_type;
+#[macro_use]
+extern crate named_type_derive;
 
 use rand::{Rng, SeedableRng, StdRng};
+
+use named_type::NamedType;
 
 /// A unique, dense identifier for a topology node (i.e. a switch)
 pub type NodeId = u32;
@@ -25,7 +30,7 @@ pub type LinkWeight = u64;
 /// A unidirectional connection between two switches
 pub type Connection = (NodeId, NodeId, LinkWeight);
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Abomonation)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Abomonation, NamedType)]
 pub enum Entity {
     Connection(Connection),
     Switch(NodeId),

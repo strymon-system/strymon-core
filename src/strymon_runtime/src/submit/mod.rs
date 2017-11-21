@@ -15,6 +15,8 @@ use futures::stream::Stream;
 
 use serde::de::DeserializeOwned;
 
+use named_type::NamedType;
+
 use strymon_communication::Network;
 use strymon_communication::rpc::{Outgoing, Response};
 
@@ -64,7 +66,7 @@ impl Submitter {
     }
 
     fn get_collection<D>(&self, name: &str) -> Result<Vec<D>>
-        where D: DeserializeOwned + Clone
+        where D: DeserializeOwned + Clone + NamedType
     {
         let topic = self.lookup(name)?;
         assert_eq!(topic.schema, TopicSchema::Collection(TopicType::of::<D>()));

@@ -10,6 +10,8 @@ abomonation = "0.4.6"
 abomonation_derive = "0.2.2"
 serde = "1.0"
 serde_derive = "1.0"
+named_type = "0.1.3"
+named_type_derive = "0.1.3"
 
 [dependencies.strymon_runtime]
 path = "../../src/strymon_runtime"

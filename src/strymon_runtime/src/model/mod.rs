@@ -7,7 +7,7 @@
 // except according to those terms.
 
 use std::fmt;
-use std::intrinsics::type_name;
+use named_type::NamedType;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Abomonation)]
 pub struct TopicId(pub u64);
@@ -24,12 +24,9 @@ pub struct TopicType {
 }
 
 impl TopicType {
-    pub fn of<T>() -> Self {
-        // TODO(swicki): This currently required unstable Rust, we really
-        // should either use NamedType instead or figure out if we can derive
-        // a schema from serde instead
+    pub fn of<T: NamedType>() -> Self {
         TopicType {
-            name: unsafe { type_name::<T>() }.to_string(),
+            name: T::type_name().to_string()
         }
     }
 }
@@ -67,7 +64,7 @@ impl fmt::Display for TopicSchema {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Abomonation)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Abomonation, NamedType)]
 pub struct Topic {
     pub id: TopicId,
     pub name: String,
@@ -75,7 +72,7 @@ pub struct Topic {
     pub schema: TopicSchema,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Abomonation)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Abomonation, NamedType)]
 pub struct QueryId(pub u64);
 
 impl From<u64> for QueryId {
@@ -84,7 +81,7 @@ impl From<u64> for QueryId {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Abomonation)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Abomonation, NamedType)]
 pub struct Query {
     pub id: QueryId,
     pub name: Option<String>,
@@ -93,20 +90,20 @@ pub struct Query {
     pub executors: Vec<ExecutorId>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Abomonation)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Abomonation, NamedType)]
 pub struct QueryProgram {
     pub format: ExecutionFormat,
     pub source: String, // TODO(swicki) use Url crate for this?
     pub args: Vec<String>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Abomonation)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Abomonation, NamedType)]
 pub enum ExecutionFormat {
     NativeExecutable,
     Other,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Abomonation)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Abomonation, NamedType)]
 pub struct ExecutorId(pub u64);
 
 impl From<u64> for ExecutorId {
@@ -115,23 +112,23 @@ impl From<u64> for ExecutorId {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Abomonation)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Abomonation, NamedType)]
 pub struct Executor {
     pub id: ExecutorId,
     pub host: String,
     pub format: ExecutionFormat,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Abomonation)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Abomonation, NamedType)]
 pub struct Publication(pub QueryId, pub TopicId);
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Abomonation)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Abomonation, NamedType)]
 pub struct Subscription(pub QueryId, pub TopicId);
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Abomonation)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Abomonation, NamedType)]
 pub struct KeeperId(pub u64);
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Abomonation)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Abomonation, NamedType)]
 pub struct Keeper {
     pub id: KeeperId,
     pub name: String,
