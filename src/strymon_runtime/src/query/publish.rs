@@ -20,6 +20,8 @@ use timely_communication::{Allocate, Pull, Push};
 use serde::ser::Serialize;
 use futures::Future;
 
+use named_type::NamedType;
+
 use query::{Coordinator, PubSubTimestamp};
 use coordinator::requests::*;
 use model::{Topic, TopicId, TopicType, TopicSchema};
@@ -155,9 +157,9 @@ impl Coordinator {
                          stream: &Stream<S, D>,
                          partition: Partition)
                          -> Result<Stream<S, D>, PublicationError>
-        where D: ExchangeData + Serialize,
+        where D: ExchangeData + Serialize + NamedType,
               S: Scope,
-              S::Timestamp: PubSubTimestamp
+              S::Timestamp: PubSubTimestamp + NamedType
     {
         let worker_id = stream.scope().index() as u64;
         let name = partition.name(name, worker_id);
@@ -210,7 +212,7 @@ impl Coordinator {
                                     stream: &Stream<S, (D, i32)>,
                                     partition: Partition)
                                     -> Result<Stream<S, (D, i32)>, PublicationError>
-        where D: ExchangeData + Eq + Serialize,
+        where D: ExchangeData + Eq + Serialize + NamedType,
               S: Scope
     {
         let worker_id = stream.scope().index() as u64;

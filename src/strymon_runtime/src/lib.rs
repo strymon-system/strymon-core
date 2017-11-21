@@ -6,8 +6,6 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-#![feature(core_intrinsics)]
-
 #[macro_use]
 extern crate log;
 #[macro_use]
@@ -26,6 +24,10 @@ extern crate serde_derive;
 extern crate abomonation;
 #[macro_use]
 extern crate abomonation_derive;
+
+extern crate named_type;
+#[macro_use]
+extern crate named_type_derive;
 
 extern crate strymon_communication;
 

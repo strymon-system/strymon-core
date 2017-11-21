@@ -21,6 +21,8 @@ use coordinator::requests::*;
 
 use pubsub::publisher::collection::{CollectionPublisher, Mutator};
 
+use named_type::NamedType;
+
 use super::util::Generator;
 
 pub struct Catalog {
@@ -206,7 +208,7 @@ struct MapCollection<K, V> {
     mutator: Mutator<V>,
 }
 
-impl<K: Ord, V: Serialize + Eq + Clone + 'static> MapCollection<K, V> {
+impl<K: Ord, V: Serialize + Eq + Clone + NamedType + 'static> MapCollection<K, V> {
     fn new(network: &Network,
            handle: &Handle,
            topic_id: TopicId,
@@ -258,7 +260,7 @@ struct Collection<T> {
     mutator: Mutator<T>,
 }
 
-impl<T: Serialize + Clone + Eq + Hash + 'static> Collection<T> {
+impl<T: Serialize + Clone + Eq + Hash + NamedType + 'static> Collection<T> {
     fn new(network: &Network,
            handle: &Handle,
            topic_id: TopicId,
