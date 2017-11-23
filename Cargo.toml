@@ -6,3 +6,6 @@ members = [
     "apps/topology-generator",
     #"apps/deltapath-routing",
 ]
+
+[profile.release]
+debug = true
