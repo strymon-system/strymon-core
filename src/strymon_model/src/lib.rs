@@ -6,6 +6,16 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+#![feature(core_intrinsics)]
+
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
+
+extern crate abomonation;
+#[macro_use]
+extern crate abomonation_derive;
+
 use std::fmt;
 use std::intrinsics::type_name;
 

@@ -17,8 +17,8 @@ use log::LogLevel;
 
 use strymon_communication::Network;
 use strymon_runtime::submit::Submitter;
-use strymon_runtime::model::{QueryProgram, QueryId, ExecutionFormat, Executor, ExecutorId};
-use strymon_runtime::coordinator::requests::Placement;
+use strymon_model::{QueryProgram, QueryId, ExecutionFormat, Executor, ExecutorId};
+use strymon_rpc::coordinator::Placement;
 
 use errors::*;
 

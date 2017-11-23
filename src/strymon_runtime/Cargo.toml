@@ -28,3 +28,9 @@ tokio-signal = "0.1.2"
 
 [dependencies.strymon_communication]
 path = "../strymon_communication/"
+
+[dependencies.strymon_model]
+path = "../strymon_model/"
+
+[dependencies.strymon_rpc]
+path = "../strymon_rpc/"

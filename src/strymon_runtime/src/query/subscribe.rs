@@ -16,10 +16,10 @@ use futures::stream::{Stream, Wait};
 
 use serde::de::DeserializeOwned;
 
-use coordinator::requests::*;
+use strymon_rpc::coordinator::*;
 
 use pubsub::subscriber::{Subscriber, TimelySubscriber};
-use model::{Topic, TopicId};
+use strymon_model::{Topic, TopicId};
 use query::{Coordinator, PubSubTimestamp};
 
 pub struct Subscription<D: Data + DeserializeOwned> {

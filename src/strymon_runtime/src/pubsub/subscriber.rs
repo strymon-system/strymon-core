@@ -17,7 +17,7 @@ use serde::de::DeserializeOwned;
 use strymon_communication::Network;
 use strymon_communication::transport::{Sender, Receiver};
 
-use model::Topic;
+use strymon_model::Topic;
 
 pub type CollectionSubscriber<D> = Subscriber<(D, i32)>;
 

@@ -20,10 +20,10 @@ use rand;
 
 use strymon_communication::rpc::{Outgoing, Response};
 
-use model::*;
-use executor::requests::*;
+use strymon_model::*;
+use strymon_rpc::executor::*;
 
-use coordinator::requests::*;
+use strymon_rpc::coordinator::*;
 use coordinator::catalog::Catalog;
 
 use super::util::Generator;

@@ -25,8 +25,8 @@ use strymon_communication::Network;
 use strymon_communication::rpc::Outgoing;
 
 use executor::executable::NativeExecutable;
-use model::QueryId;
-use coordinator::requests::{AddWorkerGroup, QueryToken};
+use strymon_model::QueryId;
+use strymon_rpc::coordinator::{AddWorkerGroup, QueryToken};
 
 pub mod subscribe;
 pub mod publish;

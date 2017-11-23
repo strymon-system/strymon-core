@@ -17,6 +17,8 @@ extern crate serde_json;
 
 extern crate strymon_runtime;
 extern crate strymon_communication;
+extern crate strymon_model;
+extern crate strymon_rpc;
 
 mod errors;
 mod status;

@@ -6,32 +6,12 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-#![feature(core_intrinsics)]
-
-#[macro_use]
-extern crate log;
-#[macro_use]
-extern crate futures;
-extern crate tokio_io;
-extern crate tokio_core;
-extern crate tokio_signal;
-extern crate tokio_process;
-
-extern crate timely;
-extern crate timely_communication;
-
-extern crate rand;
-
 extern crate serde;
+#[macro_use]
+extern crate serde_derive;
 
 extern crate strymon_communication;
-
 extern crate strymon_model;
-
-extern crate strymon_rpc;
 
 pub mod coordinator;
 pub mod executor;
-pub mod query;
-pub mod pubsub;
-pub mod submit;

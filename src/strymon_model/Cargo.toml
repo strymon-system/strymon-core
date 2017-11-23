@@ -1,0 +1,10 @@
+[package]
+authors = ["Sebastian Wicki <swicki@inf.ethz.ch>"]
+name = "strymon_model"
+version = "0.1.0"
+
+[dependencies]
+abomonation = "0.4.6"
+abomonation_derive = "0.2.2"
+serde = "1.0"
+serde_derive = "1.0"
