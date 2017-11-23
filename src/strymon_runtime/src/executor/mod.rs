@@ -13,7 +13,7 @@ use std::path::PathBuf;
 use futures;
 use futures::future::Future;
 use futures::stream::Stream;
-use tokio_core::reactor::Core;
+use tokio_core::reactor::{Core, Handle};
 
 use strymon_communication::Network;
 use strymon_communication::rpc::RequestBuf;
@@ -31,15 +31,17 @@ pub struct ExecutorService {
     coord: String,
     host: String,
     network: Network,
+    handle: Handle,
 }
 
 impl ExecutorService {
-    pub fn new(id: ExecutorId, coord: String, network: Network) -> Self {
+    pub fn new(id: ExecutorId, coord: String, network: Network, handle: Handle) -> Self {
         ExecutorService {
             id: id,
             coord: coord,
             host: network.hostname(),
             network: network,
+            handle: handle,
         }
     }
 
@@ -71,16 +73,16 @@ impl ExecutorService {
         let executable = self.fetch(&query.program.source)?;
         let args = &*query.program.args;
         let id = query.id;
-        executable::spawn(&executable,
-                          id,
-                          args,
-                          threads,
-                          process,
-                          &*hostlist,
-                          &self.coord,
-                          &self.host)?;
 
-        Ok(())
+        let mut exec = executable::Builder::new(&executable, args);
+
+        exec.threads(threads)
+            .process(process)
+            .hostlist(&hostlist)
+            .hostname(&self.host)
+            .coord(&self.coord);
+
+        exec.spawn(id, &self.handle)
     }
 
     pub fn dispatch(&mut self, req: RequestBuf) -> Result<(), Error> {
@@ -127,6 +129,23 @@ impl Default for Builder {
     }
 }
 
+#[cfg(unix)]
+fn setup_termination_handler(handle: &Handle) -> Box<Future<Item=(), Error=Error>> {
+    use tokio_signal::unix::{Signal, SIGTERM};
+
+    Box::new(Signal::new(SIGTERM, &handle).and_then(|signal| {
+        // terminate stream after first signal
+        signal.take(1).for_each(|signum| {
+            Ok(info!("received termination signal: {}", signum))
+        })
+    }))
+}
+
+#[cfg(not(unix))]
+fn setup_termination_handler(handle: &Handle) -> Box<Future<Item=(), Error=Error>> {
+    Box::new(future::empty())
+}
+
 impl Builder {
     pub fn start(self) -> Result<(), Error> {
         let Builder { ports, coord } = self;
@@ -135,7 +154,13 @@ impl Builder {
         let (tx, rx) = network.client(&*coord)?;
 
         let mut core = Core::new()?;
-        core.run(futures::lazy(move || {
+        let handle = core.handle();
+
+        // define a signal handler for clean shutdown
+        let sigterm = setup_termination_handler(&handle);
+
+        // define main executor loop
+        let service = futures::lazy(move || {
             // announce ourselves at the coordinator
             let id = tx.request(&AddExecutor {
                     host: host,
@@ -146,9 +171,15 @@ impl Builder {
 
             // once we get results, start the actual executor service
             id.and_then(move |id| {
-                let mut executor = ExecutorService::new(id, coord, network);
+                let mut executor = ExecutorService::new(id, coord, network, handle);
                 rx.for_each(move |req| executor.dispatch(req))
             })
+        });
+
+        // terminate on whatever comes first: sigterm or service exits
+        core.run(service.select2(sigterm).then(|result| match result {
+            Ok(t) => Ok(t.split().0),
+            Err(e) => Err(e.split().0),
         }))
     }
 }

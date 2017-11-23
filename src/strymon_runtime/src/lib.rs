@@ -12,7 +12,10 @@
 extern crate log;
 #[macro_use]
 extern crate futures;
+extern crate tokio_io;
 extern crate tokio_core;
+extern crate tokio_signal;
+extern crate tokio_process;
 
 extern crate timely;
 extern crate timely_communication;
