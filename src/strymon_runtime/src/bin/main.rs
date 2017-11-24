@@ -6,6 +6,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+#[macro_use]
 extern crate clap;
 #[macro_use]
 extern crate error_chain;
@@ -23,6 +24,7 @@ extern crate strymon_rpc;
 mod errors;
 mod status;
 mod submit;
+mod terminate;
 mod manage;
 
 use std::env;
@@ -41,6 +43,7 @@ fn dispatch() -> Result<()> {
         .setting(AppSettings::SubcommandRequiredElseHelp)
         .subcommand(status::usage())
         .subcommand(submit::usage())
+        .subcommand(terminate::usage())
         .subcommand(manage::usage())
         .arg(Arg::with_name("log-level")
             .short("l")
@@ -63,6 +66,7 @@ fn dispatch() -> Result<()> {
     match matches.subcommand() {
         ("status", Some(args)) => status::main(args),
         ("submit", Some(args)) => submit::main(args),
+        ("terminate", Some(args)) => terminate::main(args),
         ("manage", Some(args)) => manage::main(args),
         _ => unreachable!("invalid subcommand"),
     }

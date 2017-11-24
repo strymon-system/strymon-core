@@ -8,6 +8,7 @@
 
 #![feature(core_intrinsics)]
 
+extern crate libc;
 #[macro_use]
 extern crate log;
 #[macro_use]

@@ -53,6 +53,14 @@ impl Submitter {
         self.tx.request(&submission)
     }
 
+    pub fn terminate(&self, id: QueryId) -> Response<Termination> {
+        let termination = Termination {
+            query: id,
+        };
+
+        self.tx.request(&termination)
+    }
+
     fn lookup(&self, name: &str) -> Result<Topic> {
         self.tx
             .request(&Lookup { name: name.into() })

@@ -43,6 +43,14 @@ impl Dispatch {
 
                 self.handle.spawn(submission);
             }
+            "Termination" => {
+                let (req, resp) = req.decode::<Termination>()?;
+                let termination = self.coord
+                    .termination(req)
+                    .then(|res| Ok(resp.respond(res)));
+
+                self.handle.spawn(termination);
+            }
             "AddWorkerGroup" => {
                 let (AddWorkerGroup { query, group }, resp) =
                     req.decode::<AddWorkerGroup>()?;

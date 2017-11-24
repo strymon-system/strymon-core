@@ -16,31 +16,31 @@ use futures::stream::Stream;
 use tokio_core::reactor::{Core, Handle};
 
 use strymon_communication::Network;
-use strymon_communication::rpc::RequestBuf;
+use strymon_communication::rpc::{Request, RequestBuf};
 
 use strymon_model::*;
 
 use strymon_rpc::coordinator::*;
 use strymon_rpc::executor::*;
 
+use self::executable::ProcessService;
+
 pub mod executable;
 
 pub struct ExecutorService {
     id: ExecutorId,
-    coord: String,
-    host: String,
     network: Network,
-    handle: Handle,
+    process: ProcessService,
 }
 
 impl ExecutorService {
     pub fn new(id: ExecutorId, coord: String, network: Network, handle: Handle) -> Self {
+        let process = ProcessService::new(&handle, coord, network.hostname());
+
         ExecutorService {
             id: id,
-            coord: coord,
-            host: network.hostname(),
             network: network,
-            handle: handle,
+            process: process,
         }
     }
 
@@ -77,19 +77,23 @@ impl ExecutorService {
 
         exec.threads(threads)
             .process(process)
-            .hostlist(&hostlist)
-            .hostname(&self.host)
-            .coord(&self.coord);
+            .hostlist(&hostlist);
 
-        exec.spawn(id, &self.handle)
+        self.process.spawn(id, exec)
     }
 
     pub fn dispatch(&mut self, req: RequestBuf) -> Result<(), Error> {
         match req.name() {
-            "SpawnQuery" => {
+            SpawnQuery::NAME => {
                 let (SpawnQuery { query, hostlist }, resp) = req.decode::<SpawnQuery>()?;
-                debug!("got spawn request for {:?}", query);
+                debug!("spawn request for {:?}", query);
                 resp.respond(self.spawn(query, hostlist));
+                Ok(())
+            }
+            TerminateQuery::NAME => {
+                let (TerminateQuery { query }, resp) = req.decode::<TerminateQuery>()?;
+                debug!("termination request for {:?}", query);
+                resp.respond(self.process.terminate(query));
                 Ok(())
             }
             _ => {
