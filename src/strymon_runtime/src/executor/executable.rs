@@ -18,8 +18,8 @@ use tokio_io;
 use tokio_core::reactor::Handle;
 use tokio_process::CommandExt;
 
-use model::QueryId;
-use executor::requests::SpawnError;
+use strymon_model::QueryId;
+use strymon_rpc::executor::SpawnError;
 
 pub const QUERY_ID: &'static str = "TIMELY_EXEC_CONF_QUERY_ID";
 pub const THREADS: &'static str = "TIMELY_EXEC_CONF_THREADS";

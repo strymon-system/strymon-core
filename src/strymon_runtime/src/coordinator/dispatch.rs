@@ -14,7 +14,7 @@ use tokio_core::reactor::Handle;
 use strymon_communication::rpc::{Outgoing, RequestBuf};
 
 use super::handler::CoordinatorRef;
-use super::requests::*;
+use strymon_rpc::coordinator::*;
 
 pub struct Dispatch {
     coord: CoordinatorRef,

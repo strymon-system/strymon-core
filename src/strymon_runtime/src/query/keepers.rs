@@ -11,7 +11,7 @@ use std::net::ToSocketAddrs;
 
 use futures::Future;
 
-use coordinator::requests::*;
+use strymon_rpc::coordinator::*;
 use query::Coordinator;
 
 #[derive(Debug)]

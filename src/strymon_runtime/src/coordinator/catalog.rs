@@ -16,8 +16,8 @@ use tokio_core::reactor::Handle;
 use strymon_communication::Network;
 use serde::ser::Serialize;
 
-use model::*;
-use coordinator::requests::*;
+use strymon_model::*;
+use strymon_rpc::coordinator::*;
 
 use pubsub::publisher::collection::{CollectionPublisher, Mutator};
 

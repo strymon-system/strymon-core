@@ -6,7 +6,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use model::*;
+use strymon_model::*;
 use strymon_communication::rpc::Request;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -26,7 +26,7 @@ pub struct Submission {
 pub enum SubmissionError {
     ExecutorsNotFound,
     ExecutorUnreachable,
-    SpawnError(::executor::requests::SpawnError),
+    SpawnError(::executor::SpawnError),
 }
 
 impl Request for Submission {

@@ -21,8 +21,8 @@ use serde::ser::Serialize;
 use futures::Future;
 
 use query::{Coordinator, PubSubTimestamp};
-use coordinator::requests::*;
-use model::{Topic, TopicId, TopicType, TopicSchema};
+use strymon_rpc::coordinator::*;
+use strymon_model::{Topic, TopicId, TopicType, TopicSchema};
 use pubsub::publisher::timely::TimelyPublisher;
 use pubsub::publisher::collection::CollectionPublisher;
 

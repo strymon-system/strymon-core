@@ -18,12 +18,11 @@ use tokio_core::reactor::{Core, Handle};
 use strymon_communication::Network;
 use strymon_communication::rpc::RequestBuf;
 
-use model::*;
+use strymon_model::*;
 
-use coordinator::requests::*;
-use executor::requests::*;
+use strymon_rpc::coordinator::*;
+use strymon_rpc::executor::*;
 
-pub mod requests;
 pub mod executable;
 
 pub struct ExecutorService {

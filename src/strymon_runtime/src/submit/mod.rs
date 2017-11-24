@@ -20,8 +20,8 @@ use strymon_communication::rpc::{Outgoing, Response};
 
 use pubsub::subscriber::CollectionSubscriber;
 
-use coordinator::requests::*;
-use model::*;
+use strymon_rpc::coordinator::*;
+use strymon_model::*;
 
 pub struct Submitter {
     tx: Outgoing,
