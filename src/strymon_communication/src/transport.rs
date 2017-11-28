@@ -6,7 +6,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use std::io;
+use std::io::{self, BufReader};
 use std::net::{TcpListener, TcpStream, Shutdown, ToSocketAddrs};
 use std::sync::{mpsc, Arc};
 use std::thread::{self, JoinHandle};
@@ -89,9 +89,10 @@ pub struct Receiver {
 }
 
 impl Receiver {
-    fn new(mut instream: TcpStream) -> Self {
+    fn new(instream: TcpStream) -> Self {
         let (receiver_tx, receiver_rx) = bounded(0);
         thread::spawn(move || {
+            let mut instream = BufReader::new(instream);
             let mut tx = receiver_tx;
             let mut stop = false;
             while !stop {
@@ -110,7 +111,7 @@ impl Receiver {
                 };
             }
 
-            drop(instream.shutdown(Shutdown::Both));
+            drop(instream.get_ref().shutdown(Shutdown::Both));
         });
 
         Receiver { rx: receiver_rx }
