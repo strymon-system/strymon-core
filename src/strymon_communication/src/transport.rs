@@ -6,7 +6,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use std::io;
+use std::io::{self, BufReader};
 use std::net::{TcpListener, TcpStream, Shutdown, ToSocketAddrs};
 use std::sync::{mpsc, Arc};
 use std::thread::{self, JoinHandle};
@@ -14,7 +14,7 @@ use std::thread::{self, JoinHandle};
 use futures::{Future, Poll, Async};
 use futures::stream::Stream;
 use futures::sink::Sink;
-use futures::sync::mpsc::{Receiver as BoundedReceiver, channel as bounded};
+use futures::sync::mpsc as futures_mpsc;
 
 use Network;
 use message::MessageBuf;
@@ -85,14 +85,14 @@ impl Drop for Sender {
 }
 
 pub struct Receiver {
-    rx: BoundedReceiver<io::Result<MessageBuf>>,
+    rx: futures_mpsc::UnboundedReceiver<io::Result<MessageBuf>>,
 }
 
 impl Receiver {
-    fn new(mut instream: TcpStream) -> Self {
-        let (receiver_tx, receiver_rx) = bounded(0);
+    fn new(instream: TcpStream) -> Self {
+        let (tx, rx) = futures_mpsc::unbounded();
         thread::spawn(move || {
-            let mut tx = receiver_tx;
+            let mut instream = BufReader::new(instream);
             let mut stop = false;
             while !stop {
                 let message = match MessageBuf::read(&mut instream) {
@@ -104,16 +104,16 @@ impl Receiver {
                     }
                 };
 
-                tx = match tx.send(message).wait() {
+                match tx.unbounded_send(message) {
                     Ok(tx) => tx,
                     Err(_) => break,
                 };
             }
 
-            drop(instream.shutdown(Shutdown::Both));
+            drop(instream.get_ref().shutdown(Shutdown::Both));
         });
 
-        Receiver { rx: receiver_rx }
+        Receiver { rx: rx }
     }
 }
 
@@ -141,12 +141,12 @@ impl Stream for Receiver {
 /// spawns an acceptor thread which accepts new client on the provided tcp server
 /// socket. converts each socket with the provided function before pushing it
 /// into the receiver sink.
-pub(crate) fn accept<T, F>(listener: TcpListener, mut f: F) -> BoundedReceiver<io::Result<T>>
+pub(crate) fn accept<T, F>(listener: TcpListener, mut f: F) -> futures_mpsc::Receiver<io::Result<T>>
     where F: FnMut(TcpStream) -> io::Result<T>,
           F: Send + 'static,
           T: Send + 'static
 {
-    let (tx, rx) = bounded(0);
+    let (tx, rx) = futures_mpsc::channel(0);
     thread::spawn(move || {
         let mut tx = tx;
         let mut is_ok = true;
@@ -168,7 +168,7 @@ pub(crate) fn accept<T, F>(listener: TcpListener, mut f: F) -> BoundedReceiver<i
 pub struct Listener {
     external: Arc<String>,
     port: u16,
-    rx: BoundedReceiver<io::Result<(Sender, Receiver)>>,
+    rx: futures_mpsc::Receiver<io::Result<(Sender, Receiver)>>,
 }
 
 impl Listener {
