@@ -28,3 +28,21 @@ impl Request for SpawnQuery {
 
     const NAME: &'static str = "SpawnQuery";
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TerminateQuery {
+    pub query: QueryId,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum TerminateError {
+    NotFound,
+    OperationNotSupported,
+}
+
+impl Request for TerminateQuery {
+    type Success = ();
+    type Error = TerminateError;
+
+    const NAME: &'static str = "TerminateQuery";
+}

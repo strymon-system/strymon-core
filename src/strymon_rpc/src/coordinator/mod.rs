@@ -36,6 +36,25 @@ impl Request for Submission {
     const NAME: &'static str = "Submission";
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Termination {
+    pub query: QueryId,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum TerminationError {
+    NotFound,
+    ExecutorUnreachable,
+    TerminateError(::executor::TerminateError),
+}
+
+impl Request for Termination {
+    type Success = ();
+    type Error = TerminationError;
+
+    const NAME: &'static str = "Termination";
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AddExecutor {
     pub host: String,

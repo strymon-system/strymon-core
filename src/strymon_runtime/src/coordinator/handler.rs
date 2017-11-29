@@ -13,6 +13,7 @@ use std::cell::RefCell;
 use std::mem;
 
 use futures::{self, Future};
+use futures::stream::{self, Stream};
 use futures::unsync::oneshot::{channel, Sender};
 use tokio_core::reactor::Handle;
 
@@ -57,6 +58,10 @@ impl ExecutorState {
     fn spawn(&self, req: &SpawnQuery) -> Response<SpawnQuery> {
         debug!("issue spawn request {:?}", req);
         self.tx.request(req)
+    }
+
+    fn terminate(&self, job_id: QueryId) -> Response<TerminateQuery> {
+        self.tx.request(&TerminateQuery { query: job_id })
     }
 }
 
@@ -341,6 +346,50 @@ impl Coordinator {
         }
     }
 
+    fn termination(&mut self, req: Termination) -> Box<Future<Item=(), Error=TerminationError>> {
+        let job_id = req.query;
+        // extract the executor ids from the worker groups
+        let executor_ids = match self.queries.get(&job_id) {
+            Some(group) => group.ports.iter().map(|&(ref id, _)| id),
+            None => return Box::new(futures::failed(TerminationError::NotFound)),
+        };
+
+        let ref executors = self.executors;
+        let responses = executor_ids
+            .flat_map(|id| {
+                // send termination request to each executor
+                if let Some(executor) = executors.get(id) {
+                    let response = executor.terminate(job_id).map_err(|res| {
+                        match res {
+                            // propagate the error returned by the executor
+                            Ok(err) => TerminationError::TerminateError(err),
+                            // the request never reached the executor
+                            Err(err) => {
+                                error!("executor request failed: {}", err);
+                                TerminationError::ExecutorUnreachable
+                            }
+                        }
+                    });
+
+                    Some(response)
+                } else {
+                    // if the executor where the job is running has vanished,
+                    // we still send the termination request to the remaining
+                    // peers, in case the user is trying to shut things down.
+                    error!("Unable to find executor {:?} for {:?}", id, job_id);
+                    None
+                }
+            });
+
+        // only the first error is propaged back to the caller. otherwise we wait
+        // for all executors to respond before we treat the request as completed
+        let terminated = stream::futures_unordered(responses).for_each(|()| {
+            Ok(())
+        });
+
+        Box::new(terminated)
+    }
+
     fn add_executor(&mut self, req: AddExecutor, tx: Outgoing) -> ExecutorId {
         let id = self.executorid.generate();
         debug!("adding executor {:?} to pool", id);
@@ -397,7 +446,7 @@ impl Coordinator {
             let (lookup, result) = channel();
             self.lookups.entry(req.name).or_insert(Vec::new()).push(lookup);
 
-            let handle = self.handle();            
+            let handle = self.handle();
             let result = result
                 .then(|res| {
                     res.unwrap_or(Err(SubscribeError::TopicNotFound))
@@ -570,6 +619,11 @@ impl CoordinatorRef {
                       req: Submission)
                       -> Box<Future<Item = QueryId, Error = SubmissionError>> {
         self.coord.borrow_mut().submission(req)
+    }
+
+    pub fn termination(&self, req: Termination)
+                      -> Box<Future<Item = (), Error = TerminationError>> {
+        self.coord.borrow_mut().termination(req)
     }
 
     pub fn add_executor(&mut self, req: AddExecutor, tx: Outgoing) -> ExecutorId {
