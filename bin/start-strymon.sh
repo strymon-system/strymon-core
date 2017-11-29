@@ -51,12 +51,13 @@ shift $((OPTIND-1))
 
 # ensure paths are absolute
 LOGDIR="$(abspath "${LOGDIR}")"
-BINARY="$(abspath "$(locate_binary)")"
+BINARY="$(locate_binary)"
+FULL_BINARY="$(abspath "${BINARY}")"
 
 # create working directory and spawn cluster
 mkdir -p "${LOGDIR}"
-start_coordinator "${COORDINATOR}" "${LOGDIR}" "${BINARY}"
+start_coordinator "${COORDINATOR}" "${LOGDIR}" "${FULL_BINARY}"
 while read host; do
-  start_executor "${host}" "${LOGDIR}" "${BINARY}"
+  start_executor "${host}" "${LOGDIR}" "${FULL_BINARY}"
 done < "${EXECUTORS}"
 
