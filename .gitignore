@@ -1,4 +1,6 @@
 target
+jobs
+logs
 Cargo.lock
 *~
 *.bk
