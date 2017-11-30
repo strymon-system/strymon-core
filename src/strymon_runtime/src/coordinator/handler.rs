@@ -11,6 +11,7 @@ use std::collections::btree_map::Entry;
 use std::rc::{Rc, Weak};
 use std::cell::RefCell;
 use std::mem;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use futures::{self, Future};
 use futures::stream::{self, Stream};
@@ -192,6 +193,11 @@ impl Coordinator {
             .map(|(executor, &(_, port))| format!("{}:{}", executor.host, port))
             .collect();
 
+        let start_time = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+
         let executor_ids = executors.iter().map(|e| e.id).collect();
         let query = Query {
             id: queryid,
@@ -199,6 +205,7 @@ impl Coordinator {
             program: req.query,
             workers: num_executors * num_workers,
             executors: executor_ids,
+            start_time: start_time,
         };
         let spawnquery = SpawnQuery {
             query: query.clone(),

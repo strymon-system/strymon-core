@@ -6,9 +6,13 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+use std::fs;
 use std::io::{Error, ErrorKind};
 use std::env;
 use std::path::PathBuf;
+use std::ffi::OsStr;
+
+use time::{self, Timespec};
 
 use futures;
 use futures::future::Future;
@@ -25,29 +29,34 @@ use strymon_rpc::executor::*;
 
 use self::executable::ProcessService;
 
+const START_TIME_FMT: &'static str = "%Y%m%d%H%M%S";
+
 pub mod executable;
 
 pub struct ExecutorService {
     id: ExecutorId,
     network: Network,
     process: ProcessService,
+    workdir: PathBuf,
 }
 
 impl ExecutorService {
-    pub fn new(id: ExecutorId, coord: String, network: Network, handle: Handle) -> Self {
+    pub fn new(id: ExecutorId, coord: String, workdir: PathBuf, network: Network, handle: Handle) -> Self {
         let process = ProcessService::new(&handle, coord, network.hostname());
 
         ExecutorService {
             id: id,
             network: network,
             process: process,
+            workdir: workdir,
         }
     }
 
-    fn fetch(&self, url: &str) -> Result<PathBuf, SpawnError> {
+    fn fetch(&self, url: &str, dest: PathBuf) -> Result<PathBuf, SpawnError> {
         debug!("fetching: {:?}", url);
         if url.starts_with("tcp://") {
-            self.network.download(url).map_err(|_| SpawnError::FetchFailed)
+            self.network.download(url, &dest).map_err(|_| SpawnError::FetchFailed)?;
+            Ok(dest)
         } else {
             let path = if url.starts_with("file://") {
                 PathBuf::from(&url[7..])
@@ -58,7 +67,7 @@ impl ExecutorService {
             if path.exists() {
                 Ok(path.to_owned())
             } else {
-                Err(SpawnError::FetchFailed)
+                Err(SpawnError::FileNotFound)
             }
         }
     }
@@ -69,15 +78,28 @@ impl ExecutorService {
             .position(|&id| self.id == id)
             .ok_or(SpawnError::InvalidRequest)?;
         let threads = query.workers / hostlist.len();
-        let executable = self.fetch(&query.program.source)?;
+
+        // the job dir should be unique to this execution, we prepend a datetime
+        // string to avoid overwriting the artifacts of previous strymon instances
+        let tm = time::at_utc(Timespec::new(query.start_time as i64, 0));
+        let start_time = tm.strftime(START_TIME_FMT).expect("invalid fmt");
+        let jobdir = self.workdir.as_path()
+            .join(format!("{}_{:04}", start_time, query.id.0))
+            .join(process.to_string());
+
+        // create the working directory for this process
+        fs::create_dir_all(&jobdir).map_err(|_| SpawnError::WorkdirCreationFailed)?;
+
+        let binary = jobdir.as_path().join(query.program.binary_name);
+        let executable = self.fetch(&query.program.source, binary)?;
         let args = &*query.program.args;
         let id = query.id;
 
-        let mut exec = executable::Builder::new(&executable, args);
-
+        let mut exec = executable::Builder::new(&executable, args)?;
         exec.threads(threads)
             .process(process)
-            .hostlist(&hostlist);
+            .hostlist(&hostlist)
+            .working_directory(&jobdir);
 
         self.process.spawn(id, exec)
     }
@@ -107,6 +129,7 @@ impl ExecutorService {
 pub struct Builder {
     coord: String,
     ports: (u16, u16),
+    workdir: PathBuf,
 }
 
 impl Builder {
@@ -121,6 +144,10 @@ impl Builder {
     pub fn ports(&mut self, min: u16, max: u16) {
         self.ports = (min, max);
     }
+
+    pub fn workdir<P: AsRef<OsStr>>(&mut self, workdir: &P) {
+        self.workdir = PathBuf::from(workdir);
+    }
 }
 
 impl Default for Builder {
@@ -128,6 +155,7 @@ impl Default for Builder {
         Builder {
             coord: String::from("localhost:9189"),
             ports: (2101, 4101),
+            workdir: PathBuf::from("jobs")
         }
     }
 }
@@ -151,7 +179,7 @@ fn setup_termination_handler(handle: &Handle) -> Box<Future<Item=(), Error=Error
 
 impl Builder {
     pub fn start(self) -> Result<(), Error> {
-        let Builder { ports, coord } = self;
+        let Builder { ports, coord, workdir } = self;
         let network = Network::init()?;
         let host = network.hostname();
         let (tx, rx) = network.client(&*coord)?;
@@ -161,6 +189,9 @@ impl Builder {
 
         // define a signal handler for clean shutdown
         let sigterm = setup_termination_handler(&handle);
+
+        // ensure the working directory exists
+        fs::create_dir_all(&workdir)?;
 
         // define main executor loop
         let service = futures::lazy(move || {
@@ -174,7 +205,8 @@ impl Builder {
 
             // once we get results, start the actual executor service
             id.and_then(move |id| {
-                let mut executor = ExecutorService::new(id, coord, network, handle);
+                let mut executor = ExecutorService::new(id, coord, workdir, network, handle);
+
                 rx.for_each(move |req| executor.dispatch(req))
             })
         });

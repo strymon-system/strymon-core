@@ -6,6 +6,8 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+use std::env;
+
 use clap::{App, Arg, ArgMatches, SubCommand};
 
 use strymon_runtime::executor;
@@ -36,6 +38,12 @@ pub mod start {
                 .value_name("ADDR")
                 .help("Address of the coordinator")
                 .takes_value(true))
+        .arg(Arg::with_name("workdir")
+                .short("w")
+                .long("workdir")
+                .takes_value(true)
+                .value_name("DIR")
+                .help("Working directory for storing job artifacts"))
     }
 
     pub fn main(args: &ArgMatches) -> Result<()> {
@@ -49,6 +57,13 @@ pub mod start {
         // externally reachable hostname of this executor
         if let Some(host) = args.value_of("external-hostname") {
             executor.host(host.to_owned());
+        }
+
+        // workdir outside of current working directory
+        if let Some(path) = args.value_of("workdir") {
+            executor.workdir(&path)
+        } else if let Some(path) = env::var_os("STRYMON_WORKDIR") {
+            executor.workdir(&path)
         }
 
         // parse port range to be used for spawned Timely processes

@@ -8,7 +8,8 @@
 
 use std::io;
 use std::env;
-use std::path::{Path};
+use std::path::Path;
+use std::ffi::OsStr;
 use std::process::{Command, Stdio};
 
 use serde_json::{Value, Deserializer};
@@ -181,10 +182,15 @@ fn submit_binary(binary: String, args: &ArgMatches) -> Result<QueryId> {
     let network = Network::init()
         .chain_err(|| "Failed to initialize network")?;
     let submitter = Submitter::new(&network, &*coord)
-            .chain_err(|| "Unable to connect to coordinator")?;
+        .chain_err(|| "Unable to connect to coordinator")?;
     let executors = submitter.executors()
-            .chain_err(|| "Failed to fetch list of executors")?;
+        .chain_err(|| "Failed to fetch list of executors")?;
     let placement = parse_placement(args, executors)?;
+
+    let binary_name = Path::new(&binary).file_name()
+        .unwrap_or(OsStr::new("job_binary"))
+        .to_string_lossy()
+        .into_owned();
 
     // expose the binary on a randomly selected TCP port
     let (url, upload) = if args.is_present("no-upload") {
@@ -202,6 +208,7 @@ fn submit_binary(binary: String, args: &ArgMatches) -> Result<QueryId> {
     };
 
     let query = QueryProgram {
+        binary_name: binary_name,
         source: url,
         format: ExecutionFormat::NativeExecutable,
         args: args,

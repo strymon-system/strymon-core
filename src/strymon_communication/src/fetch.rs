@@ -9,11 +9,8 @@
 use std::net::{TcpListener, TcpStream};
 use std::io::{copy, Result, Error, ErrorKind};
 use std::fs::{self, File};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::thread;
-use std::env;
-
-use rand;
 
 use Network;
 
@@ -75,7 +72,8 @@ impl Network {
         })
     }
 
-    pub fn download(&self, url: &str) -> Result<PathBuf> {
+    pub fn download<P: AsRef<Path>>(&self, url: &str, path: P) -> Result<()> {
+        // url should have the format: "tcp://host:port"
         if !url.starts_with("tcp://") {
             return Err(Error::new(ErrorKind::InvalidInput,
                                   "url doesn't start with tcp://'"));
@@ -83,16 +81,13 @@ impl Network {
 
         let addr = &url[6..];
         let mut stream = TcpStream::connect(addr)?;
-
-        let mut path = env::temp_dir();
-        path.push(format!("timely_query_{}", rand::random::<u64>()));
         let mut file = File::create(&path)?;
         fix_permissions(&path)?;
 
-        debug!("downloading file from tcp://{} to {:?}", addr, path);
+        debug!("downloading file from tcp://{} to {:?}", addr, path.as_ref());
 
         copy(&mut stream, &mut file)?;
 
-        Ok(path)
+        Ok(())
     }
 }

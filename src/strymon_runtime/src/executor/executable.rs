@@ -16,6 +16,7 @@ use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::fmt::{Write, Display};
 use std::io::{BufReader};
+use std::path::Path;
 
 use libc;
 
@@ -87,17 +88,21 @@ pub struct Builder {
 
 impl Builder {
     /// Creates a new builder for the given native executable.
-    pub fn new<T, S, I>(executable: T, args: I) -> Self
-        where T: AsRef<OsStr>, S: AsRef<OsStr>, I: IntoIterator<Item = S>
+    pub fn new<T, S, I>(executable: T, args: I) -> Result<Self, SpawnError>
+        where T: AsRef<Path>, S: AsRef<OsStr>, I: IntoIterator<Item = S>
     {
+        let executable = executable
+            .as_ref()
+            .canonicalize()
+            .map_err(|_| SpawnError::FileNotFound)?;
         let mut cmd = Command::new(executable);
         cmd.args(args);
-        Builder {
+        Ok(Builder {
             cmd: cmd,
             threads: 1,
             process: 0,
             hostlist: Cow::Borrowed("localhost"),
-        }
+        })
     }
 
     /// Sets the number of Timely threads *per worker* (default: 1)
@@ -120,6 +125,12 @@ impl Builder {
             write!(&mut hostlist, "|{}", host).unwrap();
         }
         self.hostlist = Cow::Owned(hostlist);
+        self
+    }
+
+    /// Sets the working directory of the child process (default: the current working directory)
+    pub fn working_directory<P: AsRef<Path>>(&mut self, workdir: P) -> &mut Self {
+        self.cmd.current_dir(workdir);
         self
     }
 }
