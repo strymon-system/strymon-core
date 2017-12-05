@@ -6,7 +6,8 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-#![feature(core_intrinsics)]
+#[macro_use]
+extern crate typename;
 
 extern crate serde;
 #[macro_use]
@@ -17,9 +18,10 @@ extern crate abomonation;
 extern crate abomonation_derive;
 
 use std::fmt;
-use std::intrinsics::type_name;
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Abomonation)]
+use typename::TypeName;
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Abomonation, TypeName)]
 pub struct TopicId(pub u64);
 
 impl From<u64> for TopicId {
@@ -28,23 +30,20 @@ impl From<u64> for TopicId {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Abomonation)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Abomonation, TypeName)]
 pub struct TopicType {
     pub name: String,
 }
 
 impl TopicType {
-    pub fn of<T>() -> Self {
-        // TODO(swicki): This currently required unstable Rust, we really
-        // should either use NamedType instead or figure out if we can derive
-        // a schema from serde instead
+    pub fn of<T: TypeName>() -> Self {
         TopicType {
-            name: unsafe { type_name::<T>() }.to_string(),
+            name: T::type_name(),
         }
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Abomonation)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Abomonation, TypeName)]
 pub enum TopicSchema {
     Collection(TopicType),
     Stream(TopicType, TopicType),
@@ -77,7 +76,7 @@ impl fmt::Display for TopicSchema {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Abomonation)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Abomonation, TypeName)]
 pub struct Topic {
     pub id: TopicId,
     pub name: String,
@@ -85,7 +84,7 @@ pub struct Topic {
     pub schema: TopicSchema,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Abomonation)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Abomonation, TypeName)]
 pub struct QueryId(pub u64);
 
 impl From<u64> for QueryId {
@@ -94,7 +93,7 @@ impl From<u64> for QueryId {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Abomonation)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Abomonation, TypeName)]
 pub struct Query {
     pub id: QueryId,
     pub name: Option<String>,
@@ -104,7 +103,7 @@ pub struct Query {
     pub start_time: u64, // unix timestamp
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Abomonation)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Abomonation, TypeName)]
 pub struct QueryProgram {
     pub binary_name: String,
     pub format: ExecutionFormat,
@@ -112,13 +111,13 @@ pub struct QueryProgram {
     pub args: Vec<String>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Abomonation)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Abomonation, TypeName)]
 pub enum ExecutionFormat {
     NativeExecutable,
     Other,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Abomonation)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Abomonation, TypeName)]
 pub struct ExecutorId(pub u64);
 
 impl From<u64> for ExecutorId {
@@ -127,23 +126,23 @@ impl From<u64> for ExecutorId {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Abomonation)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Abomonation, TypeName)]
 pub struct Executor {
     pub id: ExecutorId,
     pub host: String,
     pub format: ExecutionFormat,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Abomonation)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Abomonation, TypeName)]
 pub struct Publication(pub QueryId, pub TopicId);
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Abomonation)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Abomonation, TypeName)]
 pub struct Subscription(pub QueryId, pub TopicId);
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Abomonation)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Abomonation, TypeName)]
 pub struct KeeperId(pub u64);
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Abomonation)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Abomonation, TypeName)]
 pub struct Keeper {
     pub id: KeeperId,
     pub name: String,

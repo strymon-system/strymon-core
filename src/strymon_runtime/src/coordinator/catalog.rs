@@ -13,11 +13,12 @@ use std::hash::Hash;
 
 use futures::Future;
 use tokio_core::reactor::Handle;
-use strymon_communication::Network;
 use serde::ser::Serialize;
+use typename::TypeName;
 
 use strymon_model::*;
 use strymon_rpc::coordinator::*;
+use strymon_communication::Network;
 
 use pubsub::publisher::collection::{CollectionPublisher, Mutator};
 
@@ -206,7 +207,7 @@ struct MapCollection<K, V> {
     mutator: Mutator<V>,
 }
 
-impl<K: Ord, V: Serialize + Eq + Clone + 'static> MapCollection<K, V> {
+impl<K: Ord, V: Serialize + TypeName + Eq + Clone + 'static> MapCollection<K, V> {
     fn new(network: &Network,
            handle: &Handle,
            topic_id: TopicId,
@@ -258,7 +259,7 @@ struct Collection<T> {
     mutator: Mutator<T>,
 }
 
-impl<T: Serialize + Clone + Eq + Hash + 'static> Collection<T> {
+impl<T: Serialize + TypeName + Clone + Eq + Hash + 'static> Collection<T> {
     fn new(network: &Network,
            handle: &Handle,
            topic_id: TopicId,

@@ -6,8 +6,6 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-#![feature(core_intrinsics)]
-
 extern crate libc;
 #[macro_use]
 extern crate log;
@@ -25,6 +23,7 @@ extern crate rand;
 extern crate time;
 
 extern crate serde;
+extern crate typename;
 
 extern crate strymon_communication;
 
