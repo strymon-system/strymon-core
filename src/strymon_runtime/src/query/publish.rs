@@ -19,6 +19,7 @@ use timely_communication::{Allocate, Pull, Push};
 
 use serde::ser::Serialize;
 use futures::Future;
+use typename::TypeName;
 
 use query::{Coordinator, PubSubTimestamp};
 use strymon_rpc::coordinator::*;
@@ -155,7 +156,7 @@ impl Coordinator {
                          stream: &Stream<S, D>,
                          partition: Partition)
                          -> Result<Stream<S, D>, PublicationError>
-        where D: ExchangeData + Serialize,
+        where D: ExchangeData + Serialize + TypeName,
               S: Scope,
               S::Timestamp: PubSubTimestamp
     {
@@ -173,7 +174,7 @@ impl Coordinator {
         let publication = if name.is_some() {
             // local worker hosts a publication
             let item = TopicType::of::<D>();
-            let time = TopicType::of::<S::Timestamp>();
+            let time = TopicType::of::<<S::Timestamp as PubSubTimestamp>::Converted>();
             let schema = TopicSchema::Stream(item, time);
 
             Some(self.publish_request(name.unwrap(), schema, addr.unwrap())?)
@@ -210,7 +211,7 @@ impl Coordinator {
                                     stream: &Stream<S, (D, i32)>,
                                     partition: Partition)
                                     -> Result<Stream<S, (D, i32)>, PublicationError>
-        where D: ExchangeData + Eq + Serialize,
+        where D: ExchangeData + Eq + Serialize + TypeName,
               S: Scope
     {
         let worker_id = stream.scope().index() as u64;

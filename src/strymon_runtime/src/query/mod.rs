@@ -21,6 +21,8 @@ use futures::Future;
 use serde::ser::Serialize;
 use serde::de::DeserializeOwned;
 
+use typename::TypeName;
+
 use strymon_communication::Network;
 use strymon_communication::rpc::Outgoing;
 
@@ -108,7 +110,7 @@ pub fn execute<T, F>(func: F) -> Result<WorkerGuards<T>, String>
 /// This is a helper trait to workaround the fact that Rust does not allow
 /// us to implement Serde's traits for Timely's custom timestamp types.
 pub trait PubSubTimestamp: Timestamp {
-    type Converted: Serialize + DeserializeOwned;
+    type Converted: Serialize + DeserializeOwned + TypeName;
 
     fn to_pubsub(&self) -> Self::Converted;
     fn from_pubsub(converted: Self::Converted) -> Self;

@@ -13,6 +13,8 @@ extern crate abomonation_derive;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
+#[macro_use]
+extern crate typename;
 
 use rand::{Rng, SeedableRng, StdRng};
 
@@ -25,7 +27,7 @@ pub type LinkWeight = u64;
 /// A unidirectional connection between two switches
 pub type Connection = (NodeId, NodeId, LinkWeight);
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Abomonation)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Abomonation, TypeName)]
 pub enum Entity {
     Connection(Connection),
     Switch(NodeId),
