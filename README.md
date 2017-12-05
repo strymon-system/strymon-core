@@ -15,7 +15,7 @@ Please follow the [documentation](http://strymon-system.github.io/docs/) and gui
 ## Requirements
 
  - Unix-like environment (we use Linux, Mac OS X)
- - Rust 1.21 or newer (https://rust-lang.org)
+ - [Rust 1.21](https://www.rust-lang.org/) or newer
  - git
 
 ## Contribute
