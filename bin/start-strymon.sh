@@ -32,15 +32,18 @@ start_coordinator() {
 # $1: Hostname of the machine on which the executor will be started
 # $2: Working directory for pid and log files
 # $3: Full path to the the strymon binary
+# $4: Job working directory
 start_executor() {
   exec_host="$(echo ${1} | tr -d '[:space:]')"
   exec_basedir="${2}"
   exec_binary="${3}"
+  exec_workdir="${4}"
 
   # TODO(swicki): This currently does not support the port range option
   spawn_service "executor" "${exec_host}" "${exec_basedir}" \
     "${coord_binary}" --log-level info \
-    manage start-executor --external-hostname "${exec_host}"
+    manage start-executor --external-hostname "${exec_host}" \
+    --workdir "${exec_workdir}"
 }
 
 #
@@ -51,6 +54,7 @@ shift $((OPTIND-1))
 
 # ensure paths are absolute
 LOGDIR="$(abspath "${LOGDIR}")"
+WORKDIR="$(abspath "${WORKDIR}")"
 BINARY="$(locate_binary)"
 FULL_BINARY="$(abspath "${BINARY}")"
 
@@ -58,6 +62,6 @@ FULL_BINARY="$(abspath "${BINARY}")"
 mkdir -p "${LOGDIR}"
 start_coordinator "${COORDINATOR}" "${LOGDIR}" "${FULL_BINARY}"
 while read host; do
-  start_executor "${host}" "${LOGDIR}" "${FULL_BINARY}"
+  start_executor "${host}" "${LOGDIR}" "${FULL_BINARY}" "${WORKDIR}"
 done < "${EXECUTORS}"
 

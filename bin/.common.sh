@@ -2,6 +2,7 @@
 # configuration variables
 #
 LOGDIR="${BASEDIR}/../logs"
+WORKDIR="${BASEDIR}/../jobs"
 EXECUTORS="${BASEDIR}/../conf/executors"
 COORDINATOR="localhost:9189"
 

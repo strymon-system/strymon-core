@@ -22,6 +22,7 @@ extern crate timely;
 extern crate timely_communication;
 
 extern crate rand;
+extern crate time;
 
 extern crate serde;
 

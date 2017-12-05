@@ -18,6 +18,8 @@ pub struct SpawnQuery {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SpawnError {
     InvalidRequest,
+    FileNotFound,
+    WorkdirCreationFailed,
     FetchFailed,
     ExecFailed,
 }

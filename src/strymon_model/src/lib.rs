@@ -101,10 +101,12 @@ pub struct Query {
     pub program: QueryProgram,
     pub workers: usize, // in total
     pub executors: Vec<ExecutorId>,
+    pub start_time: u64, // unix timestamp
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Abomonation)]
 pub struct QueryProgram {
+    pub binary_name: String,
     pub format: ExecutionFormat,
     pub source: String, // TODO(swicki) use Url crate for this?
     pub args: Vec<String>,

@@ -14,7 +14,6 @@ extern crate rmp_serde;
 
 extern crate futures;
 
-extern crate rand;
 #[macro_use] extern crate log;
 
 use std::io;
