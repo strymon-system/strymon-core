@@ -29,7 +29,7 @@ use serde::de::DeserializeOwned;
 
 pub trait Name: 'static+Send+Sized {
     type Discriminant: 'static+Serialize+DeserializeOwned;
-    fn discriminant(&self) -> Option<Self::Discriminant>;
+    fn discriminant(&self) -> Self::Discriminant;
     fn from_discriminant(&Self::Discriminant) -> Option<Self>;
 }
 
@@ -165,8 +165,7 @@ impl Outgoing {
         let mut msg = MessageBuf::empty();
         msg.push(Type::Request as u8).unwrap();
         msg.push(id).unwrap();
-        // TODO(moritzho): Figure out how error handling works here
-        msg.push(R::NAME.discriminant().expect("Failed to get discriminant")).unwrap();
+        msg.push(R::NAME.discriminant()).unwrap();
         msg.push::<&R>(r).unwrap();
 
         // step 2: add completion handle for pending responses
@@ -363,7 +362,7 @@ fn _assert() {
     enum E {A}
     impl Name for E {
         type Discriminant = u8;
-        fn discriminant(&self) -> Option<u8> {None}
+        fn discriminant(&self) -> u8 {0}
         fn from_discriminant(_: &u8) -> Option<E> {None}
     }
     fn _is_send<T: Send>() {}

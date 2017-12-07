@@ -6,12 +6,13 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use num_traits::{FromPrimitive, ToPrimitive};
+use num_traits::FromPrimitive;
 
 use strymon_model::*;
 use strymon_communication::rpc::{Name, Request};
 
-#[derive(Primitive, Debug, PartialEq, Eq)]
+#[derive(Primitive, Debug, PartialEq, Eq, Clone, Copy)]
+#[repr(u8)]
 pub enum ExecutorRPC {
     SpawnQuery = 1,
     TerminateQuery = 2,
@@ -20,8 +21,8 @@ pub enum ExecutorRPC {
 impl Name for ExecutorRPC {
     type Discriminant = u8;
 
-    fn discriminant(&self) -> Option<Self::Discriminant> {
-        self.to_u8()
+    fn discriminant(&self) -> Self::Discriminant {
+        *self as Self::Discriminant
     }
 
     fn from_discriminant(value: &Self::Discriminant) -> Option<Self> {
