@@ -56,12 +56,12 @@ impl ExecutorState {
         self.ports.push_back(port);
     }
 
-    fn spawn(&self, req: &SpawnQuery) -> Response<SpawnQuery> {
+    fn spawn(&self, req: &SpawnQuery) -> Response<&'static str, SpawnQuery> {
         debug!("issue spawn request {:?}", req);
         self.tx.request(req)
     }
 
-    fn terminate(&self, job_id: QueryId) -> Response<TerminateQuery> {
+    fn terminate(&self, job_id: QueryId) -> Response<&'static str, TerminateQuery> {
         self.tx.request(&TerminateQuery { query: job_id })
     }
 }

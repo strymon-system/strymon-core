@@ -32,9 +32,9 @@ impl Dispatch {
         }
     }
 
-    pub fn dispatch(&mut self, req: RequestBuf) -> Result<(), Error> {
+    pub fn dispatch<'a>(&'a mut self, req: RequestBuf<&'static str>) -> Result<(), Error> {
         debug!("dispatching request {}", req.name());
-        match req.name() {
+        match *req.name() {
             Submission::NAME => {
                 let (req, resp) = req.decode::<Submission>()?;
                 let submission = self.coord

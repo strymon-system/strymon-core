@@ -24,7 +24,7 @@ pub enum SpawnError {
     ExecFailed,
 }
 
-impl Request for SpawnQuery {
+impl Request<&'static str> for SpawnQuery {
     type Success = ();
     type Error = SpawnError;
 
@@ -42,7 +42,7 @@ pub enum TerminateError {
     OperationNotSupported,
 }
 
-impl Request for TerminateQuery {
+impl Request<&'static str> for TerminateQuery {
     type Success = ();
     type Error = TerminateError;
 

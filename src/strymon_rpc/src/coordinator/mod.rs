@@ -29,7 +29,7 @@ pub enum SubmissionError {
     SpawnError(::executor::SpawnError),
 }
 
-impl Request for Submission {
+impl Request<&'static str> for Submission {
     type Success = QueryId;
     type Error = SubmissionError;
 
@@ -48,7 +48,7 @@ pub enum TerminationError {
     TerminateError(::executor::TerminateError),
 }
 
-impl Request for Termination {
+impl Request<&'static str> for Termination {
     type Success = ();
     type Error = TerminationError;
 
@@ -65,7 +65,7 @@ pub struct AddExecutor {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ExecutorError;
 
-impl Request for AddExecutor {
+impl Request<&'static str> for AddExecutor {
     type Success = ExecutorId;
     type Error = ExecutorError;
 
@@ -91,7 +91,7 @@ pub enum WorkerGroupError {
     PeerFailed,
 }
 
-impl Request for AddWorkerGroup {
+impl Request<&'static str> for AddWorkerGroup {
     type Success = QueryToken;
     type Error = WorkerGroupError;
 
@@ -111,7 +111,7 @@ pub enum SubscribeError {
     AuthenticationFailure,
 }
 
-impl Request for Subscribe {
+impl Request<&'static str> for Subscribe {
     type Success = Topic;
     type Error = SubscribeError;
 
@@ -130,7 +130,7 @@ pub enum UnsubscribeError {
     AuthenticationFailure,
 }
 
-impl Request for Unsubscribe {
+impl Request<&'static str> for Unsubscribe {
     type Success = ();
     type Error = UnsubscribeError;
 
@@ -151,7 +151,7 @@ pub enum PublishError {
     AuthenticationFailure,
 }
 
-impl Request for Publish {
+impl Request<&'static str> for Publish {
     type Success = Topic;
     type Error = PublishError;
 
@@ -170,7 +170,7 @@ pub enum UnpublishError {
     AuthenticationFailure,
 }
 
-impl Request for Unpublish {
+impl Request<&'static str> for Unpublish {
     type Success = ();
     type Error = UnpublishError;
 
@@ -182,7 +182,7 @@ pub struct Lookup {
     pub name: String,
 }
 
-impl Request for Lookup {
+impl Request<&'static str> for Lookup {
     type Success = Topic;
     type Error = ();
 
@@ -202,7 +202,7 @@ pub enum AddKeeperWorkerError {
     WorkerAlreadyExists,
 }
 
-impl Request for AddKeeperWorker {
+impl Request<&'static str> for AddKeeperWorker {
     type Success = ();
     type Error = AddKeeperWorkerError;
 
@@ -220,7 +220,7 @@ pub enum GetKeeperAddressError {
     KeeperHasNoWorkers,
 }
 
-impl Request for GetKeeperAddress {
+impl Request<&'static str> for GetKeeperAddress {
     type Success = (String, u16);
     type Error = GetKeeperAddressError;
 
@@ -239,7 +239,7 @@ pub enum RemoveKeeperWorkerError {
     KeeperWorkerDoesntExist,
 }
 
-impl Request for RemoveKeeperWorker {
+impl Request<&'static str> for RemoveKeeperWorker {
     type Success = ();
     type Error = RemoveKeeperWorkerError;
 

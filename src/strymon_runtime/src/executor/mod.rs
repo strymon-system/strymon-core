@@ -104,8 +104,8 @@ impl ExecutorService {
         self.process.spawn(id, exec)
     }
 
-    pub fn dispatch(&mut self, req: RequestBuf) -> Result<(), Error> {
-        match req.name() {
+    pub fn dispatch(&mut self, req: RequestBuf<&'static str>) -> Result<(), Error> {
+        match *req.name() {
             SpawnQuery::NAME => {
                 let (SpawnQuery { query, hostlist }, resp) = req.decode::<SpawnQuery>()?;
                 debug!("spawn request for {:?}", query);
@@ -182,7 +182,7 @@ impl Builder {
         let Builder { ports, coord, workdir } = self;
         let network = Network::init()?;
         let host = network.hostname();
-        let (tx, rx) = network.client(&*coord)?;
+        let (tx, rx) = network.client::<&'static str, _>(&*coord)?;
 
         let mut core = Core::new()?;
         let handle = core.handle();

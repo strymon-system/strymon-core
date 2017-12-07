@@ -49,7 +49,7 @@ impl Default for Builder {
 impl Builder {
     pub fn run(self) -> Result<()> {
         let network = Network::init()?;
-        let server = network.server(self.port)?;
+        let server = network.server::<&'static str, _>(self.port)?;
 
         let mut core = Core::new()?;
         let handle = core.handle();

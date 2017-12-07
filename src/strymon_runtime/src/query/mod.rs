@@ -46,7 +46,7 @@ fn initialize(id: QueryId,
               coord: String)
               -> Result<Coordinator, IoError> {
     let network = Network::init()?;
-    let (tx, _) = network.client(&*coord)?;
+    let (tx, _) = network.client::<&'static str, _>(&*coord)?;
 
     let announce = tx.request(&AddWorkerGroup {
         query: id,
