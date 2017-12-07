@@ -27,11 +27,48 @@ use message::MessageBuf;
 use serde::ser::Serialize;
 use serde::de::DeserializeOwned;
 
-pub trait Request: Serialize + DeserializeOwned {
+/// A trait to distinguish remote procedure calls.
+///
+/// #Examples
+/// ```
+/// use strymon_communication::rpc::Name;
+/// #[derive(Clone, Copy)]
+/// #[repr(u8)]
+/// pub enum MyRPC {
+///    UselessCall = 1,
+/// }
+///
+/// impl Name for MyRPC {
+///     type Discriminant = u8;
+///     fn discriminant(&self) -> Self::Discriminant {
+///         *self as Self::Discriminant
+///     }
+///
+///     fn from_discriminant(value: &Self::Discriminant) -> Option<Self> {
+///         match *value {
+///             1 => Some(MyRPC::UselessCall),
+///             _ => None,
+///         }
+///     }
+/// }
+/// ```
+pub trait Name: 'static+Send+Sized {
+
+    /// The discriminant type representing `Self`.
+    type Discriminant: 'static+Serialize+DeserializeOwned;
+
+    /// Convert `Self` into a discriminant.
+    fn discriminant(&self) -> Self::Discriminant;
+
+    /// Restore `Self` from a discriminant. Returns `None` if `Self` cannot be restored.
+    fn from_discriminant(&Self::Discriminant) -> Option<Self>;
+}
+
+pub trait Request<N: Name>: Serialize + DeserializeOwned {
     type Success: Serialize + DeserializeOwned;
     type Error: Serialize + DeserializeOwned;
 
-    const NAME: &'static str;
+    const NAME: N;
 }
 
 type RequestId = u32;
@@ -53,19 +90,20 @@ impl Type {
     }
 }
 
-pub struct RequestBuf {
+pub struct RequestBuf<N: Name> {
     id: RequestId,
-    name: String,
+    name: N,
     origin: transport::Sender,
     msg: MessageBuf,
+    _n: PhantomData<N>,
 }
 
-impl RequestBuf {
-    pub fn name(&self) -> &str {
+impl<N: Name> RequestBuf<N> {
+    pub fn name(&self) -> &N {
         &self.name
     }
 
-    pub fn decode<R: Request>(mut self) -> io::Result<(R, Responder<R>)> {
+    pub fn decode<R: Request<N>>(mut self) -> io::Result<(R, Responder<N, R>)> {
         let payload = self.msg.pop::<R>()?;
         let responder = Responder {
             id: self.id,
@@ -77,13 +115,13 @@ impl RequestBuf {
     }
 }
 
-pub struct Responder<R: Request> {
+pub struct Responder<N: Name, R: Request<N>> {
     id: RequestId,
     origin: transport::Sender,
-    marker: PhantomData<R>,
+    marker: PhantomData<(N, R)>,
 }
 
-impl<R: Request> Responder<R> {
+impl<N: Name, R: Request<N>> Responder<N, R> {
     pub fn respond(self, res: Result<R::Success, R::Error>) {
         let mut msg = MessageBuf::empty();
         msg.push(Type::Response as u8).unwrap();
@@ -96,22 +134,22 @@ impl<R: Request> Responder<R> {
 type Pending = oneshot::Sender<MessageBuf>;
 
 #[must_use = "futures do nothing unless polled"]
-pub struct Response<R: Request> {
+pub struct Response<N: Name, R: Request<N>> {
     rx: oneshot::Receiver<MessageBuf>,
     pending: Arc<Mutex<HashMap<RequestId, Pending>>>,
     id: RequestId,
-    _request: PhantomData<R>,
+    _request: PhantomData<(N, R)>,
 }
 
-impl<R: Request> Response<R> {
+impl<N: Name, R: Request<N>> Response<N, R> {
     pub fn wait_unwrap(self) -> Result<R::Success, R::Error> {
         self.map_err(|e| e.expect("request failed with I/O error")).wait()
     }
 }
 
-impl<R: Request> Future for Response<R> {
+impl<N: Name, R: Request<N>> Future for Response<N, R> {
     type Item = R::Success;
-    type Error = Result<<R as Request>::Error, io::Error>;
+    type Error = Result<<R as Request<N>>::Error, io::Error>;
 
     fn poll(&mut self) -> Result<Async<Self::Item>, Self::Error> {
         match self.rx.poll() {
@@ -129,7 +167,7 @@ impl<R: Request> Future for Response<R> {
     }
 }
 
-impl<R: Request> Drop for Response<R> {
+impl<N: Name, R: Request<N>> Drop for Response<N, R> {
     fn drop(&mut self) {
         // cancel pending response (if not yet completed)
         if let Ok(mut pending) = self.pending.lock() {
@@ -150,7 +188,7 @@ impl Outgoing {
         self.next_id.fetch_add(1, Ordering::SeqCst) as u32
     }
 
-    pub fn request<R: Request>(&self, r: &R) -> Response<R> {
+    pub fn request<N: Name, R: Request<N>>(&self, r: &R) -> Response<N, R> {
         let id = self.next_id();
         let (tx, rx) = oneshot::channel();
 
@@ -158,7 +196,7 @@ impl Outgoing {
         let mut msg = MessageBuf::empty();
         msg.push(Type::Request as u8).unwrap();
         msg.push(id).unwrap();
-        msg.push(R::NAME).unwrap();
+        msg.push(R::NAME.discriminant()).unwrap();
         msg.push::<&R>(r).unwrap();
 
         // step 2: add completion handle for pending responses
@@ -181,27 +219,27 @@ impl Outgoing {
 }
 
 #[must_use = "futures do nothing unless polled"]
-pub struct Incoming {
-    rx: mpsc::UnboundedReceiver<Result<RequestBuf, io::Error>>,
+pub struct Incoming<N: Name> {
+    rx: mpsc::UnboundedReceiver<Result<RequestBuf<N>, io::Error>>,
 }
 
-impl Stream for Incoming {
-    type Item = RequestBuf;
+impl<N: Name> Stream for Incoming<N> {
+    type Item = RequestBuf<N>;
     type Error = io::Error;
 
-    fn poll(&mut self) -> Poll<Option<RequestBuf>, io::Error> {
+    fn poll(&mut self) -> Poll<Option<RequestBuf<N>>, io::Error> {
         transport::poll_receiver(&mut self.rx)
     }
 }
 
-struct Resolver {
-    incoming: mpsc::UnboundedSender<Result<RequestBuf, io::Error>>,
+struct Resolver<N: Name> {
+    incoming: mpsc::UnboundedSender<Result<RequestBuf<N>, io::Error>>,
     pending: Arc<Mutex<HashMap<RequestId, Pending>>>,
     sender: transport::Sender,
     stream: TcpStream,
 }
 
-impl Resolver {
+impl<N: Name> Resolver<N> {
     /// decodes a message received on the incoming socket queue.
     fn decode(&mut self, mut msg: MessageBuf) -> io::Result<()> {
         let ty = msg.pop().and_then(Type::from_u8)?;
@@ -211,12 +249,16 @@ impl Resolver {
             // requests and create an opaque requestbuf so the receiver can
             // try to decode it
             Type::Request => {
-                let name = msg.pop::<String>()?;
+                let name = msg.pop::<N::Discriminant>()?;
+                let name = N::from_discriminant(&name)
+                    .and_then(|n| Some(Ok(n)))
+                    .unwrap_or_else(|| Err(io::Error::new(ErrorKind::Other, "decoding discriminant failed")))?;
                 let buf = RequestBuf {
                     id: id,
                     name: name,
                     origin: self.sender.clone(),
                     msg: msg,
+                    _n: PhantomData,
                 };
 
                 // try to send to receiver
@@ -270,13 +312,13 @@ impl Resolver {
 }
 
 #[must_use = "futures do nothing unless polled"]
-pub struct Server {
+pub struct Server<N: Name> {
     external: Arc<String>,
     port: u16,
-    rx: mpsc::Receiver<io::Result<(Outgoing, Incoming)>>,
+    rx: mpsc::Receiver<io::Result<(Outgoing, Incoming<N>)>>,
 }
 
-impl Server {
+impl<N: Name> Server<N> {
     // TODO(swicki) could this be merged with network::Listener?
     fn new(network: Network, port: u16) -> io::Result<Self> {
         let sockaddr = ("0.0.0.0", port);
@@ -297,8 +339,8 @@ impl Server {
     }
 }
 
-impl Stream for Server {
-    type Item = (Outgoing, Incoming);
+impl<N: Name> Stream for Server<N> {
+    type Item = (Outgoing, Incoming<N>);
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
@@ -307,7 +349,7 @@ impl Stream for Server {
 }
 
 /// creates a new request dispatcher/multiplexer for each accepted tcp socket
-fn multiplex(stream: TcpStream) -> io::Result<(Outgoing, Incoming)> {
+fn multiplex<N: Name>(stream: TcpStream) -> io::Result<(Outgoing, Incoming<N>)> {
     let instream = stream.try_clone()?;
     let outstream = stream;
 
@@ -336,22 +378,28 @@ fn multiplex(stream: TcpStream) -> io::Result<(Outgoing, Incoming)> {
 }
 
 impl Network {
-    pub fn client<E: ToSocketAddrs>(&self,
+    pub fn client<N: Name, E: ToSocketAddrs>(&self,
                                     endpoint: E)
-                                    -> io::Result<(Outgoing, Incoming)> {
+                                    -> io::Result<(Outgoing, Incoming<N>)> {
         multiplex(TcpStream::connect(endpoint)?)
     }
 
-    pub fn server<P: Into<Option<u16>>>(&self, port: P) -> io::Result<Server> {
+    pub fn server<N: Name, P: Into<Option<u16>>>(&self, port: P) -> io::Result<Server<N>> {
         Server::new(self.clone(), port.into().unwrap_or(0))
     }
 }
 
 fn _assert() {
+    enum E {A}
+    impl Name for E {
+        type Discriminant = u8;
+        fn discriminant(&self) -> u8 {0}
+        fn from_discriminant(_: &u8) -> Option<E> {None}
+    }
     fn _is_send<T: Send>() {}
-    _is_send::<Incoming>();
+    _is_send::<Incoming<E>>();
     _is_send::<Outgoing>();
-    _is_send::<Server>();
+    _is_send::<Server<E>>();
 }
 /*
 TODO fix

@@ -32,7 +32,7 @@ pub struct Submitter {
 
 impl Submitter {
     pub fn new<E: ToSocketAddrs>(network: &Network, addr: E) -> Result<Self> {
-        let (tx, _) = network.client(addr)?;
+        let (tx, _) = network.client::<CoordinatorRPC, _>(addr)?;
         Ok(Submitter {
             tx: tx,
             network: network.clone(),
@@ -43,7 +43,7 @@ impl Submitter {
                      query: QueryProgram,
                      name: N,
                      placement: Placement)
-                     -> Response<Submission>
+                     -> Response<CoordinatorRPC, Submission>
         where N: Into<Option<String>>
     {
         let submission = Submission {
@@ -55,7 +55,7 @@ impl Submitter {
         self.tx.request(&submission)
     }
 
-    pub fn terminate(&self, id: QueryId) -> Response<Termination> {
+    pub fn terminate(&self, id: QueryId) -> Response<CoordinatorRPC, Termination> {
         let termination = Termination {
             query: id,
         };
