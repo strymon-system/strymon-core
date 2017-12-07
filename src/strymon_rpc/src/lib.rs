@@ -6,6 +6,10 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+#[macro_use]
+extern crate enum_primitive_derive;
+extern crate num_traits;
+
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;

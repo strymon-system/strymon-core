@@ -6,7 +6,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use std::io::{Error, ErrorKind};
+use std::io::Error;
 
 use futures::future::Future;
 use tokio_core::reactor::Handle;
@@ -32,8 +32,8 @@ impl Dispatch {
         }
     }
 
-    pub fn dispatch<'a>(&'a mut self, req: RequestBuf<&'static str>) -> Result<(), Error> {
-        debug!("dispatching request {}", req.name());
+    pub fn dispatch<'a>(&'a mut self, req: RequestBuf<CoordinatorRPC>) -> Result<(), Error> {
+        debug!("dispatching request {:?}", req.name());
         match *req.name() {
             Submission::NAME => {
                 let (req, resp) = req.decode::<Submission>()?;
@@ -100,10 +100,6 @@ impl Dispatch {
                 let (RemoveKeeperWorker { name, worker_num }, resp) =
                     req.decode::<RemoveKeeperWorker>()?;
                 resp.respond(self.coord.remove_keeper_worker(name, worker_num));
-            }
-            _ => {
-                let err = Error::new(ErrorKind::InvalidData, "invalid request");
-                return Err(err);
             }
         }
 

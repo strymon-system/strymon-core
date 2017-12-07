@@ -7,7 +7,7 @@
 // except according to those terms.
 
 use std::fs;
-use std::io::{Error, ErrorKind};
+use std::io::Error;
 use std::env;
 use std::path::PathBuf;
 use std::ffi::OsStr;
@@ -104,7 +104,7 @@ impl ExecutorService {
         self.process.spawn(id, exec)
     }
 
-    pub fn dispatch(&mut self, req: RequestBuf<&'static str>) -> Result<(), Error> {
+    pub fn dispatch(&mut self, req: RequestBuf<ExecutorRPC>) -> Result<(), Error> {
         match *req.name() {
             SpawnQuery::NAME => {
                 let (SpawnQuery { query, hostlist }, resp) = req.decode::<SpawnQuery>()?;
@@ -117,10 +117,6 @@ impl ExecutorService {
                 debug!("termination request for {:?}", query);
                 resp.respond(self.process.terminate(query));
                 Ok(())
-            }
-            _ => {
-                let err = Error::new(ErrorKind::InvalidData, "invalid request");
-                return Err(err);
             }
         }
     }
@@ -182,7 +178,7 @@ impl Builder {
         let Builder { ports, coord, workdir } = self;
         let network = Network::init()?;
         let host = network.hostname();
-        let (tx, rx) = network.client::<&'static str, _>(&*coord)?;
+        let (tx, rx) = network.client::<ExecutorRPC, _>(&*coord)?;
 
         let mut core = Core::new()?;
         let handle = core.handle();

@@ -27,7 +27,13 @@ use message::MessageBuf;
 use serde::ser::Serialize;
 use serde::de::DeserializeOwned;
 
-pub trait Request<N: 'static+Serialize>: Serialize + DeserializeOwned {
+pub trait Name: 'static+Send+Sized {
+    type Discriminant: 'static+Serialize+DeserializeOwned;
+    fn discriminant(&self) -> Option<Self::Discriminant>;
+    fn from_discriminant(&Self::Discriminant) -> Option<Self>;
+}
+
+pub trait Request<N: Name>: Serialize + DeserializeOwned {
     type Success: Serialize + DeserializeOwned;
     type Error: Serialize + DeserializeOwned;
 
@@ -53,7 +59,7 @@ impl Type {
     }
 }
 
-pub struct RequestBuf<N: Serialize + Send> {
+pub struct RequestBuf<N: Name> {
     id: RequestId,
     name: N,
     origin: transport::Sender,
@@ -61,7 +67,7 @@ pub struct RequestBuf<N: Serialize + Send> {
     _n: PhantomData<N>,
 }
 
-impl<N: Serialize + Send> RequestBuf<N> {
+impl<N: Name> RequestBuf<N> {
     pub fn name(&self) -> &N {
         &self.name
     }
@@ -78,13 +84,13 @@ impl<N: Serialize + Send> RequestBuf<N> {
     }
 }
 
-pub struct Responder<N: 'static+Serialize, R: Request<N>> {
+pub struct Responder<N: Name, R: Request<N>> {
     id: RequestId,
     origin: transport::Sender,
     marker: PhantomData<(N, R)>,
 }
 
-impl<N: 'static+Serialize, R: Request<N>> Responder<N, R> {
+impl<N: Name, R: Request<N>> Responder<N, R> {
     pub fn respond(self, res: Result<R::Success, R::Error>) {
         let mut msg = MessageBuf::empty();
         msg.push(Type::Response as u8).unwrap();
@@ -97,20 +103,20 @@ impl<N: 'static+Serialize, R: Request<N>> Responder<N, R> {
 type Pending = oneshot::Sender<MessageBuf>;
 
 #[must_use = "futures do nothing unless polled"]
-pub struct Response<N: 'static+Serialize, R: Request<N>> {
+pub struct Response<N: Name, R: Request<N>> {
     rx: oneshot::Receiver<MessageBuf>,
     pending: Arc<Mutex<HashMap<RequestId, Pending>>>,
     id: RequestId,
     _request: PhantomData<(N, R)>,
 }
 
-impl<N: 'static+Serialize, R: Request<N>> Response<N, R> {
+impl<N: Name, R: Request<N>> Response<N, R> {
     pub fn wait_unwrap(self) -> Result<R::Success, R::Error> {
         self.map_err(|e| e.expect("request failed with I/O error")).wait()
     }
 }
 
-impl<N: 'static+Serialize, R: Request<N>> Future for Response<N, R> {
+impl<N: Name, R: Request<N>> Future for Response<N, R> {
     type Item = R::Success;
     type Error = Result<<R as Request<N>>::Error, io::Error>;
 
@@ -130,7 +136,7 @@ impl<N: 'static+Serialize, R: Request<N>> Future for Response<N, R> {
     }
 }
 
-impl<N: 'static+Serialize, R: Request<N>> Drop for Response<N, R> {
+impl<N: Name, R: Request<N>> Drop for Response<N, R> {
     fn drop(&mut self) {
         // cancel pending response (if not yet completed)
         if let Ok(mut pending) = self.pending.lock() {
@@ -151,7 +157,7 @@ impl Outgoing {
         self.next_id.fetch_add(1, Ordering::SeqCst) as u32
     }
 
-    pub fn request<N: Serialize, R: Request<N>>(&self, r: &R) -> Response<N, R> {
+    pub fn request<N: Name, R: Request<N>>(&self, r: &R) -> Response<N, R> {
         let id = self.next_id();
         let (tx, rx) = oneshot::channel();
 
@@ -159,7 +165,8 @@ impl Outgoing {
         let mut msg = MessageBuf::empty();
         msg.push(Type::Request as u8).unwrap();
         msg.push(id).unwrap();
-        msg.push(R::NAME).unwrap();
+        // TODO(moritzho): Figure out how error handling works here
+        msg.push(R::NAME.discriminant().expect("Failed to get discriminant")).unwrap();
         msg.push::<&R>(r).unwrap();
 
         // step 2: add completion handle for pending responses
@@ -182,11 +189,11 @@ impl Outgoing {
 }
 
 #[must_use = "futures do nothing unless polled"]
-pub struct Incoming<N: Serialize + DeserializeOwned + Send> {
+pub struct Incoming<N: Name> {
     rx: mpsc::UnboundedReceiver<Result<RequestBuf<N>, io::Error>>,
 }
 
-impl<N: Serialize + DeserializeOwned + Send> Stream for Incoming<N> {
+impl<N: Name> Stream for Incoming<N> {
     type Item = RequestBuf<N>;
     type Error = io::Error;
 
@@ -195,14 +202,14 @@ impl<N: Serialize + DeserializeOwned + Send> Stream for Incoming<N> {
     }
 }
 
-struct Resolver<N: Serialize + DeserializeOwned + Send> {
+struct Resolver<N: Name> {
     incoming: mpsc::UnboundedSender<Result<RequestBuf<N>, io::Error>>,
     pending: Arc<Mutex<HashMap<RequestId, Pending>>>,
     sender: transport::Sender,
     stream: TcpStream,
 }
 
-impl<N: 'static+Send+Serialize+DeserializeOwned> Resolver<N> {
+impl<N: Name> Resolver<N> {
     /// decodes a message received on the incoming socket queue.
     fn decode(&mut self, mut msg: MessageBuf) -> io::Result<()> {
         let ty = msg.pop().and_then(Type::from_u8)?;
@@ -212,7 +219,10 @@ impl<N: 'static+Send+Serialize+DeserializeOwned> Resolver<N> {
             // requests and create an opaque requestbuf so the receiver can
             // try to decode it
             Type::Request => {
-                let name = msg.pop::<N>()?;
+                let name = msg.pop::<N::Discriminant>()?;
+                let name = N::from_discriminant(&name)
+                    .and_then(|n| Some(Ok(n)))
+                    .unwrap_or_else(|| Err(io::Error::new(ErrorKind::Other, "decoding discriminant failed")))?;
                 let buf = RequestBuf {
                     id: id,
                     name: name,
@@ -272,13 +282,13 @@ impl<N: 'static+Send+Serialize+DeserializeOwned> Resolver<N> {
 }
 
 #[must_use = "futures do nothing unless polled"]
-pub struct Server<N: 'static+Serialize+DeserializeOwned+Send> {
+pub struct Server<N: Name> {
     external: Arc<String>,
     port: u16,
     rx: mpsc::Receiver<io::Result<(Outgoing, Incoming<N>)>>,
 }
 
-impl<N: 'static+Serialize+DeserializeOwned+Send> Server<N> {
+impl<N: Name> Server<N> {
     // TODO(swicki) could this be merged with network::Listener?
     fn new(network: Network, port: u16) -> io::Result<Self> {
         let sockaddr = ("0.0.0.0", port);
@@ -299,7 +309,7 @@ impl<N: 'static+Serialize+DeserializeOwned+Send> Server<N> {
     }
 }
 
-impl<N: Serialize+DeserializeOwned+Send> Stream for Server<N> {
+impl<N: Name> Stream for Server<N> {
     type Item = (Outgoing, Incoming<N>);
     type Error = io::Error;
 
@@ -309,7 +319,7 @@ impl<N: Serialize+DeserializeOwned+Send> Stream for Server<N> {
 }
 
 /// creates a new request dispatcher/multiplexer for each accepted tcp socket
-fn multiplex<N: 'static+Serialize+DeserializeOwned+Send>(stream: TcpStream) -> io::Result<(Outgoing, Incoming<N>)> {
+fn multiplex<N: Name>(stream: TcpStream) -> io::Result<(Outgoing, Incoming<N>)> {
     let instream = stream.try_clone()?;
     let outstream = stream;
 
@@ -338,22 +348,28 @@ fn multiplex<N: 'static+Serialize+DeserializeOwned+Send>(stream: TcpStream) -> i
 }
 
 impl Network {
-    pub fn client<N: 'static+Send+Serialize+DeserializeOwned, E: ToSocketAddrs>(&self,
+    pub fn client<N: Name, E: ToSocketAddrs>(&self,
                                     endpoint: E)
                                     -> io::Result<(Outgoing, Incoming<N>)> {
         multiplex(TcpStream::connect(endpoint)?)
     }
 
-    pub fn server<N: 'static+Send+Serialize+DeserializeOwned, P: Into<Option<u16>>>(&self, port: P) -> io::Result<Server<N>> {
+    pub fn server<N: Name, P: Into<Option<u16>>>(&self, port: P) -> io::Result<Server<N>> {
         Server::new(self.clone(), port.into().unwrap_or(0))
     }
 }
 
 fn _assert() {
+    enum E {A}
+    impl Name for E {
+        type Discriminant = u8;
+        fn discriminant(&self) -> Option<u8> {None}
+        fn from_discriminant(_: &u8) -> Option<E> {None}
+    }
     fn _is_send<T: Send>() {}
-    _is_send::<Incoming<usize>>();
+    _is_send::<Incoming<E>>();
     _is_send::<Outgoing>();
-    _is_send::<Server<usize>>();
+    _is_send::<Server<E>>();
 }
 /*
 TODO fix

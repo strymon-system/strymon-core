@@ -16,6 +16,8 @@ use tokio_core::reactor::Core;
 
 use strymon_communication::Network;
 
+use strymon_rpc::coordinator::CoordinatorRPC;
+
 use self::handler::Coordinator;
 use self::dispatch::Dispatch;
 use self::catalog::Catalog;
@@ -49,7 +51,7 @@ impl Default for Builder {
 impl Builder {
     pub fn run(self) -> Result<()> {
         let network = Network::init()?;
-        let server = network.server::<&'static str, _>(self.port)?;
+        let server = network.server::<CoordinatorRPC, _>(self.port)?;
 
         let mut core = Core::new()?;
         let handle = core.handle();

@@ -6,6 +6,8 @@ version = "0.1.1"
 [dependencies]
 serde = "1.0"
 serde_derive = "1.0"
+enum-primitive-derive = "^0.1"
+num-traits = "^0.1"
 
 [dependencies.strymon_communication]
 path = "../strymon_communication/"
