@@ -27,9 +27,40 @@ use message::MessageBuf;
 use serde::ser::Serialize;
 use serde::de::DeserializeOwned;
 
+/// A trait to distinguish remote procedure calls.
+///
+/// #Examples
+/// ```
+/// use strymon_communication::rpc::Name;
+/// #[derive(Clone, Copy)]
+/// #[repr(u8)]
+/// pub enum MyRPC {
+///    UselessCall = 1,
+/// }
+///
+/// impl Name for MyRPC {
+///     type Discriminant = u8;
+///     fn discriminant(&self) -> Self::Discriminant {
+///         *self as Self::Discriminant
+///     }
+///
+///     fn from_discriminant(value: &Self::Discriminant) -> Option<Self> {
+///         match *value {
+///             1 => Some(MyRPC::UselessCall),
+///             _ => None,
+///         }
+///     }
+/// }
+/// ```
 pub trait Name: 'static+Send+Sized {
+
+    /// The discriminant type representing `Self`.
     type Discriminant: 'static+Serialize+DeserializeOwned;
+
+    /// Convert `Self` into a discriminant.
     fn discriminant(&self) -> Self::Discriminant;
+
+    /// Restore `Self` from a discriminant. Returns `None` if `Self` cannot be restored.
     fn from_discriminant(&Self::Discriminant) -> Option<Self>;
 }
 
