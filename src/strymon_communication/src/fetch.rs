@@ -6,6 +6,11 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+//! Utilities for sending files over the network.
+//!
+//! Currently implements a primitive server which copies the raw file contents to
+//! any client which connects to the socket.
+
 use std::net::{TcpListener, TcpStream};
 use std::io::{copy, Result, Error, ErrorKind};
 use std::fs::{self, File};
@@ -14,12 +19,14 @@ use std::thread;
 
 use Network;
 
+/// Handle for the file server. Closes the server when dropped.
 pub struct Handle {
     url: String,
     listener: TcpListener,
 }
 
 impl Handle {
+    /// Returns a URL in the format of `tcp://host:port` for the given upload.
     pub fn url(&self) -> String {
         self.url.clone()
     }
@@ -45,6 +52,7 @@ fn fix_permissions<P: AsRef<Path>>(path: P) -> Result<()> {
 fn fix_permissions<P: AsRef<Path>>(_: P) -> Result<()> { Ok(()) }
 
 impl Network {
+    /// Serves the specified file on a ephemerial network port.
     pub fn upload<P: AsRef<Path>>(&self, path: P) -> Result<Handle> {
         let path = path.as_ref().to_owned();
         if !path.is_file() {
@@ -72,6 +80,7 @@ impl Network {
         })
     }
 
+    /// Downloads the file served at `url` and downloads it into `path`.
     pub fn download<P: AsRef<Path>>(&self, url: &str, path: P) -> Result<()> {
         // url should have the format: "tcp://host:port"
         if !url.starts_with("tcp://") {
