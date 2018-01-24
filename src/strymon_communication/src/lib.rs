@@ -47,6 +47,12 @@ impl Network {
         })
     }
 
+    pub fn with_hostname(hostname: String) -> io::Result<Self> {
+        Ok(Network {
+            hostname: Arc::new(hostname),
+        })
+    }
+
     pub fn hostname(&self) -> String {
         (*self.hostname).clone()
     }

@@ -6,15 +6,11 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use std::borrow::Cow;
-use std::env;
-use std::num;
 use std::rc::Rc;
 use std::cell::RefCell;
 use std::process::{Command, Stdio};
 use std::collections::HashMap;
 use std::ffi::OsStr;
-use std::fmt::{Write, Display};
 use std::io::{BufReader};
 use std::path::Path;
 
@@ -26,55 +22,8 @@ use tokio_core::reactor::Handle;
 use tokio_process::{Child, CommandExt};
 
 use strymon_model::QueryId;
+use strymon_model::config::job::Process;
 use strymon_rpc::executor::{SpawnError, TerminateError};
-
-pub const QUERY_ID: &'static str = "TIMELY_EXEC_CONF_QUERY_ID";
-pub const THREADS: &'static str = "TIMELY_EXEC_CONF_THREADS";
-pub const PROCESS: &'static str = "TIMELY_EXEC_CONF_PROCESS";
-pub const HOSTLIST: &'static str = "TIMELY_EXEC_CONF_HOSTLIST";
-pub const COORD: &'static str = "TIMELY_EXEC_CONF_COORD";
-pub const HOST: &'static str = "TIMELY_SYSTEM_HOSTNAME";
-
-#[derive(Debug)]
-pub struct NativeExecutable {
-    pub query_id: QueryId,
-    pub threads: usize,
-    pub process: usize,
-    pub hostlist: Vec<String>,
-    pub coord: String,
-    pub host: String,
-}
-
-#[derive(Debug)]
-pub enum ParseError {
-    VarErr(env::VarError),
-    IntErr(num::ParseIntError),
-}
-
-impl From<env::VarError> for ParseError {
-    fn from(var: env::VarError) -> Self {
-        ParseError::VarErr(var)
-    }
-}
-
-impl From<num::ParseIntError> for ParseError {
-    fn from(int: num::ParseIntError) -> Self {
-        ParseError::IntErr(int)
-    }
-}
-
-impl NativeExecutable {
-    pub fn from_env() -> Result<Self, ParseError> {
-        Ok(NativeExecutable {
-            query_id: QueryId::from(env::var(QUERY_ID)?.parse::<u64>()?),
-            threads: env::var(THREADS)?.parse::<usize>()?,
-            process: env::var(PROCESS)?.parse::<usize>()?,
-            hostlist: env::var(HOSTLIST)?.split('|').map(From::from).collect(),
-            coord: env::var(COORD)?,
-            host: env::var(HOST)?,
-        })
-    }
-}
 
 #[derive(Debug)]
 pub struct Builder {
@@ -83,7 +32,7 @@ pub struct Builder {
     // timely config
     threads: usize,
     process: usize,
-    hostlist: Cow<'static, str>,
+    hostlist: Vec<String>,
 }
 
 impl Builder {
@@ -101,7 +50,7 @@ impl Builder {
             cmd: cmd,
             threads: 1,
             process: 0,
-            hostlist: Cow::Borrowed("localhost"),
+            hostlist: vec![],
         })
     }
 
@@ -117,14 +66,9 @@ impl Builder {
         self
     }
 
-    /// Specify the host names of all Timely processes (default: ["localhost"])
-    pub fn hostlist<S: Display, I: IntoIterator<Item=S>>(&mut self, hostlist: I) -> &mut Self {
-        let mut list = hostlist.into_iter();
-        let mut hostlist = list.next().expect("empty iterator").to_string();
-        for host in list {
-            write!(&mut hostlist, "|{}", host).unwrap();
-        }
-        self.hostlist = Cow::Owned(hostlist);
+    /// Specify the host names of all Timely processes (default: [])
+    pub fn hostlist(&mut self, hostlist: Vec<String>) -> &mut Self {
+        self.hostlist = hostlist;
         self
     }
 
@@ -219,14 +163,20 @@ impl ProcessService {
     /// Spawns a new process to be supervised by this process service. The Timely
     /// configuration stored in the Builder is extracted and passed down to the
     /// spawned child process.
-    pub fn spawn(&mut self, id: QueryId, mut process: Builder) -> Result<(), SpawnError> {
-        let child = process.cmd
-            .env(QUERY_ID, id.0.to_string())
-            .env(THREADS, process.threads.to_string())
-            .env(PROCESS, process.threads.to_string())
-            .env(HOSTLIST, process.hostlist.as_ref())
-            .env(COORD, self.coord.clone())
-            .env(HOST, self.hostname.clone())
+    pub fn spawn(&mut self, id: QueryId, builder: Builder) -> Result<(), SpawnError> {
+        let conf = Process {
+            job_id: id,
+            index: builder.process,
+            addrs: builder.hostlist,
+            threads: builder.threads,
+            coord: self.coord.clone(),
+            hostname: self.hostname.clone(),
+        };
+
+        let mut command = builder.cmd;
+        let child = command
+            .envs(conf.into_env())
+            .env("RUST_BACKTRACE", "1")
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .stdin(Stdio::null())

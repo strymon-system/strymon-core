@@ -77,7 +77,14 @@ impl ExecutorService {
             .iter()
             .position(|&id| self.id == id)
             .ok_or(SpawnError::InvalidRequest)?;
-        let threads = query.workers / hostlist.len();
+
+        // workers refers to the total number of workers. if there is more than
+        // one executor, we have to divide by the number of executors
+        let threads = if hostlist.is_empty() {
+            query.workers
+        } else {
+            query.workers / hostlist.len()
+        };
 
         // the job dir should be unique to this execution, we prepend a datetime
         // string to avoid overwriting the artifacts of previous strymon instances
@@ -98,7 +105,7 @@ impl ExecutorService {
         let mut exec = executable::Builder::new(&executable, args)?;
         exec.threads(threads)
             .process(process)
-            .hostlist(&hostlist)
+            .hostlist(hostlist)
             .working_directory(&jobdir);
 
         self.process.spawn(id, exec)

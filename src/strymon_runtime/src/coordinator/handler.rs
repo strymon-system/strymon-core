@@ -180,13 +180,19 @@ impl Coordinator {
         };
 
         // step 3: create the Timely configuration
-        let ports: Vec<(ExecutorId, u16)> = executors.iter()
-            .map(|executor| {
-                let id = executor.id;
-                let executor = executor_res.get_mut(&id).unwrap();
-                (id, executor.allocate_port())
-            })
-            .collect();
+        let ports: Vec<(ExecutorId, u16)> = if num_executors > 1 {
+            // allocate a port per executor
+            executors.iter()
+                .map(|executor| {
+                    let id = executor.id;
+                    let executor = executor_res.get_mut(&id).unwrap();
+                    (id, executor.allocate_port())
+                })
+                .collect()
+        } else {
+            // no need to allocate any ports for non-cluster jobs
+            Vec::new()
+        };
 
         let hostlist: Vec<String> = executors.iter()
             .zip(ports.iter())

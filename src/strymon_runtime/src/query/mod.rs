@@ -26,8 +26,8 @@ use typename::TypeName;
 use strymon_communication::Network;
 use strymon_communication::rpc::Outgoing;
 
-use executor::executable::NativeExecutable;
 use strymon_model::QueryId;
+use strymon_model::config::job::Process;
 use strymon_rpc::coordinator::{CoordinatorRPC, AddWorkerGroup, QueryToken};
 
 pub mod subscribe;
@@ -43,9 +43,10 @@ pub struct Coordinator {
 
 fn initialize(id: QueryId,
               process: usize,
-              coord: String)
+              coord: String,
+              hostname: String)
               -> Result<Coordinator, IoError> {
-    let network = Network::init()?;
+    let network = Network::with_hostname(hostname)?;
     let (tx, _) = network.client::<CoordinatorRPC, _>(&*coord)?;
 
     let announce = tx.request(&AddWorkerGroup {
@@ -74,7 +75,7 @@ pub fn execute<T, F>(func: F) -> Result<WorkerGuards<T>, String>
           F: Fn(&mut Root<Allocator>, Coordinator) -> T,
           F: Send + Sync + 'static
 {
-    let config = NativeExecutable::from_env().map_err(|err| {
+    let config = Process::from_env().map_err(|err| {
             format!(concat!("Failed to parse data from executor. ",
                             "Has this binary been launched by an executor? ",
                             "Error: {:?}"),
@@ -82,12 +83,12 @@ pub fn execute<T, F>(func: F) -> Result<WorkerGuards<T>, String>
         })?;
 
     // create timely configuration
-    let timely_conf = if config.hostlist.len() > 1 {
+    let timely_conf = if config.addrs.len() > 1 {
         info!("Configuration:Cluster({}, {}/{})",
               config.threads,
-              config.process,
-              config.hostlist.len());
-        Configuration::Cluster(config.threads, config.process, config.hostlist, true)
+              config.index,
+              config.addrs.len()-1);
+        Configuration::Cluster(config.threads, config.index, config.addrs, true)
     } else if config.threads > 1 {
         info!("Configuration:Process({})", config.threads);
         Configuration::Process(config.threads)
@@ -96,7 +97,7 @@ pub fn execute<T, F>(func: F) -> Result<WorkerGuards<T>, String>
         Configuration::Thread
     };
 
-    let coord = initialize(config.query_id, config.process, config.coord)
+    let coord = initialize(config.job_id, config.index, config.coord, config.hostname)
         .map_err(|err| format!("failed to connect to coordinator: {:?}", err))?;
 
     // wrap in mutex because timely requires `Sync` for some reason
