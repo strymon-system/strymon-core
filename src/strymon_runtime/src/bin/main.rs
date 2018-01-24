@@ -30,7 +30,7 @@ mod manage;
 use std::env;
 
 use clap::{App, AppSettings, Arg};
-use env_logger::{LogBuilder, LogTarget};
+use env_logger::{Builder, Target};
 
 use errors::*;
 
@@ -54,14 +54,14 @@ fn dispatch() -> Result<()> {
         .get_matches();
 
     // configure env_logger
-    let mut logger = LogBuilder::new();
-    logger.target(LogTarget::Stderr);
+    let mut logger = Builder::new();
+    logger.target(Target::Stderr);
     if let Some(s) = matches.value_of("log-level") {
         logger.parse(s);
     } else if let Ok(s) = env::var("RUST_LOG") {
         logger.parse(&s);
     }
-    logger.init().expect("failed to initialize logger");
+    logger.init();
 
     match matches.subcommand() {
         ("status", Some(args)) => status::main(args),
