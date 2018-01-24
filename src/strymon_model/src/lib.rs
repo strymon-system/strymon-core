@@ -21,6 +21,8 @@ use std::fmt;
 
 use typename::TypeName;
 
+pub mod config;
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Abomonation, TypeName)]
 pub struct TopicId(pub u64);
 
