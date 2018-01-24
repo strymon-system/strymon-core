@@ -11,7 +11,7 @@ parse_args "$@"
 shift $((OPTIND-1))
 
 # ensure paths are absolute
-LOGDIR="$(abspath "${LOGDIR}")"
+LOGDIR="$(canonicalize_path "${LOGDIR}")"
 
 # extract coordinator hostname
 case "${COORDINATOR}" in
