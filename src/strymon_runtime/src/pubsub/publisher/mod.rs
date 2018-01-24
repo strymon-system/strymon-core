@@ -17,7 +17,6 @@ use futures::executor::{self, Notify, Spawn};
 use strymon_communication::Network;
 use strymon_communication::transport::{Listener, Receiver, Sender};
 
-pub mod item;
 pub mod timely;
 pub mod collection;
 

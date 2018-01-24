@@ -33,6 +33,7 @@ extern crate strymon_rpc;
 
 pub mod coordinator;
 pub mod executor;
+#[deprecated(since = "0.1.2", note="The strymon_runtime::query module has been replaced by the strymon_job crate.")]
 pub mod query;
-pub mod pubsub;
+mod pubsub;
 pub mod submit;
