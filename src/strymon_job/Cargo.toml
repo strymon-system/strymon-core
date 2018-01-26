@@ -1,16 +1,27 @@
 [package]
 authors = ["Sebastian Wicki <swicki@inf.ethz.ch>"]
-name = "strymon_rpc"
+name = "strymon_job"
 version = "0.1.2"
 
 [dependencies]
+futures = "0.1.17"
+log = "0.4"
 serde = "1.0"
 serde_derive = "1.0"
-enum-primitive-derive = "0.1"
-num-traits = "0.1"
+slab = "0.4.0"
+timely = "0.3.0"
+timely_communication = "0.1.8"
+tokio-core = "0.1"
+typename = "0.1"
 
 [dependencies.strymon_communication]
 path = "../strymon_communication/"
 
 [dependencies.strymon_model]
 path = "../strymon_model/"
+
+[dependencies.strymon_rpc]
+path = "../strymon_rpc/"
+
+[dev-dependencies]
+serde_test = "1.0"

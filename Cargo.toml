@@ -1,12 +1,7 @@
 [workspace]
 members = [
-    "src/strymon_communication",
-    "src/strymon_runtime",
-    "src/strymon_model",
-    "src/strymon_rpc",
-    "apps/connected-components",
-    "apps/topology-generator",
-    #"apps/deltapath-routing",
+    "src/*/",
+    "apps/*/",
 ]
 
 [profile.release]
