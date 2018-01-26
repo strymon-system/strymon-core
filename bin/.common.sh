@@ -6,15 +6,15 @@ WORKDIR="${BASEDIR}/../jobs"
 EXECUTORS="${BASEDIR}/../conf/executors"
 COORDINATOR="localhost:9189"
 
-# Platform-independent implementation for generating an absolute path
+# Platform-independent implementation for generating an canonical path
 # $1: relative or absolute filesystem path
-abspath() {
-    case ${1} in
-    /*)
-        ;;
-    *)
-        echo "$(pwd)/${1}"
-    esac
+canonicalize_path() {
+    if [ -d "${1}" ]; then
+        (cd "${1}" 2>/dev/null && pwd -P)
+    else
+        (cd "$(dirname -- "${1}")" 2>/dev/null && \
+            printf '%s/%s\n' "$(pwd -P)" "$(basename -- "${1}")")
+    fi
 }
 
 ## Locates the path of the strymon command line utility
@@ -39,6 +39,7 @@ usage() {
   printf "    -c <ADDR>   Address of the coordinator to be spawned (default: \"${COORDINATOR}\").\n"
   printf "    -e <FILE>   Executor hosts file (default: \"${EXECUTORS}\").\n"
   printf "    -l <DIR>    Working directory for log and pid files (default: \"${LOGDIR}\").\n"
+  printf "    -w <DIR>    Working directory for job files (default: \"${WORKDIR}\").\n"
   exit 1
 }
 
@@ -46,7 +47,7 @@ usage() {
 ## Writes result to $COORDINATOR, $EXECUTORS and $LOGDIR
 # $1...: command line arguments
 parse_args() {
-  while getopts '?hc:e:l:' opt; do
+  while getopts '?hc:e:l:w:' opt; do
     case "${opt}" in
       c)
         COORDINATOR="${OPTARG}"
@@ -56,6 +57,9 @@ parse_args() {
         ;;
       l)
         LOGDIR="${OPTARG}"
+        ;;
+      w)
+        WORKDIR="${OPTARG}"
         ;;
       *)
         usage

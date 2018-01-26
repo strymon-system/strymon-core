@@ -53,10 +53,10 @@ parse_args "$@"
 shift $((OPTIND-1))
 
 # ensure paths are absolute
-LOGDIR="$(abspath "${LOGDIR}")"
-WORKDIR="$(abspath "${WORKDIR}")"
+LOGDIR="$(canonicalize_path "${LOGDIR}")"
+WORKDIR="$(canonicalize_path "${WORKDIR}")"
 BINARY="$(locate_binary)"
-FULL_BINARY="$(abspath "${BINARY}")"
+FULL_BINARY="$(canonicalize_path "${BINARY}")"
 
 # create working directory and spawn cluster
 mkdir -p "${LOGDIR}"
