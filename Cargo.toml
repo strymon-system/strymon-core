@@ -2,6 +2,7 @@
 members = [
     "src/*/",
     "apps/*/",
+    "tests/*/",
 ]
 
 [profile.release]
