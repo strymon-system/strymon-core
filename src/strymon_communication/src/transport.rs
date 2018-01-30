@@ -6,6 +6,52 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+//! Asynchronous point-to-point message channels.
+//!
+//! The implementation is a thin wrapper around TCP sockets and thus follows
+//! the same semantics: One peer needs to act as a [`Listener`](struct.Listener.html),
+//! accepting new incoming connections.
+//!
+//! A connection conists of a pair of queue handles:
+//!
+//!   1. A non-blocking [`Sender`](struct.Sender.html) which enqueues
+//!     [`MessageBuf`](../message/struct.MessageBuf.html) objects to be eventually
+//!     sent over the network.
+//!   2. A non-blocking [`Receiver`](struct.Receiver.html) receiving the messages
+//!     in the same order they were sent.
+//!
+//! # Examples
+//!
+//! ```rust
+//! extern crate futures;
+//! extern crate strymon_communication;
+//!
+//! use std::io;
+//! use std::thread;
+//! use futures::stream::Stream;
+//! use strymon_communication::Network;
+//! use strymon_communication::message::MessageBuf;
+//!
+//! fn run_example() -> io::Result<String> {
+//!     let network = Network::init()?;
+//!     let listener = network.listen(None)?;
+//!     let (_, port) = listener.external_addr();
+//!     thread::spawn(move || {
+//!         let mut blocking = listener.wait();
+//!         while let Some(Ok((tx, _rx))) = blocking.next() {
+//!             tx.send(MessageBuf::new("Hello").unwrap());
+//!         }
+//!     });
+//!
+//!     let (_tx, rx) = network.connect(("localhost", port))?;
+//!     let mut msg = rx.wait().next().unwrap()?;
+//!     msg.pop::<String>()
+//! }
+//!
+//! fn main() {
+//!     assert_eq!("Hello", run_example().expect("I/O failure"));
+//! }
+//! ```
 use std::io::{self, BufReader};
 use std::net::{TcpListener, TcpStream, Shutdown, ToSocketAddrs};
 use std::sync::{mpsc, Arc};
@@ -20,14 +66,21 @@ use Network;
 use message::MessageBuf;
 
 impl Network {
-    /// Connects to a socket specified by `endpoint` and returns two queue handles
-    /// to send and receive MessageBuf objects on that socket
+    /// Connects to a socket returns two queue handles.
+    ///
+    /// The endpoint socket is typically specified a `(host, port)` pair. The returned
+    /// queue handles can be used to send and receive `MessageBuf` objects on that socket.
+    /// Please refer to the [`transport`](transport/index.html) module level documentation
+    /// for more details.
     pub fn connect<E: ToSocketAddrs>(&self, endpoint: E) -> io::Result<(Sender, Receiver)> {
         channel(TcpStream::connect(endpoint)?)
     }
 
-    /// Opens a new socket on the optionally specified port and returns a handle
-    /// to receive incomming clients.
+    /// Opens a new socket and returns a handle to receive incomming clients.
+    ///
+    /// If the `port` is not specified, a random ephemerial port is chosen.
+    /// Please refer to the [`transport`](transport/index.html) module level documentation
+    /// for more details.
     pub fn listen<P: Into<Option<u16>>>(&self, port: P) -> io::Result<Listener> {
         Listener::new(self.clone(), port.into().unwrap_or(0))
     }
@@ -43,6 +96,12 @@ fn channel(stream: TcpStream) -> io::Result<(Sender, Receiver)> {
     Ok((sender, receiver))
 }
 
+/// A queue handle to send messages on the channel.
+///
+/// ## Drop behavior:
+/// This will close the underlying channel (including the receiving side) when
+/// dropped. In addition if the socket is still open, `drop` will block until
+/// the sender queue is drained.
 #[derive(Clone)]
 pub struct Sender {
     tx: Option<mpsc::Sender<MessageBuf>>,
@@ -69,6 +128,10 @@ impl Sender {
         }
     }
 
+    /// Enqueues an outgoing message.
+    ///
+    /// The message might still be dropped if the underlying socket is closed
+    /// by the remote receiver before the message is dequeued.
     pub fn send<T: Into<MessageBuf>>(&self, msg: T) {
         drop(self.tx.as_ref().unwrap().send(msg.into()));
     }
@@ -84,6 +147,12 @@ impl Drop for Sender {
     }
 }
 
+/// A queue handle for receiving messages on the channel.
+///
+/// This implements the `futures::stream::Stream` trait for non-blocking receives.
+/// ## Drop behavior:
+/// This will close the underlying channel (including the sending side) when
+/// dropped.
 pub struct Receiver {
     rx: futures_mpsc::UnboundedReceiver<io::Result<MessageBuf>>,
 }
@@ -165,6 +234,10 @@ pub(crate) fn accept<T, F>(listener: TcpListener, mut f: F) -> futures_mpsc::Rec
     rx
 }
 
+/// A queue handle accepting incoming connections.
+///
+/// ## Drop behavior:
+/// This will close the underlying server socket when dropped.
 pub struct Listener {
     external: Arc<String>,
     port: u16,
@@ -186,6 +259,7 @@ impl Listener {
         })
     }
 
+    /// Returns the address of the socket in the form of `(hostname, port)`.
     pub fn external_addr(&self) -> (&str, u16) {
         (&*self.external, self.port)
     }

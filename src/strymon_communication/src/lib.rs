@@ -6,6 +6,22 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+#![deny(missing_docs)]
+
+//! Communication primitives for Strymon.
+//!
+//! This crate contains the networking primitives for Strymon. It provides
+//! three different abstraction layers:
+//!
+//!   - [`message`](message/index.html): A frame-delimited multi-part message format.
+//!   - [`transport`](transport/index.html): Bi-directional asynchronous message channels,
+//!     for sending untyped [`MessageBuf`](message/struct.MessageBuf.html)s across the network.
+//!   - [`rpc`](rpc/index.html): Semi-typed asynchronous, multiplexed request-response channels.
+//!
+//! In order to use the networking functionality, client code must initialize a
+//! [`Network`](struct.Network.html) handle first.
+
+
 extern crate bytes;
 extern crate byteorder;
 
@@ -16,44 +32,22 @@ extern crate futures;
 
 #[macro_use] extern crate log;
 
-use std::io;
-use std::env;
-use std::sync::Arc;
+mod network;
 
 pub mod transport;
 pub mod message;
-pub mod fetch;
 pub mod rpc;
+pub mod fetch;
 
+use std::sync::Arc;
+
+/// Handle to the networking subsystem.
+///
+/// Currently, this handle only stores information about the externally reachable
+/// hostname of the current process. In the future, it might be backed by a
+/// dedicated networking thread to implement its methods. Thus it recommended to
+/// only initialize it once per process.
 #[derive(Clone, Debug)]
 pub struct Network {
     hostname: Arc<String>,
-}
-
-impl Network {
-    pub fn init() -> io::Result<Self> {
-        // try to guess external hostname
-        let hostname = if let Ok(hostname) = env::var("TIMELY_SYSTEM_HOSTNAME") {
-            hostname
-        } else {
-            warn!("unable to retrieve external hostname of machine.");
-            warn!("falling back to 'localhost', set TIMELY_SYSTEM_HOSTNAME to override");
-
-            String::from("localhost")
-        };
-
-        Ok(Network {
-            hostname: Arc::new(hostname),
-        })
-    }
-
-    pub fn with_hostname(hostname: String) -> io::Result<Self> {
-        Ok(Network {
-            hostname: Arc::new(hostname),
-        })
-    }
-
-    pub fn hostname(&self) -> String {
-        (*self.hostname).clone()
-    }
 }

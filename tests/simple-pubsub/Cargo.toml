@@ -1,0 +1,10 @@
+[package]
+authors = ["Sebastian Wicki <swicki@inf.ethz.ch>"]
+name = "simple-pubsub"
+version = "0.1.0"
+
+[dependencies]
+timely = "0.3.0"
+
+[dependencies.strymon_job]
+path = "../../src/strymon_job"

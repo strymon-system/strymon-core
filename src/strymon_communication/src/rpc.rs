@@ -6,6 +6,74 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+//! Asynchronous remote procedure calls.
+//!
+//! This implements a small framework for receiving and sending requests and
+//! responses between two connected peers.
+//! During set-up, one of the peers acts as a *server*, listening on a server
+//! socket to accept new incoming *clients*. Clients connect to a server
+//! using the socket address.
+//!
+//! Once a connection between two peers is established, their initial role as
+//! server and client becomes irrelevant, as they take on the role of either
+//! being a *sender* or *receiver* (or both) of requests.
+//!
+//! # 1. Defining a custom protocol
+//!
+//! In order to use this framework, client code must first define the types
+//! to be used for a request-response protocol. It is not using a custom
+//! interface description language (IDL) but rather is based on implementing
+//! certain Rust traits. Different types of requests must be distinguished
+//! from each other through a value called the *name* (i.e. the name of the
+//! remote procedure). Since the name is typically used for dispatching on the
+//! receiver-side, it is recommended to use an `enum` for it.
+//!
+//! The name, argument and return types of a method are defined by implementing
+//! the [`Request`](trait.Request.html) type. Each invocation can either return
+//! successfully with the type specified in
+//! [`Request::Success`](trait.Request.html#associatedtype.Success) or fail with
+//! an application-specific error defined in
+//! [`Request::Error`](trait.Request.html#associatedtype.Error).
+//!
+//! # 2. Connection set-up
+//!
+//! During connection set-up, one peer needs to act as a server. To instantiate
+//! a server, invoke [`Network::server()`](struct.Network.html#method.server)
+//! to obtain a handle for new incoming clients.
+//!
+//! The client is expected to call
+//! [`Network::client()`](struct.Network.html#method.client) with the
+//! corresponding socket address to connect to the server. Both peers will
+//! obtain a pair of
+//! ([`Incoming`](struct.Incoming.html), [`Outgoing`](struct.Outgoing.html))
+//! queue handles. These are used to either *receive* incoming requests, or
+//! *send* out outgoing requests.
+//!
+//! # 3. Handling requests \& responses
+//!
+//! Once connected, a peer might decide to send requests by invoking
+//! [`Outgoing::request()`](struct.Outgoing.html#method.request) with an
+//! argument implementing the [`Request`](trait.Request.html) trait. The
+//! remote peer will receive this request on its
+//! [`Incoming`](struct.Incoming.html) queue in the form of an encoded
+//! [`RequestBuf`](struct.RequestBuf.html) object. To decode this object, it
+//! is common to match on the method name returned by
+//! [`RequestBuf::name()`](struct.RequestBuf.html#method.name) and then decode
+//! the request payload using
+//! [`RequestBuf::decode()`](struct.RequestBuf.html#method.decode). Decoding
+//! a request successfully returns the decoded payload, as well as a
+//! [`Responder`](struct.Responder.html) object which is used to send back the
+//! response to the origin.
+//!
+//! Once the response arrives back at the original sender, the
+//! [`Response`](struct.Response.html) future will resolve to the decoded
+//! response.
+//!
+//! ## Examples:
+//!
+//! Please refer to `tests/calc.rs` for a complete example of how to use
+//! this module.
+
 use std::collections::HashMap;
 use std::io::{self, ErrorKind};
 use std::net::{TcpListener, TcpStream, Shutdown, ToSocketAddrs};
@@ -52,10 +120,10 @@ use serde::de::DeserializeOwned;
 ///     }
 /// }
 /// ```
-pub trait Name: 'static+Send+Sized {
+pub trait Name: Send + Sized + 'static {
 
     /// The discriminant type representing `Self`.
-    type Discriminant: 'static+Serialize+DeserializeOwned;
+    type Discriminant: Serialize + DeserializeOwned + 'static;
 
     /// Convert `Self` into a discriminant.
     fn discriminant(&self) -> Self::Discriminant;
@@ -64,10 +132,45 @@ pub trait Name: 'static+Send+Sized {
     fn from_discriminant(&Self::Discriminant) -> Option<Self>;
 }
 
+/// A trait for defining the signature of a remote procedure.
+///
+/// Within this framework, a new request type can be defined by implementing
+/// this trait. The type implementing `Request` stores the arguments sent to
+/// the remote receiver and then has to respond with either `Ok(Request::Success)`
+/// or `Err(Request::Error)`. In order for the receiver to be able to distinguish
+/// the different incoming requests without fully decoding it, each request
+/// type must define an associated constant `Request::NAME` for this purpose.
+///
+/// # Examples
+/// ```rust,ignore
+/// #[derive(Serialize, Deserialize, Clone, Debug)]
+/// pub struct GetNamesForId {
+///     pub arg: u32,
+/// }
+///
+/// #[derive(Serialize, Deserialize, Clone, Debug)]
+/// struct InvalidId;
+///
+/// // CustomRPC is an enum implementing the `Name` trait
+/// impl Request<CustomRPC> for GetNamesForId {
+///     // A unique identifier for this method
+///     const NAME = CustomRPC::GetNamesForId;
+///
+///     // Return type of a successful response
+///     type Success = Vec<String>;
+///     // Return type of a failed invocation
+///     type Error = InvalidId;
+/// }
+/// ```
 pub trait Request<N: Name>: Serialize + DeserializeOwned {
+
+    /// The type of a successful response.
     type Success: Serialize + DeserializeOwned;
+
+    /// The type of a failed response.
     type Error: Serialize + DeserializeOwned;
 
+    /// A unique value identifying this type of request.
     const NAME: N;
 }
 
@@ -90,6 +193,32 @@ impl Type {
     }
 }
 
+/// Receiver-side buffer containing an incoming request.
+///
+/// This type represents a request to be processed by a receiver. In order to
+/// serve a request, the receiver code needs to identify the method by calling
+/// [`name()`](#method.name), decode it using [`decode()`](#method.decode),
+/// process it and respond using the obtained [`Responder`](struct.Responder.html).
+///
+/// # Examples:
+/// Requests are received on the [`Incoming`](struct.Incoming.html) queue and
+/// are then typically decoded using a `match` statement as follows:
+///
+/// ```rust,ignore
+/// fn dispatch(&mut self, request: RequestBuf) -> io::Result<()> {
+///     match request.name() {
+///         &CustomRPC::Foo => {
+///             let (args, responder) = request.decode::<Foo>()?;
+///             let result = self.foo(args);
+///             responder.respond(result);
+///         },
+///         &CustomRPC::Bar => {
+///             // handle requests of type `Bar`…
+///         },
+///     };
+///     Ok(())
+/// }
+/// ```
 pub struct RequestBuf<N: Name> {
     id: RequestId,
     name: N,
@@ -99,10 +228,14 @@ pub struct RequestBuf<N: Name> {
 }
 
 impl<N: Name> RequestBuf<N> {
+    /// Extracting the `Request::NAME` to identfy the request type.
     pub fn name(&self) -> &N {
         &self.name
     }
-
+    /// Decodes the request into the request data and a responder handle.
+    ///
+    /// The returned [`Responder`](struct.Responder.html) handle is to be used
+    /// to serve the decoded request `R`.
     pub fn decode<R: Request<N>>(mut self) -> io::Result<(R, Responder<N, R>)> {
         let payload = self.msg.pop::<R>()?;
         let responder = Responder {
@@ -115,6 +248,10 @@ impl<N: Name> RequestBuf<N> {
     }
 }
 
+/// Receiver-side handle for responding to a given request.
+///
+/// Since the responder is bound to a given typed request, can only be
+/// obtained through [`RequestBuf::decode()`](struct.RequestBuf.html#method.decode).
 pub struct Responder<N: Name, R: Request<N>> {
     id: RequestId,
     origin: transport::Sender,
@@ -122,6 +259,7 @@ pub struct Responder<N: Name, R: Request<N>> {
 }
 
 impl<N: Name, R: Request<N>> Responder<N, R> {
+    /// Sends back the response to the client which submitted the request.
     pub fn respond(self, res: Result<R::Success, R::Error>) {
         let mut msg = MessageBuf::empty();
         msg.push(Type::Response as u8).unwrap();
@@ -133,6 +271,15 @@ impl<N: Name, R: Request<N>> Responder<N, R> {
 
 type Pending = oneshot::Sender<MessageBuf>;
 
+/// Sender-side future eventually yielding the response for a request.
+///
+/// Upon successful completion, the future will yield `Ok(Request::Success)`.
+/// Application-level errors occurring at the receiver-side yield a
+/// `Err(Ok(Request::Error))` while networking errors will be returned as
+/// `Err(Err(std::io::Error))`.
+///
+/// In order to obtain this type, one must first send out a request with
+/// [`Outgoing::request()`](struct.Outgoing.html#method.request).
 #[must_use = "futures do nothing unless polled"]
 pub struct Response<N: Name, R: Request<N>> {
     rx: oneshot::Receiver<MessageBuf>,
@@ -142,6 +289,10 @@ pub struct Response<N: Name, R: Request<N>> {
 }
 
 impl<N: Name, R: Request<N>> Response<N, R> {
+    /// Convenience-wrapper which performs a blocking wait on the response.
+    ///
+    /// # Panics
+    /// This panics if a networking error occurs while waiting for the response.
     pub fn wait_unwrap(self) -> Result<R::Success, R::Error> {
         self.map_err(|e| e.expect("request failed with I/O error")).wait()
     }
@@ -176,6 +327,13 @@ impl<N: Name, R: Request<N>> Drop for Response<N, R> {
     }
 }
 
+/// Sender-side queue for sending out requests.
+///
+/// Requests can be sent to the remote peer using the
+/// [`Outgoing::request()`](#method.request) method. As this method returns a
+/// future for the response, a sender can send out many concurrent outgoing
+/// requests without having to wait for responses first. This means that some
+/// requests might return before others.
 #[derive(Clone)]
 pub struct Outgoing {
     next_id: Arc<AtomicUsize>,
@@ -188,6 +346,10 @@ impl Outgoing {
         self.next_id.fetch_add(1, Ordering::SeqCst) as u32
     }
 
+    /// Asynchronously sends out a request to the remote peer.
+    ///
+    /// Returns a future for the pending response. The next request can be
+    /// submitted without having to wait for the previous response to arrive.
     pub fn request<N: Name, R: Request<N>>(&self, r: &R) -> Response<N, R> {
         let id = self.next_id();
         let (tx, rx) = oneshot::channel();
@@ -218,6 +380,10 @@ impl Outgoing {
     }
 }
 
+/// Receiver-side queue of incoming requests.
+///
+/// This implements the `futures::stream::Stream` to yield encoded
+/// [`RequestBuf`](struct.RequestBuf.html)s.
 #[must_use = "futures do nothing unless polled"]
 pub struct Incoming<N: Name> {
     rx: mpsc::UnboundedReceiver<Result<RequestBuf<N>, io::Error>>,
@@ -311,6 +477,7 @@ impl<N: Name> Resolver<N> {
     }
 }
 
+/// Handle for queue of newly connected peers.
 #[must_use = "futures do nothing unless polled"]
 pub struct Server<N: Name> {
     external: Arc<String>,
@@ -334,6 +501,7 @@ impl<N: Name> Server<N> {
         })
     }
 
+    /// Returns the address of the socket in the form of `(hostname, port)`.
     pub fn external_addr(&self) -> (&str, u16) {
         (&*self.external, self.port)
     }
@@ -378,12 +546,19 @@ fn multiplex<N: Name>(stream: TcpStream) -> io::Result<(Outgoing, Incoming<N>)> 
 }
 
 impl Network {
+    /// Connects to an remote procedure call server.
+    ///
+    /// Please refer to the [`rpc`](rpc/index.html) module level documentation for more details.
     pub fn client<N: Name, E: ToSocketAddrs>(&self,
                                     endpoint: E)
                                     -> io::Result<(Outgoing, Incoming<N>)> {
         multiplex(TcpStream::connect(endpoint)?)
     }
 
+    /// Creates a new remote procedure call server.
+    ///
+    /// If the `port` is not specified, a random ephemerial port is chosen.
+    /// Please refer to the [`rpc`](rpc/index.html) module level documentation for more details.
     pub fn server<N: Name, P: Into<Option<u16>>>(&self, port: P) -> io::Result<Server<N>> {
         Server::new(self.clone(), port.into().unwrap_or(0))
     }
@@ -401,66 +576,3 @@ fn _assert() {
     _is_send::<Outgoing>();
     _is_send::<Server<E>>();
 }
-/*
-TODO fix
-#[cfg(test)]
-mod tests {
-    use futures::stream::Stream;
-    use reqresp::Request;
-    use Network;
-
-    fn assert_io<F: FnOnce() -> ::std::io::Result<()>>(f: F) {
-        f().expect("I/O test failed")
-    }
-
-    #[derive(Clone, Serialize, Deserialize)]
-    struct Ping(i32);
-    #[derive(Clone, Serialize, Deserialize)]
-    struct Pong(i32);
-    impl Request for Ping {
-        type Success = Pong;
-        type Error = ();
-
-        const NAME: &'static str = "Ping";
-    }
-
-    #[test]
-    fn simple_ping() {
-
-        assert_io(|| {
-            let network = Network::init()?;
-            let server = network.server(None)?;
-
-            let (tx, _) = network.client(server.external_addr())?;
-            let server = server.take(1).for_each(|(_, rx)| {
-                    let handler = rx.take(1).for_each(move |req| {
-                            assert_eq!(req.name(), "Ping");
-                            let (req, resp) = req.decode::<Ping>().unwrap();
-                            resp.respond(Ok(Pong(req.0 + 1)));
-
-                            Ok(())
-                        })
-                        .map_err(|e| Err(e).unwrap());
-
-                    async::spawn(handler);
-
-                    Ok(())
-                })
-                .map_err(|e| Err(e).unwrap());
-
-            let done = futures::lazy(move || {
-                async::spawn(server);
-
-                tx.request(&Ping(5))
-                    .and_then(move |pong| {
-                        assert_eq!(pong.0, 6);
-                        Ok(())
-                    })
-                    .map_err(|_| panic!("got ping error"))
-            });
-
-            async::finish(done)
-        });
-    }
-}
-*/
