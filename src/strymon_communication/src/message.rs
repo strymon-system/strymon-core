@@ -6,6 +6,8 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+//! Reference-counted buffer for multi-part messages.
+
 use std::io::{self, Cursor, Read, Write, ErrorKind};
 
 use serde::ser::Serialize;
@@ -16,9 +18,15 @@ use rmp_serde::{encode, decode, from_slice};
 use byteorder::{NetworkEndian, ReadBytesExt, WriteBytesExt};
 use bytes::BytesMut;
 
-/// MessageBuf is a convenience wrapper around BytesMut. It represents a
-/// contiguous buffer of [MessagePack](https://msgpack.org/) encoded objects.
-/// It can be used as a multi-part message to allow partial deserialization.
+/// A `MessageBuf` represents a contiguous buffer of [MessagePack](https://msgpack.org/)
+/// encoded objects. It can be used as a multi-part message to allow partial
+/// deserialization. Partial messages can be inserted using the `push` method
+/// and are read in first-in, first-out order by the `pop` method.
+///
+/// MessageBuf is a convenience wrapper around
+/// [`bytes::BytesMut`](https://docs.rs/bytes/0.4/bytes/struct.BytesMut.html)
+/// and thus inherets the same properties: No allocation is required for small
+/// objects; clones are reference-counted and implement copy-on-write semantics.
 #[derive(Clone, Debug)]
 pub struct MessageBuf {
     buf: BytesMut,
@@ -47,18 +55,6 @@ impl<'a> Writer<'a> {
 }
 
 impl MessageBuf {
-    /// Create a new, empty message. Use one of the `From` impls to construct
-    /// a message from an already existing buffer or object.
-    pub fn empty() -> Self {
-        MessageBuf {
-            buf: BytesMut::new()
-        }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.buf.is_empty()
-    }
-
     /// Create a new message buffer containing the serialized object.
     pub fn new<S: Serialize>(item: S) -> io::Result<Self> {
         // we start with an empty buffer, because if the serialized element
@@ -69,15 +65,32 @@ impl MessageBuf {
         Ok(msg)
     }
 
-    /// Append an item to the message buffer.
+    /// Create a new, empty message.
+    ///
+    /// Use one of the `From` impls to construct a message from an already
+    /// existing buffer or object.
+    pub fn empty() -> Self {
+        MessageBuf {
+            buf: BytesMut::new()
+        }
+    }
+
+    /// Returns true if the contained bytes have a length of zero.
+    pub fn is_empty(&self) -> bool {
+        self.buf.is_empty()
+    }
+
+    /// Serialize and append an item to the message buffer.
     pub fn push<S: Serialize>(&mut self, item: S) -> io::Result<()> {
         let mut writer = Writer::new(&mut self.buf);
         encode::write(&mut writer, &item)
             .map_err(|err| io::Error::new(ErrorKind::Other, err))
     }
 
-    /// Remove the top item in the message buffer. The `push` and `pop`
-    /// operations implement a FIFO queue.
+    /// Remove and deserialize the top item in the message buffer.
+    ///
+    /// The object is not modified and kept in the buffer if deserialization fails.
+    /// The `push` and `pop` operations implement FIFO semantics.
     pub fn pop<D: DeserializeOwned>(&mut self) -> io::Result<D> {
         // TODO(swicki): it would be nice if we could split `self.buf`
         // and return an `owning_ref` for zero-copy deserialization.
@@ -104,6 +117,10 @@ impl MessageBuf {
         from_slice(&self.buf).map_err(|err| io::Error::new(ErrorKind::Other, err))
     }
 
+    /// Copies the contained bytes into the provided writer.
+    ///
+    /// Prepends the size of the message in bytes as a big-endian 32 bit
+    /// unsigned integer.
     pub fn write<W: Write>(&self, writer: &mut W) -> io::Result<()> {
         // TODO: use writev/vecio or some other scatter/gather method to
         // avoid two system calls
@@ -111,6 +128,12 @@ impl MessageBuf {
         writer.write_all(&self.buf)
     }
 
+    /// Reads a message from a reader, expecting a frame length prefix.
+    ///
+    /// If first read of the message length field fails with an
+    /// `ErrorKind::UnexpectedEof` then `Ok(None)` is returned to indicate
+    /// that the reader closed gracefully. All other read errors, most notably
+    /// `ErrorKind::WouldBlock`, are propagated verbatim.
     pub fn read<R: Read>(reader: &mut R) -> io::Result<Option<MessageBuf>> {
         let length = match reader.read_u32::<NetworkEndian>() {
             Ok(length) => length as usize,
