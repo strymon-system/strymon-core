@@ -5,3 +5,16 @@ rust:
 script:
   - cargo test --verbose --all
   - ./tests/tests.sh
+
+jobs:
+  include:
+    - stage: deploy
+      rust: stable
+      script: ./bin/build-docs.sh
+      deploy:
+        provider: pages
+        skip_cleanup: true
+        github_token: $GITHUB_TOKEN # Set in travis-ci.org dashboard
+        local_dir: target/doc
+        on:
+          branch: master
