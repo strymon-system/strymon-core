@@ -58,7 +58,7 @@ struct PublisherServer<T: Timestamp, D> {
     subscribers: Slab<Sender>,
     count: AtomicCounter,
     // tokio event loop
-    events: Option<Box<Stream<Item=Event<T, D>, Error=io::Error>>>,
+    events: Box<Stream<Item=Event<T, D>, Error=io::Error>>,
     notificator: mpsc::UnboundedSender<Event<T, D>>,
     core: Core,
     handle: Handle,
@@ -87,7 +87,7 @@ impl<T: RemoteTimestamp, D: ExchangeData + Serialize> PublisherServer<T, D> {
             upper: UpperFrontier::empty(),
             subscribers: Slab::new(),
             count: count,
-            events: Some(Box::new(events)),
+            events: Box::new(events),
             notificator: notificator,
             core: core,
             handle: handle,
@@ -96,14 +96,11 @@ impl<T: RemoteTimestamp, D: ExchangeData + Serialize> PublisherServer<T, D> {
 
     fn next_event(&mut self) -> io::Result<Event<T, D>> {
         // run tokio reactor until we get the next event
-        let stream = self.events.take().unwrap().into_future();
-        let (result, stream) = match self.core.run(stream) {
-            Ok((ev, stream)) => (Ok(ev.unwrap()), stream),
-            Err((err, stream)) => (Err(err), stream),
-        };
-
-        self.events = Some(stream);
-        result
+        let next_msg = self.events.by_ref().into_future();
+        match self.core.run(next_msg) {
+            Ok((msg, _)) => Ok(msg.unwrap()),
+            Err((err, _)) => Err(err),
+        }
     }
 
     /// Starts serving subscribers, blocks until the Timely stream completes
