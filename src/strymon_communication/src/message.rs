@@ -27,7 +27,7 @@ use bytes::BytesMut;
 /// [`bytes::BytesMut`](https://docs.rs/bytes/0.4/bytes/struct.BytesMut.html)
 /// and thus inherets the same properties: No allocation is required for small
 /// objects; clones are reference-counted and implement copy-on-write semantics.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MessageBuf {
     buf: BytesMut,
 }

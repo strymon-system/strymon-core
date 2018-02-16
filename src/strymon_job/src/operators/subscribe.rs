@@ -14,7 +14,7 @@ use timely::progress::Timestamp;
 use timely::dataflow::operators::Capability;
 
 use futures::{Future, Poll};
-use futures::stream::{Stream, Wait};
+use futures::stream::{Stream, Wait, futures_ordered};
 
 use typename::TypeName;
 use serde::de::DeserializeOwned;
@@ -22,8 +22,10 @@ use serde::de::DeserializeOwned;
 use strymon_rpc::coordinator::*;
 use strymon_model::{Topic, TopicId, TopicType, TopicSchema};
 
+use strymon_communication::transport::{Sender, Receiver};
+
 use Coordinator;
-use subscriber::Subscriber;
+use subscriber::SubscriberGroup;
 use protocol::RemoteTimestamp;
 
 /// A subscription handle used to receive data from a topic.
@@ -36,8 +38,8 @@ use protocol::RemoteTimestamp;
 /// In addition, this type also supports the asynchronous `futures::stream::Stream` trait,
 /// allowing users to block on multiple topics at once.
 pub struct Subscription<T: Timestamp, D> {
-    sub: Subscriber<T, D>,
-    topic: Topic,
+    sub: SubscriberGroup<T, D>,
+    topics: Vec<Topic>,
     coord: Coordinator,
 }
 
@@ -82,8 +84,10 @@ impl<T, D> Iterator for IntoIter<T, D>
 
 impl<T: Timestamp, D> Drop for Subscription<T, D> {
     fn drop(&mut self) {
-        if let Err(err) = self.coord.unsubscribe(self.topic.id) {
-            error!("failed to unsubscribe: {:?}", err)
+        for topic in self.topics.iter() {
+            if let Err(err) = self.coord.unsubscribe(topic.id) {
+                error!("failed to unsubscribe from {:?}: {:?}", topic, err)
+            }
         }
     }
 }
@@ -153,7 +157,39 @@ impl Coordinator {
             .wait()
     }
 
-    /// Create a new subscription for a topic.
+    fn request_multiple<I>(&self, names: I, blocking: bool) -> Result<Vec<Topic>, SubscriptionError>
+        where I: IntoIterator, I::Item: ToString
+    {
+        let pending = names.into_iter().map(|n| {
+            self.tx.request(&Subscribe {
+                name: n.to_string(),
+                token: self.token,
+                blocking: blocking,
+            }).map_err(SubscriptionError::from)
+        });
+
+        futures_ordered(pending).collect().wait()
+    }
+
+    fn connect_all<T, D>(&self, topics: &[Topic]) -> Result<Vec<(Sender, Receiver)>, SubscriptionError>
+        where T: RemoteTimestamp ,
+              D: DeserializeOwned + TypeName,
+              T::Remote: TypeName,
+    {
+        topics.iter().map(|topic| {
+            let item = TopicType::of::<D>();
+            let time = TopicType::of::<T::Remote>();
+            let schema = TopicSchema::Stream(item, time);
+            if topic.schema != schema {
+                Err(SubscriptionError::TypeMismatch)
+            } else {
+                self.network.connect((&*topic.addr.0, topic.addr.1))
+                    .map_err(SubscriptionError::from)
+            }
+        }).collect()
+    }
+
+    /// Creates a new subscription for a single topic.
     ///
     /// This method requests a subscription for a topic called `name` from
     /// the coordinator. The requested topic must be published with the same
@@ -168,40 +204,49 @@ impl Coordinator {
     /// creates a topic with a suitable name. If `blocking` is false, the call
     /// returns with an error if the catalog does not contain a topic with a
     /// matching name.
-    pub fn subscribe<T, D>(&self,
-                    name: &str,
+    pub fn subscribe<T, D>(&self, name: &str, root: Capability<T>, blocking: bool)
+       -> Result<Subscription<T, D>, SubscriptionError>
+        where T: RemoteTimestamp ,
+              D: DeserializeOwned + TypeName,
+              T::Remote: TypeName,
+    {
+        let topics = self.request_multiple(Some(name), blocking)?;
+        let sockets = self.connect_all::<T, D>(&topics)?;
+        let sub = SubscriberGroup::<T, D>::new(sockets, root).wait()?;
+        Ok(Subscription {
+            sub: sub,
+            topics: topics,
+            coord: self.clone(),
+        })
+    }
+
+    /// Create a new subscription for a partitioned topic.
+    ///
+    /// This method requests a subscription for each provided partition and
+    /// merges their stream. The partition number is attached to each topic name,
+    /// e.g. for `prefix = "foo"` and `partitions = [0, 2, 5]`, the resulting
+    /// subscriptions are for `"foo.0", "foo.2", "foo.5"`.
+    ///
+    /// See the `subscribe` method for more details.
+    pub fn subscribe_group<T, D, I>(&self,
+                    prefix: &str,
+                    partitions: I,
                     root: Capability<T>,
                     blocking: bool)
                     -> Result<Subscription<T, D>, SubscriptionError>
         where T: RemoteTimestamp ,
               D: DeserializeOwned + TypeName,
               T::Remote: TypeName,
+              I: IntoIterator<Item = usize>
     {
-        let name = name.to_string();
-        let coord = self.clone();
-        self.tx
-            .request(&Subscribe {
-                name: name,
-                token: self.token,
-                blocking: blocking,
-            })
-            .map_err(SubscriptionError::from)
-            .and_then(move |topic| {
-                let item = TopicType::of::<D>();
-                let time = TopicType::of::<T::Remote>();
-                let schema = TopicSchema::Stream(item, time);
-                if topic.schema != schema {
-                    return Err(SubscriptionError::TypeMismatch);
-                }
-
-                let socket = self.network.connect((&*topic.addr.0, topic.addr.1))?;
-                let sub = Subscriber::<T, D>::new(socket, root);
-                Ok(Subscription {
-                    sub: sub,
-                    topic: topic,
-                    coord: coord,
-                })
-            })
-            .wait()
+        let names = partitions.into_iter().map(|i| format!("{}.{}", prefix, i));
+        let topics = self.request_multiple(names, blocking)?;
+        let sockets = self.connect_all::<T, D>(&topics)?;
+        let sub = SubscriberGroup::<T, D>::new(sockets, root).wait()?;
+        Ok(Subscription {
+            sub: sub,
+            topics: topics,
+            coord: self.clone(),
+        })
     }
 }

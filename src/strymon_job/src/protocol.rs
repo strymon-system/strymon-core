@@ -7,8 +7,13 @@
 // except according to those terms.
 
 //! Data types used in the protocol between the publisher and subscribers.
+//!
+//! The protocol is based on the multi-part `MessageBuf` type. This allows
+//! for partial decoding of data messages: We can read the timestamp of a
+//! `Message::DataMessage` without having to decode the data part.
 
 use std::fmt;
+use std::io;
 use std::borrow::Cow;
 use std::marker::PhantomData;
 
@@ -17,62 +22,186 @@ use serde::{ser, de, Serialize, Deserialize};
 use timely::progress::timestamp::{Timestamp, RootTimestamp};
 use timely::progress::nested::product::Product;
 
-/// The messages published in a topic.
-///
-/// This message is supposed to be serialized with Serde. This means that all
-/// data tuples to be published must implement the `Serialize` trait, and
-/// timestamps must implement the `RemoteTimestamp` trait, which converts them
-/// into a serializable custom type.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Message<'a, T, D> where T: Clone + 'a {
-    /// Current contents the lower frontier.
-    ///
-    /// Informs the subscriber about which timestamps are completed and thus
-    /// are safe to emit notifications for.
-    LowerFrontier {
-        #[serde(with = "remote_frontier")]
-        #[serde(bound = "T: RemoteTimestamp")]
-        lower: Cow<'a, [T]>
-    },
-    /// Contents of the upper frontier.
-    ///
-    /// Informs the subscriber about currently active epochs, allowing it to
-    /// filter out messages which are smaller or equal to any element in the
-    /// `upper` frontier.
-    UpperFrontier {
-        #[serde(with = "remote_frontier")]
-        #[serde(bound = "T: RemoteTimestamp")]
-        upper: Cow<'a, [T]>,
-    },
-    /// A timely data batch.
-    ///
-    /// All data records belong to the same logical timestamp `time`.
-    DataMessage {
-        #[serde(with = "remote_timestamp")]
-        #[serde(bound = "T: RemoteTimestamp")]
-        time: T,
-        data: Vec<D>,
+use strymon_communication::message::MessageBuf;
+
+/// Tag used for indicate whether the remainder of the `MessageBuf` contains
+/// `InitialSnapshot`, `Message::LowerFrontierUpdate`, or `Message::DataMessage`.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+enum MessageTag {
+    InitialSnapshot,
+    LowerFrontierUpdate,
+    DataMessage,
+}
+
+/// The first message sent on to a new subscriber on the topic.
+#[derive(Debug, Clone)]
+pub struct InitialSnapshot<T> {
+    pub lower: Vec<T>,
+    pub upper: Vec<T>,
+}
+
+impl<T: RemoteTimestamp> InitialSnapshot<T> {
+    /// Encodes an `InitialSnapshot` message.
+    pub fn encode(lower: &[T], upper: &[T]) -> io::Result<MessageBuf> {
+        let mut buf = MessageBuf::empty();
+        buf.push(MessageTag::InitialSnapshot)?;
+        buf.push(RemoteFrontier::from(lower))?;
+        buf.push(RemoteFrontier::from(upper))?;
+        Ok(buf)
+    }
+
+    /// Decodes the first message of a topic into the `InitialSnapshot`.
+    pub fn decode(mut msg: MessageBuf) -> io::Result<Self> {
+        let tag = msg.pop::<MessageTag>()?;
+        if tag != MessageTag::InitialSnapshot {
+            let desc = format!("expected `InitialSnapshot`, got `{:?}`", tag);
+            return Err(io::Error::new(io::ErrorKind::InvalidData, desc));
+        }
+
+        let lower = msg.pop::<RemoteFrontier<T>>()?.into();
+        let upper = msg.pop::<RemoteFrontier<T>>()?.into();
+
+        Ok(InitialSnapshot { lower, upper })
     }
 }
 
-impl<'a, T, D> Message<'a, T, D> where T: Clone + 'a {
-    /// Constructs a new `LowerFrontier` message.
-    pub fn lower(frontier: &'a [T]) -> Self {
-        Message::LowerFrontier {
-            lower: Cow::Borrowed(frontier),
+/// A serialized Timely data batch, decodes into `Vec<T>`.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct Data<T> {
+    payload: MessageBuf,
+    _marker: PhantomData<T>,
+}
+
+impl<T: de::DeserializeOwned> Data<T> {
+    /// Attach a data type to the `MessageBuf`
+    ///
+    /// Assumes the payload contains of a single data object.
+    fn new(payload: MessageBuf) -> Self {
+        Data {
+            payload: payload,
+            _marker: PhantomData,
         }
     }
 
-    /// Constructs a new `UpperFrontier` message.
-    pub fn upper(frontier: &'a [T]) -> Self {
-        Message::UpperFrontier {
-            upper: Cow::Borrowed(frontier),
-        }
+    /// Decodes a `Data<T>` into the underlying `Vec<T>`.
+    ///
+    /// The underlying message buffer is dropped even if decoding fails.
+    pub fn decode(mut self) -> io::Result<Vec<T>> {
+        self.payload.pop()
+    }
+}
+
+/// The regular messages published in a topic.
+///
+/// This message can be put into a mulit-part `MessageBuf`. This means that all
+/// data tuples to be published must implement the `Serialize` trait, and
+/// timestamps must implement the `RemoteTimestamp` trait, which converts them
+/// into a serializable custom type.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum Message<T, D> {
+    /// Updates the contents the lower frontier.
+    ///
+    /// Informs the subscriber about which timestamps are completed and thus
+    /// are safe to emit notifications for.
+    LowerFrontierUpdate { update: Vec<(T, i64)> },
+    /// Creates a message indicting a Timely data batch.
+    ///
+    /// All data records belong to the same logical timestamp `time`. The `data`
+    /// is only deserialized if needed.
+    DataMessage { time: T, data: Data<D> },
+}
+
+impl<T, D> Message<T, D>
+    where T: RemoteTimestamp, D: Serialize
+{
+    // Encodes a new `LowerFrontierUpdate` message.
+    pub fn frontier_update(update: Vec<(T, i64)>) -> io::Result<MessageBuf> {
+        let mut buf = MessageBuf::empty();
+        buf.push(MessageTag::LowerFrontierUpdate)?;
+        buf.push(RemoteUpdate::from(update))?;
+        Ok(buf)
     }
 
-    /// Constructs a new `DataMessage` message.
-    pub fn data(time: T, data: Vec<D>) -> Self {
-        Message::DataMessage { time, data }
+    // Encodes a new `DataMessage` message.
+    pub fn data_message(time: T, data: Vec<D>) -> io::Result<MessageBuf> {
+        let mut buf = MessageBuf::empty();
+        buf.push(MessageTag::DataMessage)?;
+        buf.push(RemoteTime::from(time))?;
+        buf.push(data)?;
+        Ok(buf)
+    }
+}
+
+impl<T, D> Message<T, D>
+    where T: RemoteTimestamp, D: de::DeserializeOwned
+{
+    /// Partially decodes a `MessageBuf` into a `Message`
+    ///
+    /// This assumes that the `InitialSnapshot` has already been processed.
+    pub fn decode(mut msg: MessageBuf) -> io::Result<Self> {
+        let msg = match msg.pop::<MessageTag>()? {
+            MessageTag::LowerFrontierUpdate => {
+                Message::LowerFrontierUpdate {
+                    update: msg.pop::<RemoteUpdate<T>>()?.update,
+                }
+            },
+            MessageTag::DataMessage => {
+                Message::DataMessage {
+                    time: msg.pop::<RemoteTime<T>>()?.time,
+                    data: Data::<D>::new(msg),
+                }
+            },
+            tag => {
+                let desc = format!("expected `LowerFrontierUpdate` or `DataMessage`, got `{:?}`", tag);
+                return Err(io::Error::new(io::ErrorKind::InvalidData, desc));
+            }
+        };
+
+        Ok(msg)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct RemoteFrontier<'a, T: RemoteTimestamp + 'a> {
+    #[serde(with = "remote_frontier")]
+    frontier: Cow<'a, [T]>,
+}
+
+impl<'a, T: RemoteTimestamp + 'a> From<&'a [T]> for RemoteFrontier<'a, T> {
+    fn from(borrowed: &'a [T]) -> Self {
+        RemoteFrontier {
+            frontier: Cow::Borrowed(borrowed),
+        }
+    }
+}
+
+impl<'a, T: RemoteTimestamp + 'a> Into<Vec<T>> for RemoteFrontier<'a, T> {
+    fn into(self) -> Vec<T> {
+        self.frontier.into_owned()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct RemoteUpdate<T: RemoteTimestamp> {
+    #[serde(with = "remote_update")]
+    update: Vec<(T, i64)>,
+}
+
+impl<T: RemoteTimestamp> From<Vec<(T, i64)>> for RemoteUpdate<T> {
+    fn from(update: Vec<(T, i64)>) -> Self {
+        RemoteUpdate { update }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct RemoteTime<T: RemoteTimestamp> {
+    #[serde(with = "remote_timestamp")]
+    time: T,
+}
+
+impl<T: RemoteTimestamp> From<T> for RemoteTime<T> {
+    fn from(time: T) -> Self {
+        RemoteTime { time }
     }
 }
 
@@ -102,7 +231,8 @@ mod remote_frontier {
             fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
                 where A: de::SeqAccess<'de>,
             {
-                let mut frontier = Vec::with_capacity(seq.size_hint().unwrap_or(1));
+                let cap = seq.size_hint().unwrap_or(1);
+                let mut frontier = Vec::with_capacity(cap);
                 while let Some(remote) = seq.next_element()? {
                     frontier.push(T::from_remote(remote));
                 }
@@ -112,6 +242,45 @@ mod remote_frontier {
 
         let visitor = RemoteFrontierVisitor(PhantomData);
         de.deserialize_seq(visitor).map(Cow::Owned)
+    }
+}
+
+mod remote_update {
+    use super::*;
+
+    pub fn serialize<S, T>(field: &Vec<(T, i64)>, ser: S) -> Result<S::Ok, S::Error>
+        where S: ser::Serializer, T: RemoteTimestamp
+    {
+        ser.collect_seq(field.iter().map(|&(ref t, i)| (t.to_remote(), i)))
+    }
+
+    pub fn deserialize<'de, D, T>(de: D) -> Result<Vec<(T, i64)>, D::Error>
+        where D: de::Deserializer<'de>, T: RemoteTimestamp
+    {
+        struct RemoteUpdateVisitor<T>(PhantomData<T>);
+
+        impl<'de, T> de::Visitor<'de> for RemoteUpdateVisitor<T>
+            where T: RemoteTimestamp
+        {
+            type Value = Vec<(T, i64)>;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                write!(formatter, "a sequence of (timestamp, delta) tuples")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+                where A: de::SeqAccess<'de>,
+            {
+                let cap = seq.size_hint().unwrap_or(1);
+                let mut update = Vec::with_capacity(cap);
+                while let Some((remote, i)) = seq.next_element()? {
+                    update.push((T::from_remote(remote), i));
+                }
+                Ok(update)
+            }
+        }
+
+        de.deserialize_seq(RemoteUpdateVisitor(PhantomData))
     }
 }
 
@@ -198,78 +367,39 @@ impl_remote_timestamp!(i32);
 
 #[cfg(test)]
 mod tests {
-    use std::borrow::Cow;
-    use serde_test::{Token, assert_tokens};
-    use timely::progress::nested::product::Product;
-    use super::Message;
+    use super::{Message, InitialSnapshot};
 
     #[test]
-    fn serde_lower_frontier() {
-        let msg: Message<i32, ()> = Message::LowerFrontier {
-            lower: Cow::Borrowed(&[0]),
-        };
-        assert_tokens(&msg, &[
-            Token::StructVariant { name: "Message", variant: "LowerFrontier", len: 1, },
-            Token::Str("lower"),
-            Token::Seq { len: Some(1), },
-            Token::I32(0),
-            Token::SeqEnd,
-            Token::StructVariantEnd,
-        ]);
+    fn initial_snapshot_encode_decode() {
+        let msg = InitialSnapshot::encode(&[1, 2, 3], &[4, 5, 6]).unwrap();
+        let msg = InitialSnapshot::<i32>::decode(msg).unwrap();
+        assert_eq!(msg.lower, &[1, 2, 3]);
+        assert_eq!(msg.upper, &[4, 5, 6]);
 
-        let msg: Message<(), ()> = Message::LowerFrontier {
-            lower: Cow::Borrowed(&[()]),
-        };
-        assert_tokens(&msg, &[
-            Token::StructVariant { name: "Message", variant: "LowerFrontier", len: 1, },
-            Token::Str("lower"),
-            Token::Seq { len: Some(1), },
-            Token::Unit,
-            Token::SeqEnd,
-            Token::StructVariantEnd,
-        ]);
+        let msg = InitialSnapshot::encode(&[], &[()]).unwrap();
+        let msg = InitialSnapshot::<()>::decode(msg).unwrap();
+        assert_eq!(msg.lower, &[]);
+        assert_eq!(msg.upper, &[()]);
     }
 
     #[test]
-    fn serde_upper_frontier() {
-        let frontier = [Product::new(0, 1), Product::new(1, 0)];
-        let msg: Message<_, ()> = Message::UpperFrontier {
-            upper: Cow::Borrowed(&frontier),
-        };
-        assert_tokens(&msg, &[
-            Token::StructVariant { name: "Message", variant: "UpperFrontier", len: 1, },
-            Token::Str("upper"),
-            Token::Seq { len: Some(2), },
-            Token::Tuple { len: 2, },
-            Token::I32(0),
-            Token::I32(1),
-            Token::TupleEnd,
-            Token::Tuple { len: 2, },
-            Token::I32(1),
-            Token::I32(0),
-            Token::TupleEnd,
-            Token::SeqEnd,
-            Token::StructVariantEnd,
-        ]);
+    fn frontier_update_encode_decode() {
+        let msg = Message::<i32, ()>::frontier_update(vec![(0, -1), (1, 1)]).unwrap();
+        let msg = Message::<i32, ()>::decode(msg).unwrap();
+        assert_eq!(msg, Message::LowerFrontierUpdate { update: vec![(0, -1), (1, 1)] });
     }
 
     #[test]
-    fn serde_data_message() {
-        let msg: Message<u64, String> = Message::DataMessage {
-            time: 555555555555555,
-            data: vec!["foo".into(), "bar".into()],
-        };
-
-        assert_tokens(&msg, &[
-            Token::StructVariant { name: "Message", variant: "DataMessage", len: 2, },
-            Token::Str("time"),
-            Token::U64(555555555555555),
-            Token::Str("data"),
-            Token::Seq { len: Some(2), },
-            Token::Str("foo"),
-            Token::Str("bar"),
-            Token::SeqEnd,
-            Token::StructVariantEnd,
-        ]);
+    fn data_message_encode_decode() {
+        let msg = Message::<i32, String>::data_message(42,
+            vec!["hello".to_string(), "world".to_string()]).unwrap();
+        let msg = Message::<i32, String>::decode(msg).unwrap();
+        match msg {
+            Message::DataMessage { time: 42, data } => {
+                assert_eq!(data.decode().unwrap(),
+                    vec!["hello".to_string(), "world".to_string()]);
+            },
+            msg => panic!("Invalid message: {:?}", msg)
+        }
     }
 }
