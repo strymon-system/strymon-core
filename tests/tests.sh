@@ -57,6 +57,16 @@ test_pubsub() {
      terminate "${sub_id}"
 }
 
+## Partitioned publish-subscribe protocol
+test_partitioned_pubsub() {
+     sub_id=$(submit --bin multisub "${BASEDIR}/simple-pubsub" -- 4)
+     pub_id=$(submit --bin multipub --workers 4 "${BASEDIR}/simple-pubsub")
+     # wait for subscriber to receive some tuples
+     wait_job_output "${sub_id}" 'Subscriber received [0-9]+ batches'
+     terminate "${pub_id}"
+     terminate "${sub_id}"
+}
+
 ## Test for the example from the documentation
 test_example() {
      # start the topology generator with a small fat-tree
@@ -84,7 +94,11 @@ echo "Test artifacts in: ${OUTDIR}"
 start_strymon
 trap stop_strymon EXIT
 
-test_example
-test_pubsub
+TESTS=(test_example test_pubsub test_partitioned_pubsub)
+
+for test in ${TESTS[@]}; do
+    echo "===== Running '$test' ====="
+    $test
+done
 
 echo "Tests successful."
