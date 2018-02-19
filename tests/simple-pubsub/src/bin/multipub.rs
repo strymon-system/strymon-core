@@ -28,7 +28,7 @@ fn main() {
             (input, stream.probe())
         });
 
-        for i in 0..1_000_000 {
+        for i in 0.. {
             cap.downgrade(&RootTimestamp::new(i));
             input
                 .session(cap.clone())
