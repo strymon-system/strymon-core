@@ -26,7 +26,7 @@ fn main() {
                         .subscribe_group("partitioned_test", 0..num_partitions, root, true)
                         .expect("failed to subscribe")
                         .into_iter();
-
+                    println!("Multisub: Subscription successful.");
                     move |output| {
                         if let Some((t, data)) = subscription.next().map(Result::unwrap) {
                             output.session(&t)
@@ -41,7 +41,7 @@ fn main() {
                 assert_eq!(expected, batch_count);
 
                 count += 1;
-                if (count % 1000) == 0 {
+                if (count % 100) == 0 {
                     println!("Subscriber received {} batches", count);
                 }
             });
