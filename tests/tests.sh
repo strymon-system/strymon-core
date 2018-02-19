@@ -47,6 +47,12 @@ wait_job_output() {
     return 1
 }
 
+## Executed upon unexpected early exit
+error_handler() {
+    stop_strymon
+    cat "${OUTDIR}/executor_localhost.log"
+}
+
 ## Basic integration test for the publish-subscribe protocol
 test_pubsub() {
      sub_id=$(submit --bin subscriber "${BASEDIR}/simple-pubsub")
@@ -81,11 +87,6 @@ test_example() {
      wait_job_output "${cc_id}" 'There are now 2 disconnected partitions in the graph\!'
      terminate "${cc_id}"
      terminate "${topo_id}"
-}
-
-error_handler() {
-    stop_strymon
-    cat "${OUTDIR}/executor_localhost.log"
 }
 
 #
