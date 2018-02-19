@@ -80,6 +80,7 @@ struct WorkerGroup {
     state: QueryState,
     count: usize,
     ports: Vec<(ExecutorId, u16)>,
+    executors: Vec<ExecutorId>,
 }
 
 struct KeeperState {
@@ -204,13 +205,13 @@ impl Coordinator {
             .map(|d| d.as_secs())
             .unwrap_or(0);
 
-        let executor_ids = executors.iter().map(|e| e.id).collect();
+        let executor_ids: Vec<_> = executors.iter().map(|e| e.id).collect();
         let query = Query {
             id: queryid,
             name: req.name,
             program: req.query,
             workers: num_executors * num_workers,
-            executors: executor_ids,
+            executors: executor_ids.clone(),
             start_time: start_time,
         };
         let spawnquery = SpawnQuery {
@@ -251,6 +252,7 @@ impl Coordinator {
             state: state,
             count: executors.len(),
             ports: ports,
+            executors: executor_ids,
         };
         self.queries.insert(queryid, worker_group);
 
@@ -363,7 +365,7 @@ impl Coordinator {
         let job_id = req.query;
         // extract the executor ids from the worker groups
         let executor_ids = match self.queries.get(&job_id) {
-            Some(group) => group.ports.iter().map(|&(ref id, _)| id),
+            Some(group) => group.executors.iter(),
             None => return Box::new(futures::failed(TerminationError::NotFound)),
         };
 
@@ -631,6 +633,7 @@ impl CoordinatorRef {
     pub fn submission(&self,
                       req: Submission)
                       -> Box<Future<Item = QueryId, Error = SubmissionError>> {
+        trace!("incoming {:?}", req);
         self.coord.borrow_mut().submission(req)
     }
 
@@ -640,6 +643,7 @@ impl CoordinatorRef {
     }
 
     pub fn add_executor(&mut self, req: AddExecutor, tx: Outgoing) -> ExecutorId {
+        trace!("incoming {:?}", req);
         let id = self.coord.borrow_mut().add_executor(req, tx);
         self.state.borrow_mut().executor.push(id);
         id
@@ -648,6 +652,7 @@ impl CoordinatorRef {
     pub fn add_worker_group(&mut self, id: QueryId, group: usize)
          -> Box<Future<Item = QueryToken, Error = WorkerGroupError>>
     {
+        trace!("incoming AddWorkerGroup {{ id: {:?} }}", id);
         let state = self.state.clone();
         let future = self.coord
             .borrow_mut()
@@ -661,6 +666,7 @@ impl CoordinatorRef {
     }
 
     pub fn publish(&mut self, req: Publish) -> Result<Topic, PublishError> {
+        trace!("incoming {:?}", req);
         let query = req.token;
         if !self.state.borrow().authenticate(&query) {
             return Err(PublishError::AuthenticationFailure);
@@ -681,6 +687,7 @@ impl CoordinatorRef {
                      query: QueryToken,
                      topic_id: TopicId)
                      -> Result<(), UnpublishError> {
+        trace!("incoming Unpublish {{ topic_id: {:?} }}", topic_id);
         if !self.state.borrow().authenticate(&query) {
             return Err(UnpublishError::AuthenticationFailure);
         }
@@ -699,6 +706,7 @@ impl CoordinatorRef {
     pub fn subscribe(&mut self,
                      req: Subscribe)
                      -> Box<Future<Item = Topic, Error = SubscribeError>> {
+        trace!("incoming {:?}", req);
         let query = req.token;
         if !self.state.borrow().authenticate(&query) {
             return Box::new(futures::failed(SubscribeError::AuthenticationFailure));
@@ -721,6 +729,7 @@ impl CoordinatorRef {
                        query: QueryToken,
                        topic_id: TopicId)
                        -> Result<(), UnsubscribeError> {
+        trace!("incoming Unsubscribe {{ topic_id: {:?} }}", topic_id);
         if !self.state.borrow().authenticate(&query) {
             return Err(UnsubscribeError::AuthenticationFailure);
         }
@@ -744,6 +753,7 @@ impl CoordinatorRef {
     }
 
     pub fn lookup(&self, name: &str) -> Result<Topic, ()> {
+        trace!("incoming Lookup {{ name: {:?} }}", name);
         self.coord.borrow().lookup(name)
     }
 
@@ -752,12 +762,14 @@ impl CoordinatorRef {
                              worker_num: usize,
                              addr: (String, u16))
                              -> Result<(), AddKeeperWorkerError> {
+        trace!("incoming AddKeeperWorker {{ name: {:?}, worker_num: {:?}, addr: {:?} }}", name, worker_num, addr);
         self.coord.borrow_mut().add_keeper_worker(name, worker_num, addr)
     }
 
     pub fn get_keeper_address(&mut self,
                               name: String)
                               -> Result<(String, u16), GetKeeperAddressError> {
+        trace!("incoming GetKeeperAddress {{ name: {:?} }}", name);
         self.coord.borrow_mut().get_keeper_address(name)
     }
 
@@ -765,6 +777,7 @@ impl CoordinatorRef {
                                 name: String,
                                 worker_num: usize)
                                 -> Result<(), RemoveKeeperWorkerError> {
+        trace!("incoming RemoveKeeperWorker {{ name: {:?}, worker_num: {:?} }}", name, worker_num);
         self.coord.borrow_mut().remove_keeper_worker(name, worker_num)
     }
 }
