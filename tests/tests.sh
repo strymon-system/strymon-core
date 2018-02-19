@@ -51,6 +51,7 @@ wait_job_output() {
 error_handler() {
     stop_strymon
     cat "${OUTDIR}/executor_localhost.log"
+    cat "${OUTDIR}/coordinator_localhost.log"
 }
 
 ## Basic integration test for the publish-subscribe protocol
