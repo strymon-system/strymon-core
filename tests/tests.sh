@@ -10,7 +10,7 @@ STRYMON="${BINDIR}/strymon"
 ## Starts a local strymon tests instance, keeping artifacts in $OUTDIR
 start_strymon() {
     echo "localhost" > "${OUTDIR}/executors"
-    "${BINDIR}/start-strymon.sh" -l "${OUTDIR}" -w "${OUTDIR}" -e "${OUTDIR}/executors"
+    RUST_LOG="info,strymon_runtime=debug" "${BINDIR}/start-strymon.sh" -l "${OUTDIR}" -w "${OUTDIR}" -e "${OUTDIR}/executors"
 }
 
 ## Stops the strymon test instance
@@ -83,6 +83,11 @@ test_example() {
      terminate "${topo_id}"
 }
 
+error_handler() {
+    stop_strymon
+    cat "${OUTDIR}/executor_localhost.log"
+}
+
 #
 # main
 #
@@ -92,7 +97,7 @@ cargo build --release --all
 echo "Test artifacts in: ${OUTDIR}"
 
 start_strymon
-trap stop_strymon EXIT
+trap error_handler EXIT
 
 TESTS=(test_example test_pubsub test_partitioned_pubsub)
 
@@ -101,4 +106,8 @@ for test in ${TESTS[@]}; do
     $test
 done
 
-echo "Tests successful."
+trap - EXIT
+
+stop_strymon
+rm -r "${OUTDIR}"
+echo "===== Tests successful. ====="

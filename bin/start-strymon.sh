@@ -24,7 +24,7 @@ start_coordinator() {
   coord_binary="${3}"
 
   spawn_service "coordinator" "${coord_host}" "${coord_basedir}" \
-    "${coord_binary}" --log-level info manage start-coordinator \
+    "${coord_binary}" --log-level "${RUST_LOG:-info}" manage start-coordinator \
     --external-hostname "${coord_host}" --port "${coord_port}"
 }
 
@@ -41,7 +41,7 @@ start_executor() {
 
   # TODO(swicki): This currently does not support the port range option
   spawn_service "executor" "${exec_host}" "${exec_basedir}" \
-    "${coord_binary}" --log-level info \
+    "${coord_binary}" --log-level "${RUST_LOG:-info}" \
     manage start-executor --external-hostname "${exec_host}" \
     --workdir "${exec_workdir}"
 }
