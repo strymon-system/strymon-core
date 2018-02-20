@@ -10,7 +10,7 @@ STRYMON="${BINDIR}/strymon"
 ## Starts a local strymon tests instance, keeping artifacts in $OUTDIR
 start_strymon() {
     echo "localhost" > "${OUTDIR}/executors"
-    "${BINDIR}/start-strymon.sh" -l "${OUTDIR}" -w "${OUTDIR}" -e "${OUTDIR}/executors"
+    RUST_LOG="info,strymon_runtime=debug" "${BINDIR}/start-strymon.sh" -l "${OUTDIR}" -w "${OUTDIR}" -e "${OUTDIR}/executors"
 }
 
 ## Stops the strymon test instance
@@ -47,10 +47,27 @@ wait_job_output() {
     return 1
 }
 
+## Executed upon unexpected early exit
+error_handler() {
+    stop_strymon
+    cat "${OUTDIR}/executor_localhost.log"
+    cat "${OUTDIR}/coordinator_localhost.log"
+}
+
 ## Basic integration test for the publish-subscribe protocol
 test_pubsub() {
      sub_id=$(submit --bin subscriber "${BASEDIR}/simple-pubsub")
      pub_id=$(submit --bin publisher "${BASEDIR}/simple-pubsub")
+     # wait for subscriber to receive some tuples
+     wait_job_output "${sub_id}" 'Subscriber received [0-9]+ batches'
+     terminate "${pub_id}"
+     terminate "${sub_id}"
+}
+
+## Partitioned publish-subscribe protocol
+test_partitioned_pubsub() {
+     sub_id=$(submit --bin multisub "${BASEDIR}/simple-pubsub" -- 4)
+     pub_id=$(submit --bin multipub --workers 4 "${BASEDIR}/simple-pubsub")
      # wait for subscriber to receive some tuples
      wait_job_output "${sub_id}" 'Subscriber received [0-9]+ batches'
      terminate "${pub_id}"
@@ -67,7 +84,7 @@ test_example() {
      wait_job_output "${cc_id}" 'All nodes in the graph are now connected.'
      # disconnect a random switch
      "${BASEDIR}/../apps/topology-generator/inject-fault.sh" disconnect-random-switch
-     wait_job_output "${topo_id}" 'Disconnecting randomly chosen switch \#[0-9]+.'
+     wait_job_output "${topo_id}" 'Disconnecting randomly chosen switch \#[0-9]+'
      wait_job_output "${cc_id}" 'There are now 2 disconnected partitions in the graph\!'
      terminate "${cc_id}"
      terminate "${topo_id}"
@@ -82,9 +99,17 @@ cargo build --release --all
 echo "Test artifacts in: ${OUTDIR}"
 
 start_strymon
-trap stop_strymon EXIT
+trap error_handler EXIT
 
-test_example
-test_pubsub
+TESTS=(test_example test_pubsub test_partitioned_pubsub)
 
-echo "Tests successful."
+for test in ${TESTS[@]}; do
+    echo "===== Running '$test' ====="
+    $test
+done
+
+trap - EXIT
+
+stop_strymon
+rm -r "${OUTDIR}"
+echo "===== Tests successful. ====="

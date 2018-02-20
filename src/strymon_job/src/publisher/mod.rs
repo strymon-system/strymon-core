@@ -28,7 +28,7 @@ use futures::future::Future;
 use futures::stream::{self, Stream};
 use futures::unsync::mpsc;
 
-use protocol::{Message, RemoteTimestamp};
+use protocol::{Message, InitialSnapshot, RemoteTimestamp};
 
 use self::progress::{LowerFrontier, UpperFrontier};
 use self::sink::{EventSink, EventStream};
@@ -58,7 +58,7 @@ struct PublisherServer<T: Timestamp, D> {
     subscribers: Slab<Sender>,
     count: AtomicCounter,
     // tokio event loop
-    events: Option<Box<Stream<Item=Event<T, D>, Error=io::Error>>>,
+    events: Box<Stream<Item=Event<T, D>, Error=io::Error>>,
     notificator: mpsc::UnboundedSender<Event<T, D>>,
     core: Core,
     handle: Handle,
@@ -87,7 +87,7 @@ impl<T: RemoteTimestamp, D: ExchangeData + Serialize> PublisherServer<T, D> {
             upper: UpperFrontier::empty(),
             subscribers: Slab::new(),
             count: count,
-            events: Some(Box::new(events)),
+            events: Box::new(events),
             notificator: notificator,
             core: core,
             handle: handle,
@@ -96,14 +96,11 @@ impl<T: RemoteTimestamp, D: ExchangeData + Serialize> PublisherServer<T, D> {
 
     fn next_event(&mut self) -> io::Result<Event<T, D>> {
         // run tokio reactor until we get the next event
-        let stream = self.events.take().unwrap().into_future();
-        let (result, stream) = match self.core.run(stream) {
-            Ok((ev, stream)) => (Ok(ev.unwrap()), stream),
-            Err((err, stream)) => (Err(err), stream),
-        };
-
-        self.events = Some(stream);
-        result
+        let next_msg = self.events.by_ref().into_future();
+        match self.core.run(next_msg) {
+            Ok((msg, _)) => Ok(msg.unwrap()),
+            Err((err, _)) => Err(err),
+        }
     }
 
     /// Starts serving subscribers, blocks until the Timely stream completes
@@ -114,7 +111,7 @@ impl<T: RemoteTimestamp, D: ExchangeData + Serialize> PublisherServer<T, D> {
                 // processing incoming timely events
                 Event::Timely(ev) => self.timely_event(ev)?,
                 // handle networking events
-                Event::Accepted(sub) => self.add_subscriber(sub),
+                Event::Accepted(sub) => self.add_subscriber(sub)?,
                 Event::Disconnected(id) => self.remove_subscriber(id),
                 Event::Error(id, err) => {
                     // subscriber errors should not be fatal. we just log
@@ -131,13 +128,11 @@ impl<T: RemoteTimestamp, D: ExchangeData + Serialize> PublisherServer<T, D> {
     }
 
     /// Sends `msg` to all connected subscribers.
-    fn broadcast(&self, msg: Message<T, D>) -> io::Result<()> {
+    fn broadcast(&self, msg: MessageBuf) -> io::Result<()> {
         if self.subscribers.len() == 0 {
             // nothing to do here
             return Ok(());
         }
-
-        let msg = MessageBuf::new(msg)?;
 
         let last = self.subscribers.len() - 1;
         for (id, sub) in self.subscribers.iter() {
@@ -158,25 +153,15 @@ impl<T: RemoteTimestamp, D: ExchangeData + Serialize> PublisherServer<T, D> {
     /// sent to connected subscribers.
     fn timely_event(&mut self, event: TimelyEvent<T, D>) -> io::Result<()> {
         match event {
-            TimelyEvent::Progress(updates) => {
-                let frontier_changed = self.lower.update(updates);
-                if frontier_changed {
-                    let lower = Message::<T, D>::lower(self.lower.elements());
-                    self.broadcast(lower)?;
+            TimelyEvent::Progress(mut updates) => {
+                self.lower.update(&mut updates);
+                if !updates.is_empty() {
+                    self.broadcast(Message::<T, D>::frontier_update(updates)?)?;
                 }
             },
             TimelyEvent::Messages(time, data) => {
-                let new_epoch = !self.upper.greater_equal(&time);
-                if new_epoch {
-                    {
-                        let upper = Message::<T, D>::upper(self.upper.elements());
-                        self.broadcast(upper)?;
-                    }
-                    let updated = self.upper.insert(time.clone());
-                    debug_assert!(updated, "new epoch did not change upper?!");
-                }
-                let data = Message::<T, D>::data(time, data);
-                self.broadcast(data)?;
+                self.upper.insert(time.clone());
+                self.broadcast(Message::<T, D>::data_message(time, data)?)?;
             }
         };
 
@@ -187,11 +172,17 @@ impl<T: RemoteTimestamp, D: ExchangeData + Serialize> PublisherServer<T, D> {
     ///
     /// Installs a "monitor" for the subscriber, making sure we get notified
     /// when it disconnects.
-    fn add_subscriber(&mut self, (tx, rx): (Sender, Receiver)) {
+    fn add_subscriber(&mut self, (tx, rx): (Sender, Receiver)) -> io::Result<()> {
+        // inform new subscriber about current state of progress
+        let snapshot = InitialSnapshot::encode(self.lower.elements(), self.upper.elements())?;
+        tx.send(snapshot);
+
+        // add it to the list of listening subscribers
         self.count.increment();
         let id = self.subscribers.insert(tx);
-        let notificator = self.notificator.clone();
 
+        // register event handler for disconnection
+        let notificator = self.notificator.clone();
         let subscriber = rx
             .for_each(|_| {
                 Err(io::Error::new(io::ErrorKind::InvalidData, "unexpected message"))
@@ -206,6 +197,7 @@ impl<T: RemoteTimestamp, D: ExchangeData + Serialize> PublisherServer<T, D> {
             });
 
         self.handle.spawn(subscriber);
+        Ok(())
     }
 
     /// Removes a subscriber from the broadcasting list.

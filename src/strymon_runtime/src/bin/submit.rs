@@ -14,7 +14,7 @@ use std::process::{Command, Stdio};
 
 use serde_json::{Value, Deserializer};
 use clap::{App, AppSettings, Arg, ArgGroup, ArgMatches, SubCommand};
-use log::LogLevel;
+use log::Level;
 
 use strymon_communication::Network;
 use strymon_runtime::submit::Submitter;
@@ -74,10 +74,10 @@ fn build_binary(path: &Path, args: &ArgMatches) -> Result<String> {
             "compiler-message" => {
                 let rustc_msg = msg.get("message").ok_or("missing compiler message")?;
                 let level = match rustc_msg["level"].as_str().ok_or("unable to parse message level")? {
-                    "note" | "help" => LogLevel::Info,
-                    "warning" => LogLevel::Warn,
-                    "error" => LogLevel::Error,
-                    _ => LogLevel::Debug,
+                    "note" | "help" => Level::Info,
+                    "warning" => Level::Warn,
+                    "error" => Level::Error,
+                    _ => Level::Debug,
                 };
                 log!(level, "cargo: {}", msg);
             },

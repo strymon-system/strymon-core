@@ -45,8 +45,6 @@ extern crate tokio_core;
 #[macro_use]
 extern crate log;
 extern crate typename;
-#[cfg(test)]
-extern crate serde_test;
 #[macro_use]
 extern crate serde_derive;
 
@@ -169,6 +167,7 @@ mod tests {
     use std::thread;
     use std::sync::Mutex;
 
+    use futures::future::Future;
     use futures::stream::Stream;
 
     use timely;
@@ -179,7 +178,7 @@ mod tests {
 
     use strymon_communication::Network;
 
-    use subscriber::Subscriber;
+    use subscriber::SubscriberGroup;
     use publisher::{Publisher, Addr};
 
     type ExampleTime = Product<RootTimestamp, u64>;
@@ -214,10 +213,12 @@ mod tests {
         let captured = timely::example(move |scope| {
             source(scope, "Source", |cap| {
                 let socket = network.connect((&*addr.0, addr.1)).unwrap();
-                let mut sub = Subscriber::<ExampleTime, String>::new(socket, cap).wait();
+                let connecting = SubscriberGroup::<ExampleTime, String>::new(Some(socket), cap);
+                let connected = connecting.wait().unwrap();
+                let mut stream = connected.wait();
                 move |output| {
                     // subscriber will drop remaining capabilities once the publisher is drained
-                    if let Some(msg) = sub.next() {
+                    if let Some(msg) = stream.next() {
                         let (cap, data) = msg.unwrap();
                         output.session(&cap)
                               .give_iterator(data.into_iter());

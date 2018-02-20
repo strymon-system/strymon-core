@@ -4,7 +4,7 @@ rust:
   - nightly
 script:
   - cargo test --verbose --all
-  - ./tests/tests.sh
+  - bash -x ./tests/tests.sh
 
 jobs:
   include:

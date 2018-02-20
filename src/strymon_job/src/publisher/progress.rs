@@ -31,6 +31,7 @@ impl<T: Timestamp> UpperFrontier<T> {
         }
     }
 
+    #[cfg(test)]
     /// Returns true if any item in the antichain is greater or equal than the argument.
     pub fn greater_equal(&self, other: &T) -> bool {
         // SAFETY: This assumes that Rev<T> and T use the same memory layout
@@ -72,11 +73,13 @@ pub struct LowerFrontier<T: Timestamp> {
 }
 
 impl<T: Timestamp> LowerFrontier<T> {
-    /// Updates the frontier and returns `true` if the `lower` frontier changed.
-    pub fn update(&mut self, updates: Vec<(T, i64)>) -> bool {
-        let mut changed = false;
-        self.antichain.update_iter_and(updates, |_, _| changed = true);
-        changed
+    /// Updates the frontier and compacts the argument to reflect only the externally visible changes.
+    pub fn update(&mut self, updates: &mut Vec<(T, i64)>) {
+        for (t, delta) in updates.drain(..) {
+            self.antichain.update_dirty(t, delta);
+        }
+
+        self.antichain.update_iter_and(None, |t, i| updates.push((t.clone(), i)));
     }
 
     /// Reveals the minimal elements in the frontier.
@@ -147,11 +150,19 @@ mod tests {
 
     #[test]
     fn lower_frontier() {
+        let mut updates;
         let mut state = LowerFrontier::<i32>::default();
         assert_eq!(state.elements(), &[0]);
-        assert!(!state.update(vec![(0, 1)]));
+
+        updates = vec![(0, 1)];
+        state.update(&mut updates);
+        assert_eq!(&updates, &[]);
         assert_eq!(state.elements(), &[0]);
-        assert!(state.update(vec![(1, 1), (0, -2)]));
+
+        updates = vec![(1, 1), (0, -2)];
+        state.update(&mut updates);
+        updates.sort();
+        assert_eq!(&updates, &[(0, -1), (1, 1)]);
         assert_eq!(state.elements(), &[1]);
     }
 }
