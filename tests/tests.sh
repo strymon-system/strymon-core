@@ -84,7 +84,7 @@ test_example() {
      wait_job_output "${cc_id}" 'All nodes in the graph are now connected.'
      # disconnect a random switch
      "${BASEDIR}/../apps/topology-generator/inject-fault.sh" disconnect-random-switch
-     wait_job_output "${topo_id}" 'Disconnecting randomly chosen switch \#[0-9]+.'
+     wait_job_output "${topo_id}" 'Disconnecting randomly chosen switch \#[0-9]+'
      wait_job_output "${cc_id}" 'There are now 2 disconnected partitions in the graph\!'
      terminate "${cc_id}"
      terminate "${topo_id}"
