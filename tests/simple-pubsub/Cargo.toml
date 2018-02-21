@@ -5,6 +5,13 @@ version = "0.1.0"
 
 [dependencies]
 timely = "0.3.0"
+serde = "1"
+serde_derive = "1"
+typename = "0.1"
+futures = "0.1"
 
 [dependencies.strymon_job]
 path = "../../src/strymon_job"
+
+[dependencies.strymon_communication]
+path = "../../src/strymon_communication"

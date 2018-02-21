@@ -477,8 +477,13 @@ dependencies = [
 name = "simple-pubsub"
 version = "0.1.0"
 dependencies = [
+ "futures 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 1.0.27 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_derive 1.0.27 (registry+https://github.com/rust-lang/crates.io-index)",
+ "strymon_communication 0.1.2",
  "strymon_job 0.1.2",
  "timely 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "typename 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
