@@ -90,6 +90,13 @@ test_example() {
      terminate "${topo_id}"
 }
 
+## Test for simple services
+test_service() {
+     id=$(submit --bin service "${BASEDIR}/simple-pubsub")
+     # wait for subscriber to receive some tuples
+     wait_job_output "${id}" 'got response Ok\("Hello, world\!"\)'
+}
+
 #
 # main
 #
@@ -101,7 +108,7 @@ echo "Test artifacts in: ${OUTDIR}"
 start_strymon
 trap error_handler EXIT
 
-TESTS=(test_example test_pubsub test_partitioned_pubsub)
+TESTS=(test_example test_pubsub test_partitioned_pubsub test_service)
 
 for test in ${TESTS[@]}; do
     echo "===== Running '$test' ====="

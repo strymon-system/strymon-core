@@ -56,6 +56,7 @@ extern crate strymon_rpc;
 mod protocol;
 mod publisher;
 mod subscriber;
+mod util;
 pub mod operators;
 
 use std::io;

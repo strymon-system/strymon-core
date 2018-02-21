@@ -147,11 +147,23 @@ impl<T, E> From<Result<T, E>> for SubscriptionError
 
 impl Coordinator {
     /// Unsubscribes from a topic.
-    fn unsubscribe(&self, topic: TopicId) -> Result<(), SubscriptionError> {
+    pub(crate) fn unsubscribe(&self, topic: TopicId) -> Result<(), SubscriptionError> {
         self.tx
             .request(&Unsubscribe {
                 topic: topic,
                 token: self.token,
+            })
+            .map_err(SubscriptionError::from)
+            .wait()
+    }
+
+
+    pub(crate) fn subscribe_request(&self, name: &str, blocking: bool) -> Result<Topic, SubscriptionError> {
+        self.tx
+            .request(&Subscribe {
+                name: name.to_string(),
+                token: self.token,
+                blocking: blocking,
             })
             .map_err(SubscriptionError::from)
             .wait()
