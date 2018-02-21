@@ -146,7 +146,7 @@ impl<T, D> Drop for Publication<T, D> {
 
 impl Coordinator {
     /// Submit a publication request to the coordinator and block.
-    fn publish_request(&self,
+    pub(crate) fn publish_request(&self,
                        name: String,
                        schema: TopicSchema,
                        addr: (String, u16))
@@ -215,7 +215,7 @@ impl Coordinator {
     }
 
     /// Submits a depublication request.
-    fn unpublish(&self, topic: TopicId) -> Result<(), PublicationError> {
+    pub(crate) fn unpublish(&self, topic: TopicId) -> Result<(), PublicationError> {
         self.tx
             .request(&Unpublish {
                 topic: topic,

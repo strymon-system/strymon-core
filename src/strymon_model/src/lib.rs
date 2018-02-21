@@ -48,6 +48,7 @@ impl TopicType {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Abomonation, TypeName)]
 pub enum TopicSchema {
     Collection(TopicType),
+    Service(TopicType),
     Stream(TopicType, TopicType),
 }
 
@@ -65,12 +66,20 @@ impl TopicSchema {
             _ => false,
         }
     }
+
+    pub fn is_service(&self) -> bool {
+        match *self {
+            TopicSchema::Service(_) => true,
+            _ => false,
+        }
+    }
 }
 
 impl fmt::Display for TopicSchema {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             TopicSchema::Collection(ref d) => write!(f, "Collection(item={:?})", d.name),
+            TopicSchema::Service(ref d) => write!(f, "Service(item={:?})", d.name),
             TopicSchema::Stream(ref d, ref t) => {
                 write!(f, "Stream(timestamp={:?}, data={:?})", t.name, d.name)
             }

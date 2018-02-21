@@ -4,3 +4,4 @@ pub use protocol::RemoteTimestamp;
 
 pub mod publish;
 pub mod subscribe;
+pub mod service;
