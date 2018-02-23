@@ -13,7 +13,7 @@ use std::marker::PhantomData;
 
 use typename::TypeName;
 use futures::{Async, Poll};
-use futures::stream::Stream;
+use futures::stream::{Stream, Fuse};
 
 use strymon_model::{Topic, TopicType, TopicSchema};
 use strymon_communication::rpc::*;
@@ -27,7 +27,7 @@ use util::StreamsUnordered;
 ///
 /// Will deregister the announced service from the catalog when dropped.
 pub struct Service<N: Name> {
-    server: Server<N>,
+    server: Fuse<Server<N>>,
     clients: StreamsUnordered<Incoming<N>>,
     topic: Topic,
     coord: Coordinator,
@@ -51,7 +51,13 @@ impl<N: Name> Stream for Service<N> {
             self.clients.push(client);
         }
 
-        self.clients.poll()
+        match self.clients.poll() {
+            Ok(Async::Ready(None)) if !self.server.is_done() => {
+                // we don't have any clients, but the server is still alive
+                Ok(Async::NotReady)
+            },
+            other => other,
+        }
     }
 }
 
@@ -93,9 +99,9 @@ impl Coordinator {
         -> Result<Service<N>, PublicationError>
     {
         // create a new service and obtain its address
-        let server = self.network.server(None)?;
+        let server = self.network.server(None)?.fuse();
         let addr = {
-            let (host, port) = server.external_addr();
+            let (host, port) = server.get_ref().external_addr();
             (host.to_string(), port)
         };
 
