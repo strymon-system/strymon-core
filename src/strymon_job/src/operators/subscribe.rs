@@ -24,8 +24,9 @@ use strymon_model::{Topic, TopicId, TopicType, TopicSchema};
 use strymon_communication::transport::{Sender, Receiver};
 
 use Coordinator;
-use subscriber::SubscriberGroup;
 use protocol::RemoteTimestamp;
+use subscriber::SubscriberGroup;
+pub use subscriber::SubscriptionEvent;
 
 /// A subscription handle used to receive data from a topic.
 ///
@@ -54,7 +55,7 @@ impl<T, D> Subscription<T, D>
 impl<T, D> Stream for Subscription<T, D>
     where T: RemoteTimestamp, D: DeserializeOwned,
 {
-    type Item = (T, Vec<D>);
+    type Item = SubscriptionEvent<T, D>;
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
@@ -80,7 +81,7 @@ impl<T, D> IntoIterator for Subscription<T, D>
     where T: RemoteTimestamp,
           D: DeserializeOwned,
 {
-    type Item = io::Result<(T, Vec<D>)>;
+    type Item = io::Result<SubscriptionEvent<T, D>>;
     type IntoIter = IntoIter<T, D>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -92,7 +93,7 @@ impl<T, D> Iterator for IntoIter<T, D>
     where T: RemoteTimestamp,
           D: DeserializeOwned,
 {
-    type Item = io::Result<(T, Vec<D>)>;
+    type Item = io::Result<SubscriptionEvent<T, D>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()

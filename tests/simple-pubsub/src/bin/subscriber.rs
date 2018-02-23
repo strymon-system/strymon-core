@@ -10,7 +10,8 @@ extern crate strymon_job;
 extern crate timely;
 
 use timely::dataflow::operators::generic::source;
-use timely::dataflow::operators::{Accumulate, Inspect};
+use timely::dataflow::operators::{Accumulate, CapabilitySet, Inspect};
+use strymon_job::operators::subscribe::SubscriptionEvent;
 
 fn main() {
     strymon_job::execute(|root, coord| {
@@ -18,14 +19,24 @@ fn main() {
             let mut count = 0;
 
             source::<_, u32, _, _>(scope, "Source", |root| {
-                    let mut subscription = coord.subscribe("test", root, true)
+                    let mut capabilities = CapabilitySet::new();
+                    capabilities.insert(root);
+
+                    let mut subscription = coord.subscribe("test", true)
                         .expect("failed to subscribe")
                         .into_iter();
 
                     move |output| {
-                        if let Some((t, data)) = subscription.next().map(Result::unwrap) {
-                            output.session(&t)
-                                  .give_iterator(data.into_iter());
+                        if let Some(event) = subscription.next() {
+                            match event.unwrap() {
+                                SubscriptionEvent::Data(time, data) => {
+                                    output.session(&capabilities.delayed(&time))
+                                      .give_iterator(data.into_iter());
+                                }
+                                SubscriptionEvent::FrontierUpdate => {
+                                    capabilities.downgrade(subscription.frontier());
+                                }
+                            }
                         }
                     }
             })

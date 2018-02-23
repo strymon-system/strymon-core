@@ -179,7 +179,7 @@ mod tests {
 
     use strymon_communication::Network;
 
-    use subscriber::SubscriberGroup;
+    use subscriber::{SubscriberGroup, SubscriptionEvent};
     use publisher::{Publisher, Addr};
 
     type ExampleTime = Product<RootTimestamp, u64>;
@@ -225,12 +225,17 @@ mod tests {
 
                 move |output| {
                     // subscriber will drop remaining capabilities once the publisher is drained
-                    if let Some(msg) = stream.next() {
-                        let (time, data) = msg.unwrap();
-                        output.session(&capabilities.delayed(&time))
-                              .give_iterator(data.into_iter());
+                    if let Some(event) = stream.next() {
+                        match event.unwrap() {
+                            SubscriptionEvent::Data(time, data) => {
+                                output.session(&capabilities.delayed(&time))
+                                  .give_iterator(data.into_iter());
+                            }
+                            SubscriptionEvent::FrontierUpdate => {
+                                capabilities.downgrade(stream.get_ref().frontier());
+                            }
+                        }
                     }
-                    capabilities.downgrade(stream.get_ref().frontier());
                 }
             }).capture()
         });

@@ -26,6 +26,16 @@ use protocol::{Message, InitialSnapshot, RemoteTimestamp};
 use publisher::progress::{UpperFrontier};
 use util::StreamsUnordered;
 
+/// Data or frontier events emitted by a subscription.
+pub enum SubscriptionEvent<T, D> {
+    /// The `Data` marks the arrival of a data batch which has been published.
+    Data(T, Vec<D>),
+    /// The `FrontierUpdate` event indicates that the upstream frontier has changed.
+    /// The new frontier can be inspected using the `frontier()` method on the
+    /// subscription handle.
+    FrontierUpdate,
+}
+
 /// Manages a group of subscribers.
 ///
 /// Pulls messages from each underlying socket and updates the frontier
@@ -66,18 +76,19 @@ impl<T, D> SubscriberGroup<T, D>
 
     /// Drives the subscriber logic based on a received message.
     fn process_message(&mut self, msg: Message<T, D>)
-        -> io::Result<Option<(T, Vec<D>)>> {
+        -> io::Result<Option<SubscriptionEvent<T, D>>>
+    {
         match msg {
             Message::LowerFrontierUpdate { update } => {
                 self.frontier.update_iter(update);
                 let frontier = self.frontier.frontier();
                 self.filter.remove(frontier);
 
-                Ok(None)
+                Ok(Some(SubscriptionEvent::FrontierUpdate))
             },
             Message::DataMessage { time, data } => {
                 if !self.filter.contains(&time) {
-                    Ok(Some((time, data.decode()?)))
+                    Ok(Some(SubscriptionEvent::Data(time, data.decode()?)))
                 } else {
                     Ok(None)
                 }
@@ -89,7 +100,7 @@ impl<T, D> SubscriberGroup<T, D>
 impl<T, D> Stream for SubscriberGroup<T, D>
     where T: RemoteTimestamp, D: DeserializeOwned,
 {
-    type Item = (T, Vec<D>);
+    type Item = SubscriptionEvent<T, D>;
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
