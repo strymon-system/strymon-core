@@ -1,4 +1,4 @@
-// Copyright 2017 ETH Zurich. All rights reserved.
+// Copyright 2018 ETH Zurich. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 // http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -16,7 +16,11 @@ extern crate serde_derive;
 #[macro_use]
 extern crate typename;
 
+extern crate strymon_communication;
+
 use rand::{Rng, SeedableRng, StdRng};
+
+pub mod service;
 
 /// A unique, dense identifier for a topology node (i.e. a switch)
 pub type NodeId = u32;
@@ -36,7 +40,7 @@ pub enum Entity {
 /// A minimal switch-to-switch network topology model. The version used in this
 /// open-source release of Strymon only contains the bare-minimun needed
 /// for running a simple incremental routing on top of it.
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Topology {
     pub switches: usize,
     pub connections: Vec<Connection>,
@@ -56,6 +60,20 @@ impl Topology {
         let id = self.switches as NodeId;
         self.switches += 1;
         id
+    }
+
+    /// Clones the topology into a list of entity creation commands.
+    pub fn dump(&self) -> Vec<(Entity, i32)> {
+        let mut result = Vec::new();
+        for &c in self.connections.iter() {
+            result.push((Entity::Connection(c), 1i32));
+        }
+
+        for n in 0..(self.switches as NodeId) {
+            result.push((Entity::Switch(n), 1i32));
+        }
+
+        result
     }
 }
 
