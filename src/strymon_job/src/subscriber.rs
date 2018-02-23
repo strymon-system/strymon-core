@@ -19,7 +19,6 @@ use serde::de::DeserializeOwned;
 
 use timely::progress::Timestamp;
 use timely::progress::frontier::MutableAntichain;
-use timely::dataflow::operators::{Capability, CapabilitySet};
 
 use strymon_communication::transport::{Sender, Receiver};
 
@@ -35,7 +34,6 @@ use util::StreamsUnordered;
 pub struct SubscriberGroup<T: Timestamp, D> {
     streams: StreamsUnordered<Subscriber<T, D>>,
     frontier: MutableAntichain<T>,
-    capabilities: CapabilitySet<T>,
     filter: Filter<T>,
 }
 
@@ -48,7 +46,7 @@ impl<T, D> SubscriberGroup<T, D>
     /// typically the one returned by `unordered_input`.
     /// Returns a future which resolves once all connections have received
     /// their `InitialSnapshot`.
-    pub fn new<I>(connections: I, root: Capability<T>) -> ConnectingGroup<T, D>
+    pub fn new<I>(connections: I) -> ConnectingGroup<T, D>
         where I: IntoIterator<Item=(Sender, Receiver)>,
     {
         let connecting = connections.into_iter().map(Connecting::new);
@@ -58,27 +56,28 @@ impl<T, D> SubscriberGroup<T, D>
                 ready: StreamsUnordered::new(),
                 frontier: MutableAntichain::new(),
                 upper: UpperFrontier::empty(),
-                root: root,
             })
         }
     }
 
+    pub fn frontier(&self) -> &[T] {
+        self.frontier.frontier()
+    }
+
     /// Drives the subscriber logic based on a received message.
     fn process_message(&mut self, msg: Message<T, D>)
-        -> io::Result<Option<(Capability<T>, Vec<D>)>> {
+        -> io::Result<Option<(T, Vec<D>)>> {
         match msg {
             Message::LowerFrontierUpdate { update } => {
                 self.frontier.update_iter(update);
                 let frontier = self.frontier.frontier();
                 self.filter.remove(frontier);
-                self.capabilities.downgrade(frontier);
 
                 Ok(None)
             },
             Message::DataMessage { time, data } => {
                 if !self.filter.contains(&time) {
-                    let cap = self.capabilities.delayed(&time);
-                    Ok(Some((cap, data.decode()?)))
+                    Ok(Some((time, data.decode()?)))
                 } else {
                     Ok(None)
                 }
@@ -90,7 +89,7 @@ impl<T, D> SubscriberGroup<T, D>
 impl<T, D> Stream for SubscriberGroup<T, D>
     where T: RemoteTimestamp, D: DeserializeOwned,
 {
-    type Item = (Capability<T>, Vec<D>);
+    type Item = (T, Vec<D>);
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
@@ -136,7 +135,6 @@ struct GroupBuilder<T: Timestamp, D> {
     ready: StreamsUnordered<Subscriber<T, D>>,
     frontier: MutableAntichain<T>,
     upper: UpperFrontier<T>,
-    root: Capability<T>,
 }
 
 impl<T, D> GroupBuilder<T, D>
@@ -159,14 +157,9 @@ impl<T, D> GroupBuilder<T, D>
     fn build(self) -> SubscriberGroup<T, D> {
         let filter = Filter { filter: self.upper.elements().to_owned() };
 
-        let mut capabilities = CapabilitySet::new();
-        capabilities.insert(self.root);
-        capabilities.downgrade(self.frontier.frontier());
-
         SubscriberGroup {
             streams: self.ready,
             frontier: self.frontier,
-            capabilities: capabilities,
             filter: filter,
         }
     }

@@ -11,7 +11,6 @@
 use std::io;
 
 use timely::progress::Timestamp;
-use timely::dataflow::operators::Capability;
 
 use futures::{Future, Poll};
 use futures::stream::{Stream, Wait, futures_ordered};
@@ -32,8 +31,8 @@ use protocol::RemoteTimestamp;
 ///
 /// A subscription can be optained by calling the `Coordinator::subscribe` method.
 /// The subscription can be read by using the type as an iterator, e.g. in a `for`
-/// loop. The iterator will yield the necessary capabilities and data batches to
-/// to be used in combination with Timely's `unordered_input` or `source` operator.
+/// loop. To inspect the frontier of an subscription, e.g. to manage capabilities,
+/// use the `frontier()` method.
 ///
 /// In addition, this type also supports the asynchronous `futures::stream::Stream` trait,
 /// allowing users to block on multiple topics at once.
@@ -43,10 +42,19 @@ pub struct Subscription<T: Timestamp, D> {
     coord: Coordinator,
 }
 
+impl<T, D> Subscription<T, D>
+    where T: RemoteTimestamp, D: DeserializeOwned,
+{
+    /// The current frontier at the subscribed topics.
+    pub fn frontier(&self) -> &[T] {
+        self.sub.frontier()
+    }
+}
+
 impl<T, D> Stream for Subscription<T, D>
     where T: RemoteTimestamp, D: DeserializeOwned,
 {
-    type Item = (Capability<T>, Vec<D>);
+    type Item = (T, Vec<D>);
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
@@ -54,16 +62,25 @@ impl<T, D> Stream for Subscription<T, D>
     }
 }
 
-/// A blocking iterator, yielding `io::Result<(Capability<T>, Vec<D>)>` tuples.
+/// A blocking iterator, yielding `io::Result<T, Vec<D>)>` tuples.
 pub struct IntoIter<T: Timestamp, D> {
     inner: Wait<Subscription<T, D>>,
+}
+
+impl<T, D> IntoIter<T, D>
+    where T: RemoteTimestamp, D: DeserializeOwned
+{
+    /// The current frontier at the subscribed topics.
+    pub fn frontier(&self) -> &[T] {
+        self.inner.get_ref().frontier()
+    }
 }
 
 impl<T, D> IntoIterator for Subscription<T, D>
     where T: RemoteTimestamp,
           D: DeserializeOwned,
 {
-    type Item = io::Result<(Capability<T>, Vec<D>)>;
+    type Item = io::Result<(T, Vec<D>)>;
     type IntoIter = IntoIter<T, D>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -75,7 +92,7 @@ impl<T, D> Iterator for IntoIter<T, D>
     where T: RemoteTimestamp,
           D: DeserializeOwned,
 {
-    type Item = io::Result<(Capability<T>, Vec<D>)>;
+    type Item = io::Result<(T, Vec<D>)>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
@@ -207,16 +224,15 @@ impl Coordinator {
     /// the coordinator. The requested topic must be published with the same
     /// data and timestamp types `T`and `D` respectively.
     ///
-    /// In order to forward progress tracking information to the downstream
-    /// Timely computation, the subscription requires an initial root capability.
-    /// It can be obtained either through the `unordered_input` or the `source`
-    /// Timely input operators.
+    /// In to obtain progress tracking information from the upstream
+    /// Timely computation(s), the subscription handle exposes a `frontier()`
+    /// method which allows inspection of the current frontier.
     ///
     /// When `blocking` is true, this call blocks until a remote publisher
     /// creates a topic with a suitable name. If `blocking` is false, the call
     /// returns with an error if the catalog does not contain a topic with a
     /// matching name.
-    pub fn subscribe<T, D>(&self, name: &str, root: Capability<T>, blocking: bool)
+    pub fn subscribe<T, D>(&self, name: &str, blocking: bool)
        -> Result<Subscription<T, D>, SubscriptionError>
         where T: RemoteTimestamp ,
               D: DeserializeOwned + TypeName,
@@ -224,7 +240,7 @@ impl Coordinator {
     {
         let topics = self.request_multiple(Some(name), blocking)?;
         let sockets = self.connect_all::<T, D>(&topics)?;
-        let sub = SubscriberGroup::<T, D>::new(sockets, root).wait()?;
+        let sub = SubscriberGroup::<T, D>::new(sockets).wait()?;
         Ok(Subscription {
             sub: sub,
             topics: topics,
@@ -243,7 +259,6 @@ impl Coordinator {
     pub fn subscribe_group<T, D, I>(&self,
                     prefix: &str,
                     partitions: I,
-                    root: Capability<T>,
                     blocking: bool)
                     -> Result<Subscription<T, D>, SubscriptionError>
         where T: RemoteTimestamp ,
@@ -254,7 +269,7 @@ impl Coordinator {
         let names = partitions.into_iter().map(|i| format!("{}.{}", prefix, i));
         let topics = self.request_multiple(names, blocking)?;
         let sockets = self.connect_all::<T, D>(&topics)?;
-        let sub = SubscriberGroup::<T, D>::new(sockets, root).wait()?;
+        let sub = SubscriberGroup::<T, D>::new(sockets).wait()?;
         Ok(Subscription {
             sub: sub,
             topics: topics,
