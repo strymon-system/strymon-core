@@ -5,7 +5,6 @@
 // <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
-#![allow(deprecated)]
 
 extern crate strymon_job;
 extern crate timely;
@@ -46,8 +45,6 @@ fn main() {
     strymon_job::execute(|root, coord| {
         let ((mut input, cap), probe) = root.dataflow::<Version, _, _>(|scope| {
             let (input, stream) = scope.new_unordered_input::<(Entity, Product<RootTimestamp, u64>, isize)>();
-
-            use timely::dataflow::operators::Inspect;
 
             let edges = stream.flat_map(|(entity, ts, diff)| {
                 if let Entity::Connection(conn) = entity {
