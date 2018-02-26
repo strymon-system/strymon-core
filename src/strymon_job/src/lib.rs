@@ -179,7 +179,7 @@ mod tests {
 
     use strymon_communication::Network;
 
-    use subscriber::SubscriberGroup;
+    use subscriber::{SubscriberGroup, SubscriptionEvent};
     use publisher::{Publisher, Addr};
 
     type ExampleTime = Product<RootTimestamp, u64>;
@@ -211,18 +211,30 @@ mod tests {
         let addr = publisher_thread(&network);
 
         use timely::dataflow::operators::generic::operator::source;
+        use timely::dataflow::operators::CapabilitySet;
+
         let captured = timely::example(move |scope| {
-            source(scope, "Source", |cap| {
+            source(scope, "Source", |base_cap| {
+                let mut capabilities = CapabilitySet::new();
+                capabilities.insert(base_cap);
+
                 let socket = network.connect((&*addr.0, addr.1)).unwrap();
-                let connecting = SubscriberGroup::<ExampleTime, String>::new(Some(socket), cap);
+                let connecting = SubscriberGroup::<ExampleTime, String>::new(Some(socket));
                 let connected = connecting.wait().unwrap();
                 let mut stream = connected.wait();
+
                 move |output| {
                     // subscriber will drop remaining capabilities once the publisher is drained
-                    if let Some(msg) = stream.next() {
-                        let (cap, data) = msg.unwrap();
-                        output.session(&cap)
-                              .give_iterator(data.into_iter());
+                    if let Some(event) = stream.next() {
+                        match event.unwrap() {
+                            SubscriptionEvent::Data(time, data) => {
+                                output.session(&capabilities.delayed(&time))
+                                  .give_iterator(data.into_iter());
+                            }
+                            SubscriptionEvent::FrontierUpdate => {
+                                capabilities.downgrade(stream.get_ref().frontier());
+                            }
+                        }
                     }
                 }
             }).capture()

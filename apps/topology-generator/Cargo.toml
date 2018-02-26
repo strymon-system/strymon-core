@@ -11,6 +11,11 @@ abomonation_derive = "0.2.2"
 serde = "1.0"
 serde_derive = "1.0"
 typename = "0.1"
+futures = "0.1"
+tokio-timer = "0.1"
 
-[dependencies.strymon_runtime]
-path = "../../src/strymon_runtime"
+[dependencies.strymon_job]
+path = "../../src/strymon_job"
+
+[dependencies.strymon_communication]
+path = "../../src/strymon_communication"

@@ -184,7 +184,7 @@ impl Coordinator {
                          name: &str,
                          stream: &Stream<S, D>,
                          partition: Partition)
-                         -> Result<(), PublicationError>
+                         -> Result<Stream<S, D>, PublicationError>
         where D: ExchangeData + Serialize + TypeName,
               S: Scope,
               S::Timestamp: RemoteTimestamp,
@@ -205,13 +205,15 @@ impl Coordinator {
             Publication::Remote
         };
 
-        if let Partition::Merge = partition {
-            stream.exchange(|_| PUBLISH_WORKER_ID).capture_into(publication);
+        let stream = if let Partition::Merge = partition {
+            stream.exchange(|_| PUBLISH_WORKER_ID)
         } else {
-            stream.capture_into(publication);
+            stream.clone()
         };
 
-        Ok(())
+        stream.capture_into(publication);
+
+        Ok(stream)
     }
 
     /// Submits a depublication request.
