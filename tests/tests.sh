@@ -10,7 +10,7 @@ STRYMON="${BINDIR}/strymon"
 ## Starts a local strymon tests instance, keeping artifacts in $OUTDIR
 start_strymon() {
     echo "localhost" > "${OUTDIR}/executors"
-    RUST_LOG="info,strymon_runtime=debug" "${BINDIR}/start-strymon.sh" -l "${OUTDIR}" -w "${OUTDIR}" -e "${OUTDIR}/executors"
+    RUST_LOG="info,strymon_coordinator=debug" "${BINDIR}/start-strymon.sh" -l "${OUTDIR}" -w "${OUTDIR}" -e "${OUTDIR}/executors"
 }
 
 ## Stops the strymon test instance

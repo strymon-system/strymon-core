@@ -9,6 +9,7 @@
 use std::ops::RangeFrom;
 use std::marker::PhantomData;
 
+#[derive(Debug, Clone)]
 pub struct Generator<T> {
     generator: RangeFrom<u64>,
     marker: PhantomData<T>,
@@ -24,5 +25,11 @@ impl<T: From<u64>> Generator<T> {
 
     pub fn generate(&mut self) -> T {
         From::from(self.generator.next().unwrap())
+    }
+}
+
+impl<T: From<u64>> Default for Generator<T> {
+    fn default() -> Self {
+        Generator::new()
     }
 }

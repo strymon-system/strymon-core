@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 use clap::{App, Arg, ArgMatches, SubCommand};
 
 use strymon_communication::Network;
-use strymon_runtime::submit::Submitter;
+use super::submit::Submitter;
 
 use errors::*;
 
