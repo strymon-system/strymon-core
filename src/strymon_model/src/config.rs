@@ -6,10 +6,10 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-//! Datatypes to represent the configuration of the various Strymon components.
+//! Data-types used to represent the configuration of the various Strymon components.
 
 pub mod job {
-    //! Configuration for job processes.
+    //! Configuration data passed down to job processes.
 
     use std::env;
     use std::num;
@@ -51,7 +51,8 @@ pub mod job {
                 addrs: env::var(PROCESS_ADDRS)?
                     .split('|')
                     .filter(|s| !s.is_empty())
-                    .map(String::from).collect(),
+                    .map(String::from)
+                    .collect(),
                 threads: env::var(PROCESS_THREADS)?.parse::<usize>()?,
                 coord: env::var(COORD)?,
                 hostname: env::var(HOSTNAME)?,
@@ -99,7 +100,9 @@ pub mod job {
     /// from the local environment.
     #[derive(Debug)]
     pub enum EnvError {
+        /// The configuration data could not be parsed because of a missing environment variable.
         VarErr(env::VarError),
+        /// The configuration data contained invalid numbers.
         IntErr(num::ParseIntError),
     }
 
