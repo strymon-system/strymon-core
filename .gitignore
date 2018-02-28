@@ -1,6 +1,7 @@
 target
 jobs
 logs
+.idea
 *~
 *.bk
 *.log
