@@ -9,10 +9,9 @@
 use std::env;
 
 use clap::{App, Arg, ArgMatches, SubCommand};
+use failure::*;
 
 use strymon_executor::Builder;
-
-use errors::*;
 
 pub mod start {
     use super::*;
@@ -20,33 +19,41 @@ pub mod start {
     pub fn usage<'a, 'b>() -> App<'a, 'b> {
         SubCommand::with_name("start-executor")
             .about("Start an instance of a Strymon executor")
-            .arg(Arg::with_name("port-range")
-                .short("p")
-                .long("port-range")
-                .value_name("MIN..MAX")
-                .help("Port range of spawned children on this executor")
-                .takes_value(true))
-            .arg(Arg::with_name("external-hostname")
-                .short("e")
-                .long("external-hostname")
-                .value_name("HOST")
-                .help("Externally reachable hostname of the spawned coordinator")
-                .takes_value(true))
-            .arg(Arg::with_name("coordinator")
-                .short("c")
-                .long("coordinator")
-                .value_name("ADDR")
-                .help("Address of the coordinator")
-                .takes_value(true))
-        .arg(Arg::with_name("workdir")
-                .short("w")
-                .long("workdir")
-                .takes_value(true)
-                .value_name("DIR")
-                .help("Working directory for storing job artifacts"))
+            .arg(
+                Arg::with_name("port-range")
+                    .short("p")
+                    .long("port-range")
+                    .value_name("MIN..MAX")
+                    .help("Port range of spawned children on this executor")
+                    .takes_value(true),
+            )
+            .arg(
+                Arg::with_name("external-hostname")
+                    .short("e")
+                    .long("external-hostname")
+                    .value_name("HOST")
+                    .help("Externally reachable hostname of the spawned coordinator")
+                    .takes_value(true),
+            )
+            .arg(
+                Arg::with_name("coordinator")
+                    .short("c")
+                    .long("coordinator")
+                    .value_name("ADDR")
+                    .help("Address of the coordinator")
+                    .takes_value(true),
+            )
+            .arg(
+                Arg::with_name("workdir")
+                    .short("w")
+                    .long("workdir")
+                    .takes_value(true)
+                    .value_name("DIR")
+                    .help("Working directory for storing job artifacts"),
+            )
     }
 
-    pub fn main(args: &ArgMatches) -> Result<()> {
+    pub fn main(args: &ArgMatches) -> Result<(), Error> {
         let mut executor = Builder::default();
 
         // host and port of the executor
@@ -78,6 +85,9 @@ pub mod start {
             executor.ports(min.unwrap(), max.unwrap());
         }
 
-        executor.start().chain_err(|| "Failed to start executor")
+        executor
+            .start()
+            .context("Failed to start executor")
+            .map_err(Error::from)
     }
 }

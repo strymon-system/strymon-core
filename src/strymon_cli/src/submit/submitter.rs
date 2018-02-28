@@ -36,12 +36,14 @@ impl Submitter {
         Ok(Submitter { coord, catalog })
     }
 
-    pub fn submit<N>(&self,
-                     query: QueryProgram,
-                     name: N,
-                     placement: Placement)
-                     -> Response<CoordinatorRPC, Submission>
-        where N: Into<Option<String>>
+    pub fn submit<N>(
+        &self,
+        query: QueryProgram,
+        name: N,
+        placement: Placement,
+    ) -> Response<CoordinatorRPC, Submission>
+    where
+        N: Into<Option<String>>,
     {
         let submission = Submission {
             query: query,
@@ -53,32 +55,33 @@ impl Submitter {
     }
 
     pub fn terminate(&self, id: QueryId) -> Response<CoordinatorRPC, Termination> {
-        let termination = Termination {
-            query: id,
-        };
+        let termination = Termination { query: id };
 
         self.coord.request(&termination)
     }
 
     pub fn topics(&self) -> Result<Vec<Topic>> {
-        self.catalog
-            .request(&AllTopics::new())
-            .wait()
-            .map_err(|err| err.unwrap_err())
+        self.catalog.request(&AllTopics::new()).wait().map_err(
+            |err| {
+                err.unwrap_err()
+            },
+        )
     }
 
     pub fn executors(&self) -> Result<Vec<Executor>> {
-        self.catalog
-            .request(&AllExecutors::new())
-            .wait()
-            .map_err(|err| err.unwrap_err())
+        self.catalog.request(&AllExecutors::new()).wait().map_err(
+            |err| {
+                err.unwrap_err()
+            },
+        )
     }
 
     pub fn queries(&self) -> Result<Vec<Query>> {
-        self.catalog
-            .request(&AllQueries::new())
-            .wait()
-            .map_err(|err| err.unwrap_err())
+        self.catalog.request(&AllQueries::new()).wait().map_err(
+            |err| {
+                err.unwrap_err()
+            },
+        )
     }
 
     pub fn publications(&self) -> Result<Vec<Publication>> {

@@ -7,11 +7,10 @@
 // except according to those terms.
 
 use clap::{App, AppSettings, ArgMatches, SubCommand};
+use failure::Error;
 
 mod coordinator;
 mod executor;
-
-use errors::*;
 
 pub fn usage<'a, 'b>() -> App<'a, 'b> {
     SubCommand::with_name("manage")
@@ -22,7 +21,7 @@ pub fn usage<'a, 'b>() -> App<'a, 'b> {
         .subcommand(executor::start::usage())
 }
 
-pub fn main(args: &ArgMatches) -> Result<()> {
+pub fn main(args: &ArgMatches) -> Result<(), Error> {
     match args.subcommand() {
         ("start-coordinator", Some(args)) => coordinator::start::main(args),
         ("start-executor", Some(args)) => executor::start::main(args),

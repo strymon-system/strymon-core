@@ -62,7 +62,7 @@ impl Dispatch {
             AddExecutor::NAME => {
                 let (req, resp) = req.decode::<AddExecutor>()?;
                 let id = self.coord.add_executor(req, self.tx.clone());
-                resp.respond(Ok((id)));
+                resp.respond(Ok(id));
             }
             Publish::NAME => {
                 let (req, resp) = req.decode::<Publish>()?;
