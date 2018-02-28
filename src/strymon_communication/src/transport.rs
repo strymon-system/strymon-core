@@ -33,7 +33,7 @@
 //! use strymon_communication::message::MessageBuf;
 //!
 //! fn run_example() -> io::Result<String> {
-//!     let network = Network::init()?;
+//!     let network = Network::new(String::from("localhost"))?;
 //!     let listener = network.listen(None)?;
 //!     let (_, port) = listener.external_addr();
 //!     thread::spawn(move || {
@@ -298,7 +298,7 @@ mod tests {
     #[test]
     fn network_integration() {
         assert_io(|| {
-            let network = Network::init()?;
+            let network = Network::new(None)?;
             let listener = network.listen(None)?;
             let (tx, rx) = network.connect(listener.external_addr())?;
 

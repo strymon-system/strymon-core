@@ -22,7 +22,6 @@ extern crate strymon_communication;
 
 use std::fs;
 use std::io::Error;
-use std::env;
 use std::path::PathBuf;
 use std::ffi::OsStr;
 
@@ -146,23 +145,28 @@ pub struct Builder {
     coord: String,
     ports: (u16, u16),
     workdir: PathBuf,
+    hostname: Option<String>,
 }
 
 impl Builder {
-    pub fn host(&mut self, host: String) {
-        env::set_var("TIMELY_SYSTEM_HOSTNAME", host);
+    pub fn hostname(&mut self, host: String) -> &mut Self {
+        self.hostname = Some(host);
+        self
     }
 
-    pub fn coordinator(&mut self, coord: String) {
+    pub fn coordinator(&mut self, coord: String) -> &mut Self {
         self.coord = coord;
+        self
     }
 
-    pub fn ports(&mut self, min: u16, max: u16) {
+    pub fn ports(&mut self, min: u16, max: u16) -> &mut Self {
         self.ports = (min, max);
+        self
     }
 
-    pub fn workdir<P: AsRef<OsStr>>(&mut self, workdir: &P) {
+    pub fn workdir<P: AsRef<OsStr>>(&mut self, workdir: &P) -> &mut Self {
         self.workdir = PathBuf::from(workdir);
+        self
     }
 }
 
@@ -171,7 +175,8 @@ impl Default for Builder {
         Builder {
             coord: String::from("localhost:9189"),
             ports: (2101, 4101),
-            workdir: PathBuf::from("jobs")
+            workdir: PathBuf::from("jobs"),
+            hostname: None,
         }
     }
 }
@@ -195,8 +200,8 @@ fn setup_termination_handler(handle: &Handle) -> Box<Future<Item=(), Error=Error
 
 impl Builder {
     pub fn start(self) -> Result<(), Error> {
-        let Builder { ports, coord, workdir } = self;
-        let network = Network::init()?;
+        let Builder { ports, coord, workdir, hostname } = self;
+        let network = Network::new(hostname)?;
         let host = network.hostname();
         let (tx, rx) = network.client::<ExecutorRPC, _>(&*coord)?;
 

@@ -18,27 +18,24 @@ use Network;
 impl Network {
     /// Creates a new default network handle.
     ///
-    /// This will try to use the externally reachable hostname of the current
-    /// process by reading the `STRYMON_COMM_HOSTNAME` environment variable. It will
-    /// fall-back to `"localhost"` if the environment variable is not available.
-    pub fn init() -> io::Result<Self> {
+    /// The `hostname` argument should be set to an externally reachable
+    /// hostname of the current process. If it is `None`, this constructor
+    /// will try to retrieve it by reading the `STRYMON_COMM_HOSTNAME` environment
+    /// variable. If both the argument and the environment variable are missing,
+    /// it falls back to `"localhost"`.
+    pub fn new<T: Into<Option<String>>>(hostname: T) -> io::Result<Self> {
         // try to guess external hostname
-        let hostname = if let Ok(hostname) = env::var("TIMELY_SYSTEM_HOSTNAME") {
-            hostname
-        } else if let Ok(hostname) = env::var("STRYMON_COMM_HOSTNAME") {
-            hostname
+        let hostname = if let Some(hostname_arg) = hostname.into() {
+            hostname_arg
+        } else if let Ok(hostname_env) = env::var("STRYMON_COMM_HOSTNAME") {
+            hostname_env
         } else {
             warn!("unable to retrieve external hostname of machine.");
-            warn!("falling back to 'localhost', set TIMELY_SYSTEM_HOSTNAME to override");
+            warn!("falling back to 'localhost', set STRYMON_COMM_HOSTNAME to override");
 
             String::from("localhost")
         };
 
-        Network::with_hostname(hostname)
-    }
-
-    /// Creates a new instance with a set externally reachable hostname.
-    pub fn with_hostname(hostname: String) -> io::Result<Self> {
         Ok(Network {
             hostname: Arc::new(hostname),
         })

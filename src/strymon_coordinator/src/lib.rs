@@ -17,7 +17,6 @@ extern crate strymon_model;
 extern crate strymon_communication;
 
 use std::io::Result;
-use std::env;
 
 use futures::future::Future;
 use futures::stream::Stream;
@@ -39,27 +38,30 @@ mod util;
 
 pub struct Builder {
     port: u16,
+    hostname: Option<String>,
 }
 
 impl Builder {
-    pub fn host(&mut self, host: String) {
-        env::set_var("TIMELY_SYSTEM_HOSTNAME", host);
+    pub fn hostname(&mut self, hostname: String) -> &mut Self {
+        self.hostname = Some(hostname);
+        self
     }
 
-    pub fn port(&mut self, port: u16) {
+    pub fn port(&mut self, port: u16) -> &mut Self {
         self.port = port;
+        self
     }
 }
 
 impl Default for Builder {
     fn default() -> Self {
-        Builder { port: 9189 }
+        Builder { port: 9189, hostname: None }
     }
 }
 
 impl Builder {
     pub fn run(self) -> Result<()> {
-        let network = Network::init()?;
+        let network = Network::new(self.hostname)?;
         let server = network.server::<CoordinatorRPC, _>(self.port)?;
 
         let mut core = Core::new()?;
