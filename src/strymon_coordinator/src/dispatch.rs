@@ -87,20 +87,6 @@ impl Dispatch {
                 let (Lookup { name }, resp) = req.decode::<Lookup>()?;
                 resp.respond(self.coord.lookup(&name));
             }
-            AddKeeperWorker::NAME => {
-                let (AddKeeperWorker { name, worker_num, addr }, resp) =
-                    req.decode::<AddKeeperWorker>()?;
-                resp.respond(self.coord.add_keeper_worker(name, worker_num, addr));
-            }
-            GetKeeperAddress::NAME => {
-                let (GetKeeperAddress { name }, resp) = req.decode::<GetKeeperAddress>()?;
-                resp.respond(self.coord.get_keeper_address(name));
-            }
-            RemoveKeeperWorker::NAME => {
-                let (RemoveKeeperWorker { name, worker_num }, resp) =
-                    req.decode::<RemoveKeeperWorker>()?;
-                resp.respond(self.coord.remove_keeper_worker(name, worker_num));
-            }
         }
 
         Ok(())

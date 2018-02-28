@@ -25,9 +25,6 @@ pub enum CoordinatorRPC {
     Publish = 7,
     Unpublish = 8,
     Lookup = 9,
-    AddKeeperWorker = 10,
-    GetKeeperAddress = 11,
-    RemoveKeeperWorker = 12,
 }
 
 impl Name for CoordinatorRPC {
@@ -219,61 +216,4 @@ impl Request<CoordinatorRPC> for Lookup {
     type Error = ();
 
     const NAME: CoordinatorRPC = CoordinatorRPC::Lookup;
-}
-
-/// Add a worker of a Keeper.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct AddKeeperWorker {
-    pub name: String,
-    pub worker_num: usize,
-    pub addr: (String, u16),
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum AddKeeperWorkerError {
-    WorkerAlreadyExists,
-}
-
-impl Request<CoordinatorRPC> for AddKeeperWorker {
-    type Success = ();
-    type Error = AddKeeperWorkerError;
-
-    const NAME: CoordinatorRPC = CoordinatorRPC::AddKeeperWorker;
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct GetKeeperAddress {
-    pub name: String,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum GetKeeperAddressError {
-    KeeperNotFound,
-    KeeperHasNoWorkers,
-}
-
-impl Request<CoordinatorRPC> for GetKeeperAddress {
-    type Success = (String, u16);
-    type Error = GetKeeperAddressError;
-
-    const NAME: CoordinatorRPC = CoordinatorRPC::GetKeeperAddress;
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct RemoveKeeperWorker {
-    pub name: String,
-    pub worker_num: usize,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum RemoveKeeperWorkerError {
-    KeeperDoesntExist,
-    KeeperWorkerDoesntExist,
-}
-
-impl Request<CoordinatorRPC> for RemoveKeeperWorker {
-    type Success = ();
-    type Error = RemoveKeeperWorkerError;
-
-    const NAME: CoordinatorRPC = CoordinatorRPC::RemoveKeeperWorker;
 }
