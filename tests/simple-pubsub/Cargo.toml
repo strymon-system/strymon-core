@@ -4,7 +4,7 @@ name = "simple-pubsub"
 version = "0.1.0"
 
 [dependencies]
-timely = "0.3.0"
+timely = "0.5"
 serde = "1"
 serde_derive = "1"
 typename = "0.1"

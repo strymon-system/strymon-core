@@ -11,7 +11,7 @@ extern crate timely;
 extern crate differential_dataflow;
 extern crate topology_generator;
 
-use differential_dataflow::operators::{Count, Distinct, Group, Iterate, Join};
+use differential_dataflow::operators::{Count, Threshold, Group, Iterate, Join};
 use differential_dataflow::collection::AsCollection;
 
 use timely::dataflow::operators::{Capability, CapabilitySet, Map, UnorderedInput};

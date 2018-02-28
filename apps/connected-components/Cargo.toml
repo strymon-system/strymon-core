@@ -4,8 +4,8 @@ version = "0.1.1"
 authors = ["Sebastian Wicki <swicki@inf.ethz.ch>"]
 
 [dependencies]
-timely = "0.3.0"
-differential-dataflow = "0.2.0"
+timely = "0.5"
+differential-dataflow = "0.5"
 
 [dependencies.strymon_job]
 path = "../../src/strymon_job"

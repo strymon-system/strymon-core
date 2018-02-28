@@ -5,9 +5,9 @@ version = "0.1.1"
 
 [dependencies]
 rand = "0.3.17"
-timely = "0.3.0"
-abomonation = "0.4.6"
-abomonation_derive = "0.2.2"
+timely = "0.5"
+abomonation = "0.5"
+abomonation_derive = "0.3"
 serde = "1.0"
 serde_derive = "1.0"
 typename = "0.1"

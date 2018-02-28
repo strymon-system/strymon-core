@@ -1,11 +1,11 @@
 [[package]]
 name = "abomonation"
-version = "0.4.6"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "abomonation_derive"
-version = "0.2.3"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "quote 0.3.15 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -118,21 +118,22 @@ dependencies = [
 name = "connected_components"
 version = "0.1.1"
 dependencies = [
- "differential-dataflow 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "differential-dataflow 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "strymon_job 0.1.2",
- "timely 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "timely 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "topology_generator 0.1.1",
 ]
 
 [[package]]
 name = "differential-dataflow"
-version = "0.2.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "abomonation 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "abomonation 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "abomonation_derive 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "timely 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "timely_communication 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "timely 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "timely_communication 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "timely_sort 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -489,7 +490,7 @@ dependencies = [
  "serde_derive 1.0.27 (registry+https://github.com/rust-lang/crates.io-index)",
  "strymon_communication 0.1.2",
  "strymon_job 0.1.2",
- "timely 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "timely 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "typename 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -591,8 +592,8 @@ dependencies = [
  "strymon_communication 0.1.2",
  "strymon_model 0.1.2",
  "strymon_rpc 0.1.2",
- "timely 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "timely_communication 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "timely 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "timely_communication 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-core 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "typename 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -601,8 +602,8 @@ dependencies = [
 name = "strymon_model"
 version = "0.1.2"
 dependencies = [
- "abomonation 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "abomonation_derive 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "abomonation 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "abomonation_derive 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.27 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.27 (registry+https://github.com/rust-lang/crates.io-index)",
  "typename 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -695,23 +696,26 @@ dependencies = [
 
 [[package]]
 name = "timely"
-version = "0.3.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "abomonation 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "abomonation 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "abomonation_derive 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "byteorder 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "time 0.1.39 (registry+https://github.com/rust-lang/crates.io-index)",
- "timely_communication 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "timely_sort 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "timely_communication 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "timely_communication"
-version = "0.1.8"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "abomonation 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "abomonation 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "abomonation_derive 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "byteorder 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "getopts 0.2.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "time 0.1.39 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -786,15 +790,15 @@ dependencies = [
 name = "topology_generator"
 version = "0.1.1"
 dependencies = [
- "abomonation 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "abomonation_derive 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "abomonation 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "abomonation_derive 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.3.20 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.27 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.27 (registry+https://github.com/rust-lang/crates.io-index)",
  "strymon_communication 0.1.2",
  "strymon_job 0.1.2",
- "timely 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "timely 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-timer 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "typename 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -897,8 +901,8 @@ dependencies = [
 ]
 
 [metadata]
-"checksum abomonation 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)" = "26765ff23842b7519e3de7e3ca80a9f27e15e9f685955af921fdfeca2f83ef55"
-"checksum abomonation_derive 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "14d69de2fdfb087f38fe69a6bd55d7801962a8ec2d59cc70e0694cd73ff627d3"
+"checksum abomonation 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "fb19df531d6a4acddb132d699a4487425c6ca3378d5d64cf556a5d1455d104a6"
+"checksum abomonation_derive 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "e0bb1889db0b87cd8ef839c56b5283e28c8db68cac904b400a6170c9af1e673c"
 "checksum aho-corasick 0.6.4 (registry+https://github.com/rust-lang/crates.io-index)" = "d6531d44de723825aa81398a6415283229725a00fa30713812ab9323faa82fc4"
 "checksum ansi_term 0.10.2 (registry+https://github.com/rust-lang/crates.io-index)" = "6b3568b48b7cefa6b8ce125f9bb4989e52fbcc29ebea88df04cc7c5f12f70455"
 "checksum atty 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)" = "8352656fd42c30a0c3c89d26dea01e3b77c0ab2af18230835c15e2e13cd51859"
@@ -912,7 +916,7 @@ dependencies = [
 "checksum cfg-if 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "d4c819a1287eb618df47cc647173c5c4c66ba19d888a6e50d605672aed3140de"
 "checksum chrono 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "7c20ebe0b2b08b0aeddba49c609fe7957ba2e33449882cb186a180bc60682fa9"
 "checksum clap 2.29.2 (registry+https://github.com/rust-lang/crates.io-index)" = "4151c5790817c7d21bbdc6c3530811f798172915f93258244948b93ba19604a6"
-"checksum differential-dataflow 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "d94bf0d387d0b632f1ad5b0696fe93f2506bb66c84537f3b32415cab7f42fcea"
+"checksum differential-dataflow 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "9f7ddbd17c2703dce1ef6ec61a16f3fe00f823d3235a383b607e872a10101afe"
 "checksum dtoa 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)" = "09c3753c3db574d215cba4ea76018483895d7bff25a31b49ba45db21c48e50ab"
 "checksum enum-primitive-derive 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "e2b90e520ec62c1864c8c78d637acbfe8baf5f63240f2fb8165b8325c07812dd"
 "checksum env_logger 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)" = "f15f0b172cb4f52ed5dbf47f774a387cd2315d1bf7894ab5af9b083ae27efa5a"
@@ -967,8 +971,8 @@ dependencies = [
 "checksum textwrap 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "c0b59b6b4b44d867f1370ef1bd91bfb262bf07bf0ae65c202ea2fbc16153b693"
 "checksum thread_local 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)" = "279ef31c19ededf577bfd12dfae728040a21f635b06a24cd670ff510edd38963"
 "checksum time 0.1.39 (registry+https://github.com/rust-lang/crates.io-index)" = "a15375f1df02096fb3317256ce2cee6a1f42fc84ea5ad5fc8c421cfe40c73098"
-"checksum timely 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "79f467f32dceab949b7e05c2315a2b88dfc760e375b6ac49c7cf5c6fe64fc683"
-"checksum timely_communication 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)" = "122bfb9de98e5a2bc200ea5cc7e0b147ff0816dbc0eecd8fd32ae4c39a0e274a"
+"checksum timely 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "88f9665ba23adad1d01576ae053e585dcb4d87973074b5205f06bc65986d610b"
+"checksum timely_communication 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "400f700a4427dc4ecc565b2a37a22cef3e17fae32284dd3dc03299ab200ad75d"
 "checksum timely_sort 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)" = "f6e4b497ab85f6e09ea309d696342d198e444e93a4a55500bf3b0c3c53bdd4b3"
 "checksum tokio-core 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)" = "52b4e32d8edbf29501aabb3570f027c6ceb00ccef6538f4bddba0200503e74e8"
 "checksum tokio-io 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "514aae203178929dbf03318ad7c683126672d4d96eccb77b29603d33c9e25743"
