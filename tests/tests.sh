@@ -60,8 +60,8 @@ test_pubsub() {
      pub_id=$(submit --bin publisher "${BASEDIR}/simple-pubsub")
      # wait for subscriber to receive some tuples
      wait_job_output "${sub_id}" 'Subscriber received [0-9]+ batches'
-     terminate "${pub_id}"
      terminate "${sub_id}"
+     terminate "${pub_id}"
 }
 
 ## Partitioned publish-subscribe protocol
@@ -70,8 +70,8 @@ test_partitioned_pubsub() {
      pub_id=$(submit --bin multipub --workers 4 "${BASEDIR}/simple-pubsub")
      # wait for subscriber to receive some tuples
      wait_job_output "${sub_id}" 'Subscriber received [0-9]+ batches'
-     terminate "${pub_id}"
      terminate "${sub_id}"
+     terminate "${pub_id}"
 }
 
 ## Test for the example from the documentation
