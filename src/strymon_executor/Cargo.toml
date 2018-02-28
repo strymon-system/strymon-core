@@ -1,0 +1,23 @@
+[package]
+name = "strymon_executor"
+version = "0.1.0"
+authors = ["Sebastian Wicki <swicki@inf.ethz.ch>"]
+
+[dependencies]
+futures = "0.1"
+libc = "0.2"
+time = "0.1"
+log = "0.4"
+tokio-io = "0.1"
+tokio-core = "0.1"
+tokio-process = "0.1"
+tokio-signal = "0.1"
+
+[dependencies.strymon_communication]
+path = "../strymon_communication/"
+
+[dependencies.strymon_model]
+path = "../strymon_model/"
+
+[dependencies.strymon_rpc]
+path = "../strymon_rpc/"

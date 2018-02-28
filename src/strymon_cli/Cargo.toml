@@ -1,30 +1,20 @@
 [package]
 authors = ["Sebastian Wicki <swicki@inf.ethz.ch>"]
-name = "strymon_runtime"
+name = "strymon_cli"
 version = "0.1.2"
 
 [[bin]]
 name = "strymon"
-path = "src/bin/main.rs"
+path = "src/main.rs"
 
 [dependencies]
 clap = "2.29"
+log = "0.4"
 env_logger = "0.5"
 error-chain = "0.11.0"
 futures = "0.1"
-libc = "0.2"
-log = "0.4"
-rand = "0.3"
 serde = "1.0"
 serde_json = "1.0"
-time = "0.1"
-timely = "0.3.0"
-timely_communication = "0.1.8"
-tokio-io = "0.1"
-tokio-core = "0.1"
-tokio-process = "0.1"
-tokio-signal = "0.1"
-typename = "0.1"
 
 [dependencies.strymon_communication]
 path = "../strymon_communication/"
@@ -34,3 +24,9 @@ path = "../strymon_model/"
 
 [dependencies.strymon_rpc]
 path = "../strymon_rpc/"
+
+[dependencies.strymon_coordinator]
+path = "../strymon_coordinator/"
+
+[dependencies.strymon_executor]
+path = "../strymon_executor/"

@@ -15,8 +15,10 @@ extern crate log;
 extern crate env_logger;
 extern crate serde;
 extern crate serde_json;
+extern crate futures;
 
-extern crate strymon_runtime;
+extern crate strymon_executor;
+extern crate strymon_coordinator;
 extern crate strymon_communication;
 extern crate strymon_model;
 extern crate strymon_rpc;

@@ -6,15 +6,28 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+#[macro_use]
+extern crate log;
+extern crate libc;
+extern crate time;
+extern crate futures;
+extern crate tokio_core;
+extern crate tokio_io;
+extern crate tokio_process;
+extern crate tokio_signal;
+
+extern crate strymon_model;
+extern crate strymon_rpc;
+extern crate strymon_communication;
+
 use std::fs;
 use std::io::Error;
 use std::env;
 use std::path::PathBuf;
 use std::ffi::OsStr;
 
-use time::{self, Timespec};
+use time::Timespec;
 
-use futures;
 use futures::future::Future;
 use futures::stream::Stream;
 use tokio_core::reactor::{Core, Handle};

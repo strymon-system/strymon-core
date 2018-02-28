@@ -6,11 +6,13 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+
+use std::io;
+use std::mem;
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::collections::btree_map::Entry;
 use std::rc::{Rc, Weak};
 use std::cell::RefCell;
-use std::mem;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use futures::{self, Future};
@@ -20,13 +22,15 @@ use tokio_core::reactor::Handle;
 
 use rand;
 
-use strymon_communication::rpc::{Outgoing, Response};
+use strymon_communication::rpc::{Outgoing, Response, RequestBuf};
 
 use strymon_model::*;
 use strymon_rpc::executor::*;
 
 use strymon_rpc::coordinator::*;
-use coordinator::catalog::Catalog;
+use strymon_rpc::coordinator::catalog::CatalogRPC;
+
+use catalog::Catalog;
 
 use super::util::Generator;
 
@@ -779,6 +783,10 @@ impl CoordinatorRef {
                                 -> Result<(), RemoveKeeperWorkerError> {
         trace!("incoming RemoveKeeperWorker {{ name: {:?}, worker_num: {:?} }}", name, worker_num);
         self.coord.borrow_mut().remove_keeper_worker(name, worker_num)
+    }
+
+    pub fn catalog_request(&self, req: RequestBuf<CatalogRPC>) -> io::Result<()> {
+        self.coord.borrow().catalog.request(req)
     }
 }
 

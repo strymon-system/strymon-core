@@ -6,10 +6,19 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+#[macro_use]
+extern crate log;
+extern crate rand;
+extern crate futures;
+extern crate tokio_core;
+
+extern crate strymon_rpc;
+extern crate strymon_model;
+extern crate strymon_communication;
+
 use std::io::Result;
 use std::env;
 
-use futures;
 use futures::future::Future;
 use futures::stream::Stream;
 use tokio_core::reactor::Core;
@@ -55,10 +64,19 @@ impl Builder {
 
         let mut core = Core::new()?;
         let handle = core.handle();
+        let (catalog_addr, catalog_service) = catalog::Service::new(&network, &handle)?;
+
         let coordinate = futures::lazy(move || {
-            // TODO(swicki) we should return an I/O error instead
-            let catalog = Catalog::new(&network, &handle).expect("failed to create catalog");
+            let catalog = Catalog::new(catalog_addr);
             let coord = Coordinator::new(catalog, handle.clone());
+
+            // dispatch requests for the catalog
+            let catalog_coord = coord.clone();
+            handle.spawn(catalog_service.for_each(move |req| {
+                catalog_coord.catalog_request(req).map_err(|err| {
+                    error!("Invalid catalog request: {:?}", err)
+                })
+            }));
 
             server.for_each(move |(tx, rx)| {
                 // every connection gets its own handle

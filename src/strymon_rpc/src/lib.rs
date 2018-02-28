@@ -14,6 +14,9 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 
+#[macro_use]
+extern crate typename;
+
 extern crate strymon_communication;
 extern crate strymon_model;
 

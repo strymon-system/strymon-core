@@ -10,7 +10,7 @@ use std::env;
 
 use clap::{App, Arg, ArgMatches, SubCommand};
 
-use strymon_runtime::executor;
+use strymon_executor::Builder;
 
 use errors::*;
 
@@ -47,7 +47,7 @@ pub mod start {
     }
 
     pub fn main(args: &ArgMatches) -> Result<()> {
-        let mut executor = executor::Builder::default();
+        let mut executor = Builder::default();
 
         // host and port of the executor
         if let Some(addr) = args.value_of("coordinator") {

@@ -8,7 +8,7 @@
 
 use clap::{App, Arg, ArgMatches, SubCommand};
 
-use strymon_runtime::coordinator;
+use strymon_coordinator::Builder;
 
 use errors::*;
 
@@ -33,7 +33,7 @@ pub mod start {
     }
 
     pub fn main(args: &ArgMatches) -> Result<()> {
-        let mut coordinator = coordinator::Builder::default();
+        let mut coordinator = Builder::default();
 
         if let Some(port) = args.value_of("port") {
             let parsed = port.parse::<u16>()
