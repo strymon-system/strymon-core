@@ -34,8 +34,6 @@ pub struct Catalog {
 
     publications: HashSet<Publication>,
     subscriptions: HashSet<Subscription>,
-
-    keepers: HashMap<KeeperId, Keeper>,
 }
 
 impl Catalog {
@@ -154,27 +152,6 @@ impl Catalog {
         debug!("unsubscribe: {:?}", subscription);
         self.subscriptions.remove(&subscription);
         Ok(())
-    }
-
-    pub fn add_keeper(&mut self, keeper: Keeper) {
-        self.keepers.insert(keeper.id, keeper);
-    }
-
-    pub fn add_keeper_worker(&mut self,
-                             keeper_id: &KeeperId,
-                             worker_num: usize,
-                             addr: (String, u16)) -> Result<(), String> {
-        let mut keeper = match self.keepers.remove(keeper_id) {
-            Some(keeper) => keeper,
-            None => return Err("No such Keeper".to_string()),
-        };
-        keeper.workers.push((worker_num, addr));
-        self.keepers.insert(keeper.id, keeper);
-        Ok(())
-    }
-
-    pub fn remove_keeper(&mut self, id: &KeeperId) -> Option<Keeper> {
-        self.keepers.remove(id)
     }
 
     pub fn request(&self, req: RequestBuf<CatalogRPC>) -> io::Result<()> {

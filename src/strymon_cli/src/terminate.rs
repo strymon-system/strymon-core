@@ -30,7 +30,7 @@ pub fn usage<'a, 'b>() -> App<'a, 'b> {
 }
 
 pub fn main(args: &ArgMatches) -> Result<()> {
-    let network = Network::init()?;
+    let network = Network::new(None)?;
     let coord = args.value_of("coordinator").unwrap_or("localhost:9189");
     let submitter = Submitter::new(&network, &*coord)?;
 

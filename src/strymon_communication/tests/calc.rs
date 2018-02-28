@@ -111,7 +111,7 @@ fn calc_server(network: &Network) -> io::Result<u16> {
 }
 
 fn run_client() -> io::Result<()> {
-    let network = Network::with_hostname(String::from("localhost"))?;
+    let network = Network::new(String::from("localhost"))?;
     let port = calc_server(&network)?;
 
     // this client only acts as a sender

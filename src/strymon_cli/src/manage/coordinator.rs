@@ -43,7 +43,7 @@ pub mod start {
 
         // externally reachable hostname of the coordinator
         if let Some(host) = args.value_of("external-hostname") {
-            coordinator.host(host.to_owned());
+            coordinator.hostname(host.to_owned());
         }
 
         coordinator.run().chain_err(|| "Failed to run coordinator")

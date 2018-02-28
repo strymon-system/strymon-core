@@ -91,7 +91,7 @@ pub struct Coordinator {
 impl Coordinator {
     /// Registers the local job at the coordinator at address `coord`.
     fn initialize(id: QueryId, process: usize, coord: String, hostname: String) -> io::Result<Self> {
-        let network = Network::with_hostname(hostname)?;
+        let network = Network::new(Some(hostname))?;
         let (tx, _) = network.client::<CoordinatorRPC, _>(&*coord)?;
 
         let announce = tx.request(&AddWorkerGroup {
@@ -207,7 +207,7 @@ mod tests {
 
     #[test]
     fn raw_publisher() {
-        let network = Network::with_hostname("localhost".to_string()).unwrap();
+        let network = Network::new("localhost".to_string()).unwrap();
         let addr = publisher_thread(&network);
 
         use timely::dataflow::operators::generic::operator::source;

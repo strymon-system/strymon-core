@@ -56,14 +56,14 @@ pub mod start {
 
         // externally reachable hostname of this executor
         if let Some(host) = args.value_of("external-hostname") {
-            executor.host(host.to_owned());
+            executor.hostname(String::from(host));
         }
 
         // workdir outside of current working directory
         if let Some(path) = args.value_of("workdir") {
-            executor.workdir(&path)
+            executor.workdir(&path);
         } else if let Some(path) = env::var_os("STRYMON_WORKDIR") {
-            executor.workdir(&path)
+            executor.workdir(&path);
         }
 
         // parse port range to be used for spawned Timely processes

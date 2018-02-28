@@ -7,7 +7,6 @@
 // except according to those terms.
 
 
-use std::env;
 use std::path::Path;
 use std::ffi::OsStr;
 
@@ -81,13 +80,10 @@ fn submit_binary(binary: String, args: &ArgMatches) -> Result<QueryId> {
     let desc = args.value_of("description").map(String::from);
 
     // external hostname
-    if let Some(host) = args.value_of("external-hostname") {
-        env::set_var("TIMELY_SYSTEM_HOSTNAME", host);
-    }
-
-    // initialize the connection to the cluster
-    let network = Network::init()
+    let hostname = args.value_of("external-hostname").map(String::from);
+    let network = Network::new(hostname)
         .chain_err(|| "Failed to initialize network")?;
+
     let submitter = Submitter::new(&network, &*coord)
         .chain_err(|| "Unable to connect to coordinator")?;
     let executors = submitter.executors()
@@ -135,7 +131,7 @@ static AFTER_HELP: &'static str = "
 By default, the submitted binary is uploaded using a randomly selected TCP port. \
 For this reason, the external hostname of the local machine must be known. \
 Either using the `--external-hostname` option, or by setting the \
-TIMELY_SYSTEM_HOSTNAME environment variable. This functionality can be disabled \
+STRYMON_COMM_HOSTNAME environment variable. This functionality can be disabled \
 by using the `--no-upload` option.
 
 The `--placement-strategy` argument is used to specify to which machines the \
