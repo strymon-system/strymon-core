@@ -112,7 +112,9 @@ pub enum Message<T, D> {
 }
 
 impl<T, D> Message<T, D>
-    where T: RemoteTimestamp, D: Serialize
+where
+    T: RemoteTimestamp,
+    D: Serialize,
 {
     // Encodes a new `LowerFrontierUpdate` message.
     pub fn frontier_update(update: Vec<(T, i64)>) -> io::Result<MessageBuf> {
@@ -133,7 +135,9 @@ impl<T, D> Message<T, D>
 }
 
 impl<T, D> Message<T, D>
-    where T: RemoteTimestamp, D: de::DeserializeOwned
+where
+    T: RemoteTimestamp,
+    D: de::DeserializeOwned,
 {
     /// Partially decodes a `MessageBuf` into a `Message`
     ///
@@ -141,18 +145,19 @@ impl<T, D> Message<T, D>
     pub fn decode(mut msg: MessageBuf) -> io::Result<Self> {
         let msg = match msg.pop::<MessageTag>()? {
             MessageTag::LowerFrontierUpdate => {
-                Message::LowerFrontierUpdate {
-                    update: msg.pop::<RemoteUpdate<T>>()?.update,
-                }
-            },
+                Message::LowerFrontierUpdate { update: msg.pop::<RemoteUpdate<T>>()?.update }
+            }
             MessageTag::DataMessage => {
                 Message::DataMessage {
                     time: msg.pop::<RemoteTime<T>>()?.time,
                     data: Data::<D>::new(msg),
                 }
-            },
+            }
             tag => {
-                let desc = format!("expected `LowerFrontierUpdate` or `DataMessage`, got `{:?}`", tag);
+                let desc = format!(
+                    "expected `LowerFrontierUpdate` or `DataMessage`, got `{:?}`",
+                    tag
+                );
                 return Err(io::Error::new(io::ErrorKind::InvalidData, desc));
             }
         };
@@ -169,9 +174,7 @@ struct RemoteFrontier<'a, T: RemoteTimestamp + 'a> {
 
 impl<'a, T: RemoteTimestamp + 'a> From<&'a [T]> for RemoteFrontier<'a, T> {
     fn from(borrowed: &'a [T]) -> Self {
-        RemoteFrontier {
-            frontier: Cow::Borrowed(borrowed),
-        }
+        RemoteFrontier { frontier: Cow::Borrowed(borrowed) }
     }
 }
 
@@ -209,18 +212,23 @@ mod remote_frontier {
     use super::*;
 
     pub fn serialize<'a, S, T>(field: &Cow<'a, [T]>, ser: S) -> Result<S::Ok, S::Error>
-        where S: ser::Serializer, T: RemoteTimestamp + 'a
+    where
+        S: ser::Serializer,
+        T: RemoteTimestamp + 'a,
     {
         ser.collect_seq(field.iter().map(|t| t.to_remote()))
     }
 
     pub fn deserialize<'de, 'a, D, T>(de: D) -> Result<Cow<'a, [T]>, D::Error>
-        where D: de::Deserializer<'de>, T: RemoteTimestamp + 'a
+    where
+        D: de::Deserializer<'de>,
+        T: RemoteTimestamp + 'a,
     {
         struct RemoteFrontierVisitor<T>(PhantomData<T>);
 
         impl<'de, T> de::Visitor<'de> for RemoteFrontierVisitor<T>
-            where T: RemoteTimestamp
+        where
+            T: RemoteTimestamp,
         {
             type Value = Vec<T>;
 
@@ -229,7 +237,8 @@ mod remote_frontier {
             }
 
             fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-                where A: de::SeqAccess<'de>,
+            where
+                A: de::SeqAccess<'de>,
             {
                 let cap = seq.size_hint().unwrap_or(1);
                 let mut frontier = Vec::with_capacity(cap);
@@ -249,18 +258,23 @@ mod remote_update {
     use super::*;
 
     pub fn serialize<S, T>(field: &Vec<(T, i64)>, ser: S) -> Result<S::Ok, S::Error>
-        where S: ser::Serializer, T: RemoteTimestamp
+    where
+        S: ser::Serializer,
+        T: RemoteTimestamp,
     {
         ser.collect_seq(field.iter().map(|&(ref t, i)| (t.to_remote(), i)))
     }
 
     pub fn deserialize<'de, D, T>(de: D) -> Result<Vec<(T, i64)>, D::Error>
-        where D: de::Deserializer<'de>, T: RemoteTimestamp
+    where
+        D: de::Deserializer<'de>,
+        T: RemoteTimestamp,
     {
         struct RemoteUpdateVisitor<T>(PhantomData<T>);
 
         impl<'de, T> de::Visitor<'de> for RemoteUpdateVisitor<T>
-            where T: RemoteTimestamp
+        where
+            T: RemoteTimestamp,
         {
             type Value = Vec<(T, i64)>;
 
@@ -269,7 +283,8 @@ mod remote_update {
             }
 
             fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-                where A: de::SeqAccess<'de>,
+            where
+                A: de::SeqAccess<'de>,
             {
                 let cap = seq.size_hint().unwrap_or(1);
                 let mut update = Vec::with_capacity(cap);
@@ -288,13 +303,17 @@ mod remote_timestamp {
     use super::*;
 
     pub fn serialize<'a, S, T>(field: &T, ser: S) -> Result<S::Ok, S::Error>
-        where S: ser::Serializer, T: RemoteTimestamp + 'a
+    where
+        S: ser::Serializer,
+        T: RemoteTimestamp + 'a,
     {
         Serialize::serialize(&field.to_remote(), ser)
     }
 
     pub fn deserialize<'de, 'a, D, T>(de: D) -> Result<T, D::Error>
-        where D: de::Deserializer<'de>, T: RemoteTimestamp + 'a
+    where
+        D: de::Deserializer<'de>,
+        T: RemoteTimestamp + 'a,
     {
         <T::Remote as Deserialize>::deserialize(de).map(T::from_remote)
     }
@@ -318,7 +337,9 @@ pub trait RemoteTimestamp: Timestamp {
 }
 
 impl<TOuter, TInner> RemoteTimestamp for Product<TOuter, TInner>
-    where TOuter: RemoteTimestamp, TInner: RemoteTimestamp
+where
+    TOuter: RemoteTimestamp,
+    TInner: RemoteTimestamp,
 {
     type Remote = (TOuter::Remote, TInner::Remote);
 
@@ -386,20 +407,27 @@ mod tests {
     fn frontier_update_encode_decode() {
         let msg = Message::<i32, ()>::frontier_update(vec![(0, -1), (1, 1)]).unwrap();
         let msg = Message::<i32, ()>::decode(msg).unwrap();
-        assert_eq!(msg, Message::LowerFrontierUpdate { update: vec![(0, -1), (1, 1)] });
+        assert_eq!(
+            msg,
+            Message::LowerFrontierUpdate { update: vec![(0, -1), (1, 1)] }
+        );
     }
 
     #[test]
     fn data_message_encode_decode() {
-        let msg = Message::<i32, String>::data_message(42,
-            vec!["hello".to_string(), "world".to_string()]).unwrap();
+        let msg = Message::<i32, String>::data_message(
+            42,
+            vec!["hello".to_string(), "world".to_string()],
+        ).unwrap();
         let msg = Message::<i32, String>::decode(msg).unwrap();
         match msg {
             Message::DataMessage { time: 42, data } => {
-                assert_eq!(data.decode().unwrap(),
-                    vec!["hello".to_string(), "world".to_string()]);
-            },
-            msg => panic!("Invalid message: {:?}", msg)
+                assert_eq!(
+                    data.decode().unwrap(),
+                    vec!["hello".to_string(), "world".to_string()]
+                );
+            }
+            msg => panic!("Invalid message: {:?}", msg),
         }
     }
 }

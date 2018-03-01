@@ -44,7 +44,9 @@ pub struct Subscription<T: Timestamp, D> {
 }
 
 impl<T, D> Subscription<T, D>
-    where T: RemoteTimestamp, D: DeserializeOwned,
+where
+    T: RemoteTimestamp,
+    D: DeserializeOwned,
 {
     /// The current frontier at the subscribed topics.
     pub fn frontier(&self) -> &[T] {
@@ -53,7 +55,9 @@ impl<T, D> Subscription<T, D>
 }
 
 impl<T, D> Stream for Subscription<T, D>
-    where T: RemoteTimestamp, D: DeserializeOwned,
+where
+    T: RemoteTimestamp,
+    D: DeserializeOwned,
 {
     type Item = SubscriptionEvent<T, D>;
     type Error = io::Error;
@@ -69,7 +73,9 @@ pub struct IntoIter<T: Timestamp, D> {
 }
 
 impl<T, D> IntoIter<T, D>
-    where T: RemoteTimestamp, D: DeserializeOwned
+where
+    T: RemoteTimestamp,
+    D: DeserializeOwned,
 {
     /// The current frontier at the subscribed topics.
     pub fn frontier(&self) -> &[T] {
@@ -78,8 +84,9 @@ impl<T, D> IntoIter<T, D>
 }
 
 impl<T, D> IntoIterator for Subscription<T, D>
-    where T: RemoteTimestamp,
-          D: DeserializeOwned,
+where
+    T: RemoteTimestamp,
+    D: DeserializeOwned,
 {
     type Item = io::Result<SubscriptionEvent<T, D>>;
     type IntoIter = IntoIter<T, D>;
@@ -90,8 +97,9 @@ impl<T, D> IntoIterator for Subscription<T, D>
 }
 
 impl<T, D> Iterator for IntoIter<T, D>
-    where T: RemoteTimestamp,
-          D: DeserializeOwned,
+where
+    T: RemoteTimestamp,
+    D: DeserializeOwned,
 {
     type Item = io::Result<SubscriptionEvent<T, D>>;
 
@@ -127,9 +135,7 @@ impl From<SubscribeError> for SubscriptionError {
     fn from(err: SubscribeError) -> Self {
         match err {
             SubscribeError::TopicNotFound => SubscriptionError::TopicNotFound,
-            SubscribeError::AuthenticationFailure => {
-                SubscriptionError::AuthenticationFailure
-            }
+            SubscribeError::AuthenticationFailure => SubscriptionError::AuthenticationFailure,
         }
     }
 }
@@ -138,9 +144,7 @@ impl From<UnsubscribeError> for SubscriptionError {
     fn from(err: UnsubscribeError) -> Self {
         match err {
             UnsubscribeError::InvalidTopicId => SubscriptionError::TopicNotFound,
-            UnsubscribeError::AuthenticationFailure => {
-                SubscriptionError::AuthenticationFailure
-            }
+            UnsubscribeError::AuthenticationFailure => SubscriptionError::AuthenticationFailure,
         }
     }
 }
@@ -152,8 +156,9 @@ impl From<io::Error> for SubscriptionError {
 }
 
 impl<T, E> From<Result<T, E>> for SubscriptionError
-    where T: Into<SubscriptionError>,
-          E: Into<SubscriptionError>
+where
+    T: Into<SubscriptionError>,
+    E: Into<SubscriptionError>,
 {
     fn from(err: Result<T, E>) -> Self {
         match err {
@@ -176,7 +181,11 @@ impl Coordinator {
     }
 
 
-    pub(crate) fn subscribe_request(&self, name: &str, blocking: bool) -> Result<Topic, SubscriptionError> {
+    pub(crate) fn subscribe_request(
+        &self,
+        name: &str,
+        blocking: bool,
+    ) -> Result<Topic, SubscriptionError> {
         self.tx
             .request(&Subscribe {
                 name: name.to_string(),
@@ -188,35 +197,47 @@ impl Coordinator {
     }
 
     fn request_multiple<I>(&self, names: I, blocking: bool) -> Result<Vec<Topic>, SubscriptionError>
-        where I: IntoIterator, I::Item: ToString
+    where
+        I: IntoIterator,
+        I::Item: ToString,
     {
         let pending = names.into_iter().map(|n| {
-            self.tx.request(&Subscribe {
-                name: n.to_string(),
-                token: self.token,
-                blocking: blocking,
-            }).map_err(SubscriptionError::from)
+            self.tx
+                .request(&Subscribe {
+                    name: n.to_string(),
+                    token: self.token,
+                    blocking: blocking,
+                })
+                .map_err(SubscriptionError::from)
         });
 
         futures_ordered(pending).collect().wait()
     }
 
-    fn connect_all<T, D>(&self, topics: &[Topic]) -> Result<Vec<(Sender, Receiver)>, SubscriptionError>
-        where T: RemoteTimestamp ,
-              D: DeserializeOwned + TypeName,
-              T::Remote: TypeName,
+    fn connect_all<T, D>(
+        &self,
+        topics: &[Topic],
+    ) -> Result<Vec<(Sender, Receiver)>, SubscriptionError>
+    where
+        T: RemoteTimestamp,
+        D: DeserializeOwned + TypeName,
+        T::Remote: TypeName,
     {
-        topics.iter().map(|topic| {
-            let item = TopicType::of::<D>();
-            let time = TopicType::of::<T::Remote>();
-            let schema = TopicSchema::Stream(item, time);
-            if topic.schema != schema {
-                Err(SubscriptionError::TypeMismatch)
-            } else {
-                self.network.connect((&*topic.addr.0, topic.addr.1))
-                    .map_err(SubscriptionError::from)
-            }
-        }).collect()
+        topics
+            .iter()
+            .map(|topic| {
+                let item = TopicType::of::<D>();
+                let time = TopicType::of::<T::Remote>();
+                let schema = TopicSchema::Stream(item, time);
+                if topic.schema != schema {
+                    Err(SubscriptionError::TypeMismatch)
+                } else {
+                    self.network
+                        .connect((&*topic.addr.0, topic.addr.1))
+                        .map_err(SubscriptionError::from)
+                }
+            })
+            .collect()
     }
 
     /// Creates a new subscription for a single topic.
@@ -233,11 +254,15 @@ impl Coordinator {
     /// creates a topic with a suitable name. If `blocking` is false, the call
     /// returns with an error if the catalog does not contain a topic with a
     /// matching name.
-    pub fn subscribe<T, D>(&self, name: &str, blocking: bool)
-       -> Result<Subscription<T, D>, SubscriptionError>
-        where T: RemoteTimestamp ,
-              D: DeserializeOwned + TypeName,
-              T::Remote: TypeName,
+    pub fn subscribe<T, D>(
+        &self,
+        name: &str,
+        blocking: bool,
+    ) -> Result<Subscription<T, D>, SubscriptionError>
+    where
+        T: RemoteTimestamp,
+        D: DeserializeOwned + TypeName,
+        T::Remote: TypeName,
     {
         let topics = self.request_multiple(Some(name), blocking)?;
         let sockets = self.connect_all::<T, D>(&topics)?;
@@ -257,15 +282,17 @@ impl Coordinator {
     /// subscriptions are for `"foo.0", "foo.2", "foo.5"`.
     ///
     /// See the `subscribe` method for more details.
-    pub fn subscribe_group<T, D, I>(&self,
-                    prefix: &str,
-                    partitions: I,
-                    blocking: bool)
-                    -> Result<Subscription<T, D>, SubscriptionError>
-        where T: RemoteTimestamp ,
-              D: DeserializeOwned + TypeName,
-              T::Remote: TypeName,
-              I: IntoIterator<Item = usize>
+    pub fn subscribe_group<T, D, I>(
+        &self,
+        prefix: &str,
+        partitions: I,
+        blocking: bool,
+    ) -> Result<Subscription<T, D>, SubscriptionError>
+    where
+        T: RemoteTimestamp,
+        D: DeserializeOwned + TypeName,
+        T::Remote: TypeName,
+        I: IntoIterator<Item = usize>,
     {
         let names = partitions.into_iter().map(|i| format!("{}.{}", prefix, i));
         let topics = self.request_multiple(names, blocking)?;

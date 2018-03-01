@@ -58,7 +58,7 @@ struct PublisherServer<T: Timestamp, D> {
     subscribers: Slab<Sender>,
     count: AtomicCounter,
     // tokio event loop
-    events: Box<Stream<Item=Event<T, D>, Error=io::Error>>,
+    events: Box<Stream<Item = Event<T, D>, Error = io::Error>>,
     notificator: mpsc::UnboundedSender<Event<T, D>>,
     core: Core,
     handle: Handle,
@@ -76,7 +76,9 @@ impl<T: RemoteTimestamp, D: ExchangeData + Serialize> PublisherServer<T, D> {
 
         // we have three event sources:
         let listener = socket.map(Event::Accepted);
-        let timely = stream.map(Event::Timely).map_err(|_| unreachable!())
+        let timely = stream
+            .map(Event::Timely)
+            .map_err(|_| unreachable!())
             .chain(stream::once(Ok(Event::ShutdownRequested)));
         let subscribers = subscribers.map_err(|_| unreachable!());
         // all of which we merge into a single stream
@@ -158,7 +160,7 @@ impl<T: RemoteTimestamp, D: ExchangeData + Serialize> PublisherServer<T, D> {
                 if !updates.is_empty() {
                     self.broadcast(Message::<T, D>::frontier_update(updates)?)?;
                 }
-            },
+            }
             TimelyEvent::Messages(time, data) => {
                 self.upper.insert(time.clone());
                 self.broadcast(Message::<T, D>::data_message(time, data)?)?;
@@ -183,11 +185,12 @@ impl<T: RemoteTimestamp, D: ExchangeData + Serialize> PublisherServer<T, D> {
 
         // register event handler for disconnection
         let notificator = self.notificator.clone();
-        let subscriber = rx
-            .for_each(|_| {
-                Err(io::Error::new(io::ErrorKind::InvalidData, "unexpected message"))
-            })
-            .then(move |res| {
+        let subscriber = rx.for_each(|_| {
+            Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "unexpected message",
+            ))
+        }).then(move |res| {
                 let event = match res {
                     Ok(()) => Event::Disconnected(id),
                     Err(err) => Event::Error(id, err),
@@ -234,7 +237,11 @@ pub struct Publisher<T, D> {
     subscribers: AtomicCounter,
 }
 
-impl<T, D> Publisher<T, D> where T: RemoteTimestamp, D: ExchangeData + Serialize {
+impl<T, D> Publisher<T, D>
+where
+    T: RemoteTimestamp,
+    D: ExchangeData + Serialize,
+{
     /// Spawns a new publisher thread on a ephemerial network port.
     ///
     /// The corresponding address can be obtained from the first member of the
@@ -289,7 +296,9 @@ impl<T, D> Publisher<T, D> where T: RemoteTimestamp, D: ExchangeData + Serialize
 }
 
 impl<T, D> EventPusher<T, D> for Publisher<T, D>
-    where T: RemoteTimestamp, D: ExchangeData + Serialize
+where
+    T: RemoteTimestamp,
+    D: ExchangeData + Serialize,
 {
     fn push(&mut self, event: TimelyEvent<T, D>) {
         self.sink.as_mut().unwrap().push(event)
@@ -343,7 +352,10 @@ impl AtomicCounter {
 
     fn lock<'a>(&'a self) -> (::std::sync::MutexGuard<'a, usize>, &'a Condvar) {
         let AtomicCounter(ref inner) = *self;
-        (inner.0.lock().expect("publisher thread poisioned counter"), &inner.1)
+        (
+            inner.0.lock().expect("publisher thread poisioned counter"),
+            &inner.1,
+        )
     }
 
     fn increment(&self) {
