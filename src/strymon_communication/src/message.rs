@@ -153,6 +153,12 @@ impl MessageBuf {
             buf: BytesMut::from(bytes),
         }))
     }
+
+    #[cfg(feature = "tracing")]
+    /// Returns a decoded printable representation of the message
+    pub fn debug<'a>(&'a self) -> tracing::Debug<'a> {
+        tracing::Debug::new(&*self.buf)
+    }
 }
 
 impl From<BytesMut> for MessageBuf {
@@ -164,6 +170,48 @@ impl From<BytesMut> for MessageBuf {
 impl Into<BytesMut> for MessageBuf {
     fn into(self) -> BytesMut {
         self.buf
+    }
+}
+
+#[cfg(feature = "tracing")]
+mod tracing {
+    use std::fmt;
+    use rmpv::decode::read_value_ref;
+    use super::*;
+
+    /// A proxy type implementing a more detailed version of `fmt::Debug`
+    pub struct Debug<'a> {
+        buf: &'a [u8],
+    }
+
+    impl<'a> Debug<'a> {
+        pub fn new(buf: &'a [u8]) -> Debug<'a> {
+            Debug { buf }
+        }
+    }
+
+
+    impl<'a> fmt::Debug for Debug<'a> {
+        fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+            let mut remaining = self.buf.len() as u64;
+            let mut reader = Cursor::new(self.buf);
+            let mut fmt = fmt.debug_tuple("MessageBuf");
+            while remaining > 0 {
+                let item = read_value_ref(&mut reader).map_err(|_| fmt::Error)?;
+                remaining = self.buf.len() as u64 - reader.position();
+                fmt.field(&DisplayDebug(item));
+            }
+            fmt.finish()
+        }
+    }
+
+    /// Adapter which implements `Debug` by calling into `Display`.
+    struct DisplayDebug<T>(T);
+
+    impl<T: fmt::Display> fmt::Debug for DisplayDebug<T> {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            self.0.fmt(f)
+        }
     }
 }
 
