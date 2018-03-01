@@ -257,10 +257,10 @@ struct Filter<T> {
 }
 
 impl<T: Timestamp> Filter<T> {
-    /// Removes all elements from the filter which are less or equal than any element in `frontier`
+    /// Removes all elements from the filter which are strictly less than any element in `frontier`
     fn remove(&mut self, frontier: &[T]) {
         self.filter.retain(
-            |t| !frontier.iter().any(|f| t.less_equal(f)),
+            |t| !frontier.iter().any(|f| t.less_than(f)),
         )
     }
 
