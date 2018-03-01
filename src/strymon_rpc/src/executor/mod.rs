@@ -6,15 +6,21 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+//! The interface exposed by executors. This interface is currently only intended to be used by the
+//! coordinator to send requests to a registered executor.
+
 use num_traits::FromPrimitive;
 
 use strymon_model::*;
 use strymon_communication::rpc::{Name, Request};
 
+/// The list of available requests an executor can serve.
 #[derive(Primitive, Debug, PartialEq, Eq, Clone, Copy)]
 #[repr(u8)]
 pub enum ExecutorRPC {
+    /// Request to spawn a new job worker group.
     SpawnQuery = 1,
+    /// Request to terminate a running job.
     TerminateQuery = 2,
 }
 
@@ -30,18 +36,27 @@ impl Name for ExecutorRPC {
     }
 }
 
+/// A request to spawn a new worker group.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SpawnQuery {
+    /// The meta-data of the job worker group to spawn.
     pub query: Query,
+    /// The hostlist to be passed to `timely_communication`.
     pub hostlist: Vec<String>,
 }
 
+/// The error message returned by the executor for failed spawn requests.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SpawnError {
+    /// The request was invalid.
     InvalidRequest,
+    /// The executor was unable to locate the downloaded file.
     FileNotFound,
+    /// The working directory for the job could not be created.
     WorkdirCreationFailed,
+    /// The executable was unable to fetch the executable file.
     FetchFailed,
+    /// Launching the executable failed.
     ExecFailed,
 }
 
@@ -52,14 +67,19 @@ impl Request<ExecutorRPC> for SpawnQuery {
     const NAME: ExecutorRPC = ExecutorRPC::SpawnQuery;
 }
 
+/// A request to terminate a running job.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TerminateQuery {
+    /// The job to terminate.
     pub query: QueryId,
 }
 
+/// The error message returned by the executor if job termination fails.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TerminateError {
+    /// The specified job is not running on this executor.
     NotFound,
+    /// This implementation of the executor does not support job termination.
     OperationNotSupported,
 }
 
