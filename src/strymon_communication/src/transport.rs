@@ -53,7 +53,7 @@
 //! }
 //! ```
 use std::io::{self, BufReader};
-use std::net::{TcpListener, TcpStream, Shutdown, ToSocketAddrs};
+use std::net::{TcpListener, TcpStream, Shutdown, SocketAddr, ToSocketAddrs};
 use std::sync::{mpsc, Arc};
 use std::thread::{self, JoinHandle};
 
@@ -87,11 +87,14 @@ impl Network {
 }
 
 fn channel(stream: TcpStream) -> io::Result<(Sender, Receiver)> {
+    let local = stream.local_addr()?;
+    let remote = stream.peer_addr()?;
+
     let instream = stream.try_clone()?;
     let outstream = stream;
 
-    let sender = Sender::new(outstream);
-    let receiver = Receiver::new(instream);
+    let sender = Sender::new(outstream, local, remote);
+    let receiver = Receiver::new(instream, remote, local);
 
     Ok((sender, receiver))
 }
@@ -109,16 +112,17 @@ pub struct Sender {
 }
 
 impl Sender {
-    pub(crate) fn new(mut outstream: TcpStream) -> Self {
+    pub(crate) fn new(mut outstream: TcpStream, from: SocketAddr, to: SocketAddr) -> Self {
         let (sender_tx, sender_rx) = mpsc::channel::<MessageBuf>();
         let thr = thread::spawn(move || {
             while let Ok(msg) = sender_rx.recv() {
                 if let Err(err) = msg.write(&mut outstream) {
-                    info!("unexpected error while writing bytes: {:?}", err);
+                    info!("unexpected error while writing bytes {} -> {}: {:?}", from, to, err);
                     break;
                 }
             }
 
+            debug!("Sender shutting down {} -> {}", from, to);
             drop(outstream.shutdown(Shutdown::Both));
         });
 
@@ -158,7 +162,7 @@ pub struct Receiver {
 }
 
 impl Receiver {
-    fn new(instream: TcpStream) -> Self {
+    fn new(instream: TcpStream, from: SocketAddr, to: SocketAddr) -> Self {
         let (tx, rx) = futures_mpsc::unbounded();
         thread::spawn(move || {
             let mut instream = BufReader::new(instream);
@@ -179,6 +183,7 @@ impl Receiver {
                 };
             }
 
+            debug!("Receiver shutting down {} -> {}", from, to);
             drop(instream.get_ref().shutdown(Shutdown::Both));
         });
 

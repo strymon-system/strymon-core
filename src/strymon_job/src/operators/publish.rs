@@ -59,16 +59,15 @@ impl From<UnpublishError> for PublicationError {
     fn from(err: UnpublishError) -> Self {
         match err {
             UnpublishError::InvalidTopicId => PublicationError::TopicNotFound,
-            UnpublishError::AuthenticationFailure => {
-                PublicationError::AuthenticationFailure
-            }
+            UnpublishError::AuthenticationFailure => PublicationError::AuthenticationFailure,
         }
     }
 }
 
 impl<T, E> From<Result<T, E>> for PublicationError
-    where T: Into<PublicationError>,
-          E: Into<PublicationError>
+where
+    T: Into<PublicationError>,
+    E: Into<PublicationError>,
 {
     fn from(err: Result<T, E>) -> Self {
         match err {
@@ -106,9 +105,7 @@ impl Partition {
     fn name(&self, name: &str, worker_id: u64) -> Option<String> {
         match *self {
             Partition::PerWorker => Some(format!("{}.{}", name, worker_id)),
-            Partition::Merge if worker_id == PUBLISH_WORKER_ID => {
-                Some(String::from(name))
-            }
+            Partition::Merge if worker_id == PUBLISH_WORKER_ID => Some(String::from(name)),
             _ => None,
         }
     }
@@ -125,7 +122,9 @@ enum Publication<T, D> {
 }
 
 impl<T, D> EventPusher<T, D> for Publication<T, D>
-    where T: RemoteTimestamp, D: ExchangeData + Serialize
+where
+    T: RemoteTimestamp,
+    D: ExchangeData + Serialize,
 {
     fn push(&mut self, event: Event<T, D>) {
         if let Publication::Local(_, _, ref mut publisher) = *self {
@@ -146,12 +145,12 @@ impl<T, D> Drop for Publication<T, D> {
 
 impl Coordinator {
     /// Submit a publication request to the coordinator and block.
-    pub(crate) fn publish_request(&self,
-                       name: String,
-                       schema: TopicSchema,
-                       addr: (String, u16))
-                       -> Result<Topic, PublicationError>
-    {
+    pub(crate) fn publish_request(
+        &self,
+        name: String,
+        schema: TopicSchema,
+        addr: (String, u16),
+    ) -> Result<Topic, PublicationError> {
         self.tx
             .request(&Publish {
                 name: name,
@@ -180,15 +179,17 @@ impl Coordinator {
     /// whose name is specified in `name`. If a `Partition::PerWorker` partitioning
     /// scheme is used, one topic is created for each worker, with the worker's
     /// index appended, e.g. `foobar.1`.
-    pub fn publish<S, D>(&self,
-                         name: &str,
-                         stream: &Stream<S, D>,
-                         partition: Partition)
-                         -> Result<Stream<S, D>, PublicationError>
-        where D: ExchangeData + Serialize + TypeName,
-              S: Scope,
-              S::Timestamp: RemoteTimestamp,
-              <S::Timestamp as RemoteTimestamp>::Remote: TypeName
+    pub fn publish<S, D>(
+        &self,
+        name: &str,
+        stream: &Stream<S, D>,
+        partition: Partition,
+    ) -> Result<Stream<S, D>, PublicationError>
+    where
+        D: ExchangeData + Serialize + TypeName,
+        S: Scope,
+        S::Timestamp: RemoteTimestamp,
+        <S::Timestamp as RemoteTimestamp>::Remote: TypeName,
     {
         // if we have an assigned topic name, we need to create a publisher
         let worker_id = stream.scope().index() as u64;

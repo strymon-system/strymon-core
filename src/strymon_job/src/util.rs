@@ -10,9 +10,7 @@ pub struct StreamsUnordered<S> {
 impl<S: Stream> StreamsUnordered<S> {
     /// Creates an empty polling set.
     pub fn new() -> Self {
-        StreamsUnordered {
-            inner: FuturesUnordered::new(),
-        }
+        StreamsUnordered { inner: FuturesUnordered::new() }
     }
 
     /// Adds a stream to the polling set.
@@ -32,7 +30,7 @@ impl<S: Stream> Stream for StreamsUnordered<S> {
                     // stream returned a value, reregister and yield value
                     self.push(stream);
                     return Ok(Async::Ready(Some(val)));
-                },
+                }
                 Ok(Async::Ready(Some((None, stream)))) => {
                     // stream exhausted, drop it and try next one
                     drop(stream);
@@ -50,7 +48,7 @@ impl<S: Stream> Stream for StreamsUnordered<S> {
                     // stream returned an error, reregister and yield error
                     self.push(stream);
                     return Err(err);
-                },
+                }
             }
         }
     }

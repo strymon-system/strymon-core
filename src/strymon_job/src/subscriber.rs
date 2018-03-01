@@ -23,7 +23,7 @@ use timely::progress::frontier::MutableAntichain;
 use strymon_communication::transport::{Sender, Receiver};
 
 use protocol::{Message, InitialSnapshot, RemoteTimestamp};
-use publisher::progress::{UpperFrontier};
+use publisher::progress::UpperFrontier;
 use util::StreamsUnordered;
 
 /// Data or frontier events emitted by a subscription.
@@ -48,16 +48,17 @@ pub struct SubscriberGroup<T: Timestamp, D> {
 }
 
 impl<T, D> SubscriberGroup<T, D>
-    where T: RemoteTimestamp, D: DeserializeOwned,
+where
+    T: RemoteTimestamp,
+    D: DeserializeOwned,
 {
     /// Creates a new driver for managing a subscriber group.
     ///
-    /// The `root` capability is used to maintain the input frontier, it is
-    /// typically the one returned by `unordered_input`.
     /// Returns a future which resolves once all connections have received
     /// their `InitialSnapshot`.
     pub fn new<I>(connections: I) -> ConnectingGroup<T, D>
-        where I: IntoIterator<Item=(Sender, Receiver)>,
+    where
+        I: IntoIterator<Item = (Sender, Receiver)>,
     {
         let connecting = connections.into_iter().map(Connecting::new);
         ConnectingGroup {
@@ -66,7 +67,7 @@ impl<T, D> SubscriberGroup<T, D>
                 ready: StreamsUnordered::new(),
                 frontier: MutableAntichain::new(),
                 upper: UpperFrontier::empty(),
-            })
+            }),
         }
     }
 
@@ -75,9 +76,10 @@ impl<T, D> SubscriberGroup<T, D>
     }
 
     /// Drives the subscriber logic based on a received message.
-    fn process_message(&mut self, msg: Message<T, D>)
-        -> io::Result<Option<SubscriptionEvent<T, D>>>
-    {
+    fn process_message(
+        &mut self,
+        msg: Message<T, D>,
+    ) -> io::Result<Option<SubscriptionEvent<T, D>>> {
         match msg {
             Message::LowerFrontierUpdate { update } => {
                 self.frontier.update_iter(update);
@@ -85,7 +87,7 @@ impl<T, D> SubscriberGroup<T, D>
                 self.filter.remove(frontier);
 
                 Ok(Some(SubscriptionEvent::FrontierUpdate))
-            },
+            }
             Message::DataMessage { time, data } => {
                 if !self.filter.contains(&time) {
                     Ok(Some(SubscriptionEvent::Data(time, data.decode()?)))
@@ -98,7 +100,9 @@ impl<T, D> SubscriberGroup<T, D>
 }
 
 impl<T, D> Stream for SubscriberGroup<T, D>
-    where T: RemoteTimestamp, D: DeserializeOwned,
+where
+    T: RemoteTimestamp,
+    D: DeserializeOwned,
 {
     type Item = SubscriptionEvent<T, D>;
     type Error = io::Error;
@@ -122,7 +126,9 @@ pub struct ConnectingGroup<T: Timestamp, D> {
 }
 
 impl<T, D> Future for ConnectingGroup<T, D>
-    where T: RemoteTimestamp, D: DeserializeOwned,
+where
+    T: RemoteTimestamp,
+    D: DeserializeOwned,
 {
     type Item = SubscriberGroup<T, D>;
     type Error = io::Error;
@@ -149,7 +155,9 @@ struct GroupBuilder<T: Timestamp, D> {
 }
 
 impl<T, D> GroupBuilder<T, D>
-    where T: RemoteTimestamp, D: DeserializeOwned
+where
+    T: RemoteTimestamp,
+    D: DeserializeOwned,
 {
     /// Marks a subscriber as connected (provided we have its initial state).
     ///
@@ -161,7 +169,9 @@ impl<T, D> GroupBuilder<T, D>
             self.upper.insert(t);
         }
 
-        self.frontier.update_iter(snapshot.lower.into_iter().map(|t| (t, 1)));
+        self.frontier.update_iter(
+            snapshot.lower.into_iter().map(|t| (t, 1)),
+        );
     }
 
     /// Builds the subscriber group, assuming all clients are connected.
@@ -192,7 +202,9 @@ impl<T, D> Connecting<T, D> {
 }
 
 impl<T, D> Future for Connecting<T, D>
-    where T: RemoteTimestamp, D: DeserializeOwned,
+where
+    T: RemoteTimestamp,
+    D: DeserializeOwned,
 {
     type Item = (InitialSnapshot<T>, Subscriber<T, D>);
     type Error = io::Error;
@@ -201,10 +213,13 @@ impl<T, D> Future for Connecting<T, D>
         if let Some(buf) = try_ready!(self.socket.as_mut().unwrap().1.poll()) {
             let snapshot = InitialSnapshot::decode(buf)?;
             let socket = self.socket.take().unwrap();
-            Ok(Async::Ready((snapshot, Subscriber {
-                socket: socket,
-                marker: self.marker,
-            })))
+            Ok(Async::Ready((
+                snapshot,
+                Subscriber {
+                    socket: socket,
+                    marker: self.marker,
+                },
+            )))
         } else {
             Err(io::Error::from(io::ErrorKind::UnexpectedEof))
         }
@@ -219,7 +234,9 @@ struct Subscriber<T, D> {
 }
 
 impl<T, D> Stream for Subscriber<T, D>
-    where T: RemoteTimestamp, D: DeserializeOwned,
+where
+    T: RemoteTimestamp,
+    D: DeserializeOwned,
 {
     type Item = Message<T, D>;
     type Error = io::Error;
@@ -240,11 +257,11 @@ struct Filter<T> {
 }
 
 impl<T: Timestamp> Filter<T> {
-    /// Removes all elements from the filter which are less or equal than any element in `frontier`
+    /// Removes all elements from the filter which are strictly less than any element in `frontier`
     fn remove(&mut self, frontier: &[T]) {
-        self.filter.retain(|t| {
-            !frontier.iter().any(|f| t.less_equal(f))
-        })
+        self.filter.retain(
+            |t| !frontier.iter().any(|f| t.less_than(f)),
+        )
     }
 
     /// Returns `true` if `time` is less or equal than any element in the filter.

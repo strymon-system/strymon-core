@@ -90,7 +90,12 @@ pub struct Coordinator {
 
 impl Coordinator {
     /// Registers the local job at the coordinator at address `coord`.
-    fn initialize(id: QueryId, process: usize, coord: String, hostname: String) -> io::Result<Self> {
+    fn initialize(
+        id: QueryId,
+        process: usize,
+        coord: String,
+        hostname: String,
+    ) -> io::Result<Self> {
         let network = Network::new(Some(hostname))?;
         let (tx, _) = network.client::<CoordinatorRPC, _>(&*coord)?;
 
@@ -99,7 +104,8 @@ impl Coordinator {
             group: process,
         });
 
-        let token = announce.wait()
+        let token = announce
+            .wait()
             .map_err(|err| {
                 err.and_then::<(), _>(|err| {
                     let err = format!("failed to register: {:?}", err);
@@ -126,23 +132,30 @@ impl Coordinator {
 /// the worker configuration is provided by the parent executor and that the running
 /// worker gains the ability to talk to the coordinator.
 pub fn execute<T, F>(func: F) -> Result<WorkerGuards<T>, String>
-    where T: Send + 'static,
-          F: Fn(&mut Root<Allocator>, Coordinator) -> T,
-          F: Send + Sync + 'static
+where
+    T: Send + 'static,
+    F: Fn(&mut Root<Allocator>, Coordinator) -> T,
+    F: Send + Sync + 'static,
 {
     let config = Process::from_env().map_err(|err| {
-            format!(concat!("Failed to parse data from executor. ",
-                            "Has this binary been launched by an executor? ",
-                            "Error: {:?}"),
-                    err)
-        })?;
+        format!(
+            concat!(
+                "Failed to parse data from executor. ",
+                "Has this binary been launched by an executor? ",
+                "Error: {:?}"
+            ),
+            err
+        )
+    })?;
 
     // create timely configuration
     let timely_conf = if config.addrs.len() > 1 {
-        info!("Configuration:Cluster({}, {}/{})",
-              config.threads,
-              config.index,
-              config.addrs.len()-1);
+        info!(
+            "Configuration:Cluster({}, {}/{})",
+            config.threads,
+            config.index,
+            config.addrs.len() - 1
+        );
         Configuration::Cluster(config.threads, config.index, config.addrs, true)
     } else if config.threads > 1 {
         info!("Configuration:Process({})", config.threads);
@@ -185,11 +198,12 @@ mod tests {
     type ExampleTime = Product<RootTimestamp, u64>;
 
     fn publisher_thread(network: &Network) -> Addr {
-        let (addr, publisher) =
-            Publisher::<ExampleTime, String>::new(&network).unwrap();
+        let (addr, publisher) = Publisher::<ExampleTime, String>::new(&network).unwrap();
 
         thread::spawn(move || {
-            publisher.subscriber_barrier().expect("publisher died unexpectedly");
+            publisher.subscriber_barrier().expect(
+                "publisher died unexpectedly",
+            );
 
             let slot = Mutex::new(Some(publisher));
             timely::example(move |scope| {
@@ -228,8 +242,9 @@ mod tests {
                     if let Some(event) = stream.next() {
                         match event.unwrap() {
                             SubscriptionEvent::Data(time, data) => {
-                                output.session(&capabilities.delayed(&time))
-                                  .give_iterator(data.into_iter());
+                                output.session(&capabilities.delayed(&time)).give_iterator(
+                                    data.into_iter(),
+                                );
                             }
                             SubscriptionEvent::FrontierUpdate => {
                                 capabilities.downgrade(stream.get_ref().frontier());
@@ -242,8 +257,12 @@ mod tests {
 
         let expected: Vec<(ExampleTime, Vec<String>)> = (0..10)
             .map(|t| t * 10)
-            .map(|t| (RootTimestamp::new(t),
-                (0..10).map(|d| format!("{}", t + d)).collect()))
+            .map(|t| {
+                (
+                    RootTimestamp::new(t),
+                    (0..10).map(|d| format!("{}", t + d)).collect(),
+                )
+            })
             .collect();
         assert_eq!(captured.extract(), expected);
     }

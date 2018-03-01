@@ -26,17 +26,21 @@ pub struct UpperFrontier<T: Timestamp> {
 impl<T: Timestamp> UpperFrontier<T> {
     /// Creates a new empty upper frontier.
     pub fn empty() -> Self {
-        UpperFrontier {
-            antichain: Antichain::new(),
-        }
+        UpperFrontier { antichain: Antichain::new() }
     }
 
     #[cfg(test)]
     /// Returns true if any item in the antichain is greater or equal than the argument.
     pub fn greater_equal(&self, other: &T) -> bool {
         // SAFETY: This assumes that Rev<T> and T use the same memory layout
-        debug_assert_eq!(::std::mem::size_of::<&Rev<T>>(), ::std::mem::size_of::<&T>());
-        debug_assert_eq!(::std::mem::align_of::<&Rev<T>>(), ::std::mem::align_of::<&T>());
+        debug_assert_eq!(
+            ::std::mem::size_of::<&Rev<T>>(),
+            ::std::mem::size_of::<&T>()
+        );
+        debug_assert_eq!(
+            ::std::mem::align_of::<&Rev<T>>(),
+            ::std::mem::align_of::<&T>()
+        );
 
         let rev: &Rev<T> = unsafe { ::std::mem::transmute(other) };
 
@@ -55,7 +59,10 @@ impl<T: Timestamp> UpperFrontier<T> {
     pub fn elements(&self) -> &[T] {
         // SAFETY: This assumes that Rev<T> and T use the same memory layout
         debug_assert_eq!(::std::mem::size_of::<Rev<T>>(), ::std::mem::size_of::<T>());
-        debug_assert_eq!(::std::mem::align_of::<Rev<T>>(), ::std::mem::align_of::<T>());
+        debug_assert_eq!(
+            ::std::mem::align_of::<Rev<T>>(),
+            ::std::mem::align_of::<T>()
+        );
 
         let ptr = self.antichain.elements().as_ptr() as *const T;
         let len = self.antichain.elements().len();
@@ -73,13 +80,17 @@ pub struct LowerFrontier<T: Timestamp> {
 }
 
 impl<T: Timestamp> LowerFrontier<T> {
-    /// Updates the frontier and compacts the argument to reflect only the externally visible changes.
+    /// Updates the frontier and compacts the argument to reflect only the externally
+    /// visible changes.
     pub fn update(&mut self, updates: &mut Vec<(T, i64)>) {
         for (t, delta) in updates.drain(..) {
             self.antichain.update_dirty(t, delta);
         }
 
-        self.antichain.update_iter_and(None, |t, i| updates.push((t.clone(), i)));
+        self.antichain.update_iter_and(
+            None,
+            |t, i| updates.push((t.clone(), i)),
+        );
     }
 
     /// Reveals the minimal elements in the frontier.
@@ -90,9 +101,7 @@ impl<T: Timestamp> LowerFrontier<T> {
 
 impl<T: Timestamp> Default for LowerFrontier<T> {
     fn default() -> Self {
-        LowerFrontier {
-            antichain: MutableAntichain::new_bottom(Default::default()),
-        }
+        LowerFrontier { antichain: MutableAntichain::new_bottom(Default::default()) }
     }
 }
 

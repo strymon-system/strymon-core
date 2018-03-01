@@ -27,6 +27,8 @@ extern crate byteorder;
 
 extern crate serde;
 extern crate rmp_serde;
+#[cfg(feature = "tracing")]
+extern crate rmpv;
 
 extern crate futures;
 

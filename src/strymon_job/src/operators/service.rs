@@ -55,7 +55,7 @@ impl<N: Name> Stream for Service<N> {
             Ok(Async::Ready(None)) if !self.server.is_done() => {
                 // we don't have any clients, but the server is still alive
                 Ok(Async::NotReady)
-            },
+            }
             other => other,
         }
     }
@@ -95,9 +95,10 @@ impl Coordinator {
     /// Given a service interface definition and a name, creates a new server
     /// for receiving incoming requests. A topic is created under the specified
     /// name which is used by clients to bind to the service.
-    pub fn announce_service<N: Name + TypeName>(&self, name: &str)
-        -> Result<Service<N>, PublicationError>
-    {
+    pub fn announce_service<N: Name + TypeName>(
+        &self,
+        name: &str,
+    ) -> Result<Service<N>, PublicationError> {
         // create a new service and obtain its address
         let server = self.network.server(None)?.fuse();
         let addr = {
@@ -110,7 +111,12 @@ impl Coordinator {
         let topic = self.publish_request(name.to_string(), schema, addr)?;
         let clients = StreamsUnordered::new();
         let coord = self.clone();
-        Ok(Service { server, clients, topic, coord })
+        Ok(Service {
+            server,
+            clients,
+            topic,
+            coord,
+        })
     }
 
     /// Creates a binding to a service topic for sending requests.
@@ -123,13 +129,15 @@ impl Coordinator {
     /// When `blocking` is true, this call blocks until a remote job registers
     /// a service with the matching name. If `blocking` is false, the call
     /// returns with an error if the topic does not exist.
-    pub fn bind_service<N: Name + TypeName>(&self, name: &str, blocking: bool)
-        -> Result<Client<N>, SubscriptionError>
-    {
+    pub fn bind_service<N: Name + TypeName>(
+        &self,
+        name: &str,
+        blocking: bool,
+    ) -> Result<Client<N>, SubscriptionError> {
         let topic = self.subscribe_request(name, blocking)?;
         let schema = TopicSchema::Service(TopicType::of::<N>());
         if topic.schema != schema {
-            return Err(SubscriptionError::TypeMismatch)
+            return Err(SubscriptionError::TypeMismatch);
         }
 
         let queue = {
@@ -139,6 +147,11 @@ impl Coordinator {
         };
         let coord = self.clone();
         let name = PhantomData;
-        Ok(Client { queue, topic, coord, name })
+        Ok(Client {
+            queue,
+            topic,
+            coord,
+            name,
+        })
     }
 }

@@ -518,12 +518,15 @@ impl<N: Name> Stream for Server<N> {
 
 /// creates a new request dispatcher/multiplexer for each accepted tcp socket
 fn multiplex<N: Name>(stream: TcpStream) -> io::Result<(Outgoing, Incoming<N>)> {
+    let local = stream.local_addr()?;
+    let remote = stream.peer_addr()?;
+
     let instream = stream.try_clone()?;
     let outstream = stream;
 
     let (incoming_tx, incoming_rx) = mpsc::unbounded();
     let pending = Arc::new(Mutex::new(HashMap::new()));
-    let sender = transport::Sender::new(outstream);
+    let sender = transport::Sender::new(outstream, local, remote);
 
     let resolver = Resolver {
         pending: pending.clone(),
