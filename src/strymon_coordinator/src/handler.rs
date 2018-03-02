@@ -60,13 +60,13 @@ impl ExecutorState {
         self.ports.push_back(port);
     }
 
-    fn spawn(&self, req: &SpawnQuery) -> Response<ExecutorRPC, SpawnQuery> {
+    fn spawn(&self, req: &SpawnJob) -> Response<ExecutorRPC, SpawnJob> {
         debug!("issue spawn request {:?}", req);
         self.tx.request(req)
     }
 
-    fn terminate(&self, job_id: JobId) -> Response<ExecutorRPC, TerminateQuery> {
-        self.tx.request(&TerminateQuery { query: job_id })
+    fn terminate(&self, job_id: JobId) -> Response<ExecutorRPC, TerminateJob> {
+        self.tx.request(&TerminateJob { query: job_id })
     }
 }
 
@@ -206,7 +206,7 @@ impl Coordinator {
             executors: executor_ids.clone(),
             start_time: start_time,
         };
-        let spawnquery = SpawnQuery {
+        let spawnquery = SpawnJob {
             query: query.clone(),
             hostlist: hostlist,
         };

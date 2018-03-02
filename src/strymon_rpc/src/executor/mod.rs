@@ -19,9 +19,9 @@ use strymon_communication::rpc::{Name, Request};
 #[repr(u8)]
 pub enum ExecutorRPC {
     /// Request to spawn a new job worker group.
-    SpawnQuery = 1,
+    SpawnJob = 1,
     /// Request to terminate a running job.
-    TerminateQuery = 2,
+    TerminateJob = 2,
 }
 
 impl Name for ExecutorRPC {
@@ -38,7 +38,7 @@ impl Name for ExecutorRPC {
 
 /// A request to spawn a new worker group.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SpawnQuery {
+pub struct SpawnJob {
     /// The meta-data of the job worker group to spawn.
     pub query: Job,
     /// The hostlist to be passed to `timely_communication`.
@@ -60,16 +60,16 @@ pub enum SpawnError {
     ExecFailed,
 }
 
-impl Request<ExecutorRPC> for SpawnQuery {
+impl Request<ExecutorRPC> for SpawnJob {
     type Success = ();
     type Error = SpawnError;
 
-    const NAME: ExecutorRPC = ExecutorRPC::SpawnQuery;
+    const NAME: ExecutorRPC = ExecutorRPC::SpawnJob;
 }
 
 /// A request to terminate a running job.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TerminateQuery {
+pub struct TerminateJob {
     /// The job to terminate.
     pub query: JobId,
 }
@@ -83,9 +83,9 @@ pub enum TerminateError {
     OperationNotSupported,
 }
 
-impl Request<ExecutorRPC> for TerminateQuery {
+impl Request<ExecutorRPC> for TerminateJob {
     type Success = ();
     type Error = TerminateError;
 
-    const NAME: ExecutorRPC = ExecutorRPC::TerminateQuery;
+    const NAME: ExecutorRPC = ExecutorRPC::TerminateJob;
 }

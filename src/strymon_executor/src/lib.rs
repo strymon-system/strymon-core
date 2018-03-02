@@ -125,14 +125,14 @@ impl ExecutorService {
 
     pub fn dispatch(&mut self, req: RequestBuf<ExecutorRPC>) -> Result<(), Error> {
         match *req.name() {
-            SpawnQuery::NAME => {
-                let (SpawnQuery { query, hostlist }, resp) = req.decode::<SpawnQuery>()?;
+            SpawnJob::NAME => {
+                let (SpawnJob { query, hostlist }, resp) = req.decode::<SpawnJob>()?;
                 debug!("spawn request for {:?}", query);
                 resp.respond(self.spawn(query, hostlist));
                 Ok(())
             }
-            TerminateQuery::NAME => {
-                let (TerminateQuery { query }, resp) = req.decode::<TerminateQuery>()?;
+            TerminateJob::NAME => {
+                let (TerminateJob { query }, resp) = req.decode::<TerminateJob>()?;
                 debug!("termination request for {:?}", query);
                 resp.respond(self.process.terminate(query));
                 Ok(())
