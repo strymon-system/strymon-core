@@ -70,7 +70,7 @@ impl ExecutorState {
     }
 }
 
-enum QueryState {
+enum JobState {
     Spawning {
         query: Job,
         submitter: Sender<Result<JobId, SubmissionError>>,
@@ -81,7 +81,7 @@ enum QueryState {
 }
 
 struct WorkerGroup {
-    state: QueryState,
+    state: JobState,
     count: usize,
     ports: Vec<(ExecutorId, u16)>,
     executors: Vec<ExecutorId>,
@@ -234,7 +234,7 @@ impl Coordinator {
         // TODO(swicki) add a timeout that triggers SpawnFailed here
         debug!("add pending submission for {:?}", query.id);
         let (tx, rx) = channel();
-        let state = QueryState::Spawning {
+        let state = JobState::Spawning {
             query: query,
             submitter: tx,
             waiting: vec![],
@@ -254,7 +254,7 @@ impl Coordinator {
     fn cancel_submission(&mut self, id: JobId, err: SubmissionError) {
         debug!("canceling pending submission for {:?}", id);
         if let Some(query) = self.queries.remove(&id) {
-            if let QueryState::Spawning { submitter, waiting, .. } = query.state {
+            if let JobState::Spawning { submitter, waiting, .. } = query.state {
                 let _ = submitter.send(Err(err));
                 for worker in waiting {
                     let _ = worker.send(Err(WorkerGroupError::PeerFailed));
@@ -281,13 +281,13 @@ impl Coordinator {
 
         // step 2: add current request to waiting workers
         let (connected, rx) = match query.state {
-            QueryState::Spawning { ref mut waiting, .. } => {
+            JobState::Spawning { ref mut waiting, .. } => {
                 let (tx, rx) = channel();
                 let rx = rx.then(|res| res.expect("spawning worker group failed"));
                 waiting.push(tx);
                 (waiting.len(), Box::new(rx))
             }
-            QueryState::Running | QueryState::Terminating => {
+            JobState::Running | JobState::Terminating => {
                 return Box::new(futures::failed(WorkerGroupError::InvalidWorkerGroup))
             }
         };
@@ -299,9 +299,9 @@ impl Coordinator {
         }
 
         // step 3: at this point, all worker groups have registered themselves
-        let waiting = mem::replace(&mut query.state, QueryState::Running);
+        let waiting = mem::replace(&mut query.state, JobState::Running);
         let (submitter, waiting, query) = match waiting {
-            QueryState::Spawning { submitter, waiting, query } => {
+            JobState::Spawning { submitter, waiting, query } => {
                 (submitter, waiting, query)
             }
             _ => unreachable!(),
@@ -336,7 +336,7 @@ impl Coordinator {
         // decrease counter, set to terminating
         let count = {
             let query = query.get_mut();
-            query.state = QueryState::Terminating;
+            query.state = JobState::Terminating;
             query.count -= 1;
 
             query.count
