@@ -11,13 +11,13 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 
 use clap::ArgMatches;
+use failure::{Error, err_msg};
 use log::Level;
 use serde_json::{Value, Deserializer};
 
-pub fn binary(path: &Path, args: &ArgMatches) -> super::Result<String> {
+pub fn binary(path: &Path, args: &ArgMatches) -> Result<String, Error> {
     let mut cargo = Command::new("cargo");
-    cargo.arg("build")
-        .args(&["--message-format", "json"]);
+    cargo.arg("build").args(&["--message-format", "json"]);
 
     // translate project directory to manifest path
     let manifest = path.join("Cargo.toml");
@@ -34,7 +34,9 @@ pub fn binary(path: &Path, args: &ArgMatches) -> super::Result<String> {
     if args.is_present("all-features") {
         cargo.arg("--all-features");
     } else if let Some(list) = args.values_of("features") {
-        cargo.arg("--features").arg(list.collect::<Vec<_>>().join(" "));
+        cargo.arg("--features").arg(
+            list.collect::<Vec<_>>().join(" "),
+        );
     };
 
     if let Some(name) = args.value_of("bin") {
@@ -61,17 +63,23 @@ pub fn binary(path: &Path, args: &ArgMatches) -> super::Result<String> {
     let stream = Deserializer::from_reader(child.stdout.take().unwrap()).into_iter::<Value>();
     for result in stream {
         let msg = result?;
-        match msg["reason"].as_str().ok_or("missing reason field in cargo message")? {
+        match msg["reason"].as_str().ok_or(err_msg(
+            "missing reason field in cargo message",
+        ))? {
             "compiler-message" => {
-                let rustc_msg = msg.get("message").ok_or("missing compiler message")?;
-                let level = match rustc_msg["level"].as_str().ok_or("unable to parse message level")? {
+                let rustc_msg = msg.get("message").ok_or(
+                    err_msg("missing compiler message"),
+                )?;
+                let level = match rustc_msg["level"].as_str().ok_or(err_msg(
+                    "unable to parse message level",
+                ))? {
                     "note" | "help" => Level::Info,
                     "warning" => Level::Warn,
                     "error" => Level::Error,
                     _ => Level::Debug,
                 };
                 log!(level, "cargo: {}", msg);
-            },
+            }
             "compiler-artifact" => {
                 if let Value::String(ref crate_name) = msg["package_id"] {
                     info!("compiled crate: {}", crate_name);
@@ -80,7 +88,9 @@ pub fn binary(path: &Path, args: &ArgMatches) -> super::Result<String> {
                 let ref crate_type = msg["target"]["crate_types"][0];
                 let ref kind = msg["target"]["kind"][0];
                 if crate_type == "bin" && (kind == "bin" || kind == "example") {
-                    let file = msg["filenames"][0].as_str().ok_or("missing filename")?;
+                    let file = msg["filenames"][0].as_str().ok_or(
+                        err_msg("missing filename"),
+                    )?;
                     binaries.push(file.to_owned());
                 }
             }
@@ -94,7 +104,10 @@ pub fn binary(path: &Path, args: &ArgMatches) -> super::Result<String> {
     let status = child.wait()?;
     if !status.success() {
         io::copy(child.stderr.as_mut().unwrap(), &mut io::stderr())?;
-        bail!("Cargo failed with exit code {}", status.code().unwrap_or(-1));
+        bail!(
+            "Cargo failed with exit code {}",
+            status.code().unwrap_or(-1)
+        );
     }
 
     if binaries.is_empty() {
@@ -102,7 +115,9 @@ pub fn binary(path: &Path, args: &ArgMatches) -> super::Result<String> {
     }
 
     if binaries.len() > 1 {
-        bail!("Multiple binaries for this project, please specify which one to submit using `--bin` or `--example`");
+        bail!(
+            "Multiple binaries for this project, please specify which one to submit using `--bin` or `--example`"
+        );
     }
 
     let binary = binaries.pop().unwrap();

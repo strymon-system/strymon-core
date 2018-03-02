@@ -11,27 +11,25 @@ use std::path::Path;
 use std::ffi::OsStr;
 
 use clap::{App, AppSettings, Arg, ArgGroup, ArgMatches, SubCommand};
-
+use failure::{Error, ResultExt};
 
 use strymon_communication::Network;
 use strymon_model::{QueryProgram, QueryId, ExecutionFormat, Executor, ExecutorId};
 use strymon_rpc::coordinator::Placement;
-
-use errors::*;
 
 pub use self::submitter::Submitter;
 
 mod submitter;
 mod build;
 
-fn parse_placement(args: &ArgMatches, executors: Vec<Executor>) -> Result<Placement> {
+fn parse_placement(args: &ArgMatches, executors: Vec<Executor>) -> Result<Placement, Error> {
     fn parse_err(arg: &str) -> String {
         format!("Failed to parse value of '--{}' option", arg)
     }
 
     // number of workers per machine
     let workers = if let Some(w) = args.value_of("workers") {
-        w.parse().chain_err(|| parse_err("workers"))?
+        w.parse::<usize>().with_context(|_| parse_err("workers"))?
     } else {
         1
     };
@@ -39,20 +37,21 @@ fn parse_placement(args: &ArgMatches, executors: Vec<Executor>) -> Result<Placem
     // parse placement strategy and its arguments
     match args.value_of("placement-strategy") {
         Some("random") => {
-            let num_executors = args
-                .value_of("num-executors")
+            let num_executors = args.value_of("num-executors")
                 .expect("missing `num-executors` argument")
-                .parse().chain_err(|| parse_err("num-executors"))?;
+                .parse::<usize>()
+                .with_context(|_| parse_err("num-executors"))?;
             Ok(Placement::Random(num_executors, workers))
-        },
+        }
         Some("pinned") => {
             let mut pinned = vec![];
             if let Some(ids) = args.values_of("pinned-id") {
                 for num in ids {
-                    let id = num.parse::<u64>().chain_err(|| parse_err("pinned-id"))?;
+                    let id = num.parse::<u64>().with_context(|_| parse_err("pinned-id"))?;
                     pinned.push(ExecutorId(id));
                 }
-            } if let Some(hosts) = args.values_of("pinned-host") {
+            }
+            if let Some(hosts) = args.values_of("pinned-host") {
                 for name in hosts {
                     let executor = executors.iter().find(|e| e.host == name);
                     if let Some(executor) = executor {
@@ -65,7 +64,7 @@ fn parse_placement(args: &ArgMatches, executors: Vec<Executor>) -> Result<Placem
             } else {
                 bail!("Missing executors list for pinning")
             }
-        },
+        }
         _ => {
             // by default choose a random executor
             Ok(Placement::Random(1, workers))
@@ -73,7 +72,7 @@ fn parse_placement(args: &ArgMatches, executors: Vec<Executor>) -> Result<Placem
     }
 }
 
-fn submit_binary(binary: String, args: &ArgMatches) -> Result<QueryId> {
+fn submit_binary(binary: String, args: &ArgMatches) -> Result<QueryId, Error> {
     eprintln!("Submitting binary {:?}", binary);
 
     let coord = args.value_of("coordinator").unwrap_or("localhost:9189");
@@ -81,16 +80,20 @@ fn submit_binary(binary: String, args: &ArgMatches) -> Result<QueryId> {
 
     // external hostname
     let hostname = args.value_of("external-hostname").map(String::from);
-    let network = Network::new(hostname)
-        .chain_err(|| "Failed to initialize network")?;
+    let network = Network::new(hostname).context(
+        "Failed to initialize network",
+    )?;
 
-    let submitter = Submitter::new(&network, &*coord)
-        .chain_err(|| "Unable to connect to coordinator")?;
-    let executors = submitter.executors()
-        .chain_err(|| "Failed to fetch list of executors")?;
+    let submitter = Submitter::new(&network, &*coord).context(
+        "Unable to connect to coordinator",
+    )?;
+    let executors = submitter.executors().context(
+        "Failed to fetch list of executors",
+    )?;
     let placement = parse_placement(args, executors)?;
 
-    let binary_name = Path::new(&binary).file_name()
+    let binary_name = Path::new(&binary)
+        .file_name()
         .unwrap_or(OsStr::new("job_binary"))
         .to_string_lossy()
         .into_owned();
@@ -120,10 +123,10 @@ fn submit_binary(binary: String, args: &ArgMatches) -> Result<QueryId> {
     let res = submitter
         .submit(query, desc, placement)
         .wait_unwrap()
-        .map_err(|e| format!("Failed to submit job: {:?}", e).into());
+        .map_err(|e| format_err!("Failed to submit job: {:?}", e).into());
 
     drop(upload);
-    
+
     res
 }
 
@@ -280,11 +283,13 @@ pub fn usage<'a, 'b>() -> App<'a, 'b> {
              .required(true))
 }
 
-pub fn main(args: &ArgMatches) -> Result<()> {
+pub fn main(args: &ArgMatches) -> Result<(), Error> {
     let binary = if let Some(path) = args.value_of("path").map(Path::new) {
         build::binary(path, args)?
     } else {
-        args.value_of("binary-path").expect("no binary specified").to_owned()
+        args.value_of("binary-path")
+            .expect("no binary specified")
+            .to_owned()
     };
 
     let id = submit_binary(binary, args)?;
