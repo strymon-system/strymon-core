@@ -153,7 +153,7 @@ pub struct Job {
     /// A human-readable description of the job.
     pub name: Option<String>,
     /// Information about the job executable.
-    pub program: QueryProgram,
+    pub program: JobProgram,
     /// The *total* amount of workers.
     pub workers: usize,
     /// A list of executors currently executing this job.
@@ -164,7 +164,7 @@ pub struct Job {
 
 /// The meta-data about the executable code of a job.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Abomonation, TypeName)]
-pub struct QueryProgram {
+pub struct JobProgram {
     /// The name of the binary submitted to Strymon.
     pub binary_name: String,
     /// The kind of the submitted executable.

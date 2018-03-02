@@ -14,7 +14,7 @@ use clap::{App, AppSettings, Arg, ArgGroup, ArgMatches, SubCommand};
 use failure::{Error, ResultExt};
 
 use strymon_communication::Network;
-use strymon_model::{QueryProgram, JobId, ExecutionFormat, Executor, ExecutorId};
+use strymon_model::{JobProgram, JobId, ExecutionFormat, Executor, ExecutorId};
 use strymon_rpc::coordinator::Placement;
 
 pub use self::submitter::Submitter;
@@ -113,7 +113,7 @@ fn submit_binary(binary: String, args: &ArgMatches) -> Result<JobId, Error> {
         Vec::new()
     };
 
-    let query = QueryProgram {
+    let query = JobProgram {
         binary_name: binary_name,
         source: url,
         format: ExecutionFormat::NativeExecutable,

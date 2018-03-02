@@ -64,7 +64,7 @@ pub enum Placement {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Submission {
     /// Specifies the job executable.
-    pub query: QueryProgram,
+    pub query: JobProgram,
     /// An optional human-readable description.
     pub name: Option<String>,
     /// The placement of workers in the cluster.

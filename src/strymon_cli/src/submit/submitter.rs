@@ -38,7 +38,7 @@ impl Submitter {
 
     pub fn submit<N>(
         &self,
-        query: QueryProgram,
+        query: JobProgram,
         name: N,
         placement: Placement,
     ) -> Response<CoordinatorRPC, Submission>
