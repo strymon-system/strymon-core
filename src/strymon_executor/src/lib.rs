@@ -84,8 +84,8 @@ impl ExecutorService {
         }
     }
 
-    fn spawn(&mut self, query: Job, hostlist: Vec<String>) -> Result<(), SpawnError> {
-        let process = query.executors
+    fn spawn(&mut self, job: Job, hostlist: Vec<String>) -> Result<(), SpawnError> {
+        let process = job.executors
             .iter()
             .position(|&id| self.id == id)
             .ok_or(SpawnError::InvalidRequest)?;
@@ -93,26 +93,26 @@ impl ExecutorService {
         // workers refers to the total number of workers. if there is more than
         // one executor, we have to divide by the number of executors
         let threads = if hostlist.is_empty() {
-            query.workers
+            job.workers
         } else {
-            query.workers / hostlist.len()
+            job.workers / hostlist.len()
         };
 
         // the job dir should be unique to this execution, we prepend a datetime
         // string to avoid overwriting the artifacts of previous strymon instances
-        let tm = time::at_utc(Timespec::new(query.start_time as i64, 0));
+        let tm = time::at_utc(Timespec::new(job.start_time as i64, 0));
         let start_time = tm.strftime(START_TIME_FMT).expect("invalid fmt");
         let jobdir = self.workdir.as_path()
-            .join(format!("{}_{:04}", start_time, query.id.0))
+            .join(format!("{}_{:04}", start_time, job.id.0))
             .join(process.to_string());
 
         // create the working directory for this process
         fs::create_dir_all(&jobdir).map_err(|_| SpawnError::WorkdirCreationFailed)?;
 
-        let binary = jobdir.as_path().join(query.program.binary_name);
-        let executable = self.fetch(&query.program.source, binary)?;
-        let args = &*query.program.args;
-        let id = query.id;
+        let binary = jobdir.as_path().join(job.program.binary_name);
+        let executable = self.fetch(&job.program.source, binary)?;
+        let args = &*job.program.args;
+        let id = job.id;
 
         let mut exec = executable::Builder::new(&executable, args)?;
         exec.threads(threads)
@@ -126,15 +126,15 @@ impl ExecutorService {
     pub fn dispatch(&mut self, req: RequestBuf<ExecutorRPC>) -> Result<(), Error> {
         match *req.name() {
             SpawnJob::NAME => {
-                let (SpawnJob { query, hostlist }, resp) = req.decode::<SpawnJob>()?;
-                debug!("spawn request for {:?}", query);
-                resp.respond(self.spawn(query, hostlist));
+                let (SpawnJob { job, hostlist }, resp) = req.decode::<SpawnJob>()?;
+                debug!("spawn request for {:?}", job);
+                resp.respond(self.spawn(job, hostlist));
                 Ok(())
             }
             TerminateJob::NAME => {
-                let (TerminateJob { query }, resp) = req.decode::<TerminateJob>()?;
-                debug!("termination request for {:?}", query);
-                resp.respond(self.process.terminate(query));
+                let (TerminateJob { job }, resp) = req.decode::<TerminateJob>()?;
+                debug!("termination request for {:?}", job);
+                resp.respond(self.process.terminate(job));
                 Ok(())
             }
         }

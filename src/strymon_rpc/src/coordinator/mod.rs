@@ -64,7 +64,7 @@ pub enum Placement {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Submission {
     /// Specifies the job executable.
-    pub query: JobProgram,
+    pub job: JobProgram,
     /// An optional human-readable description.
     pub name: Option<String>,
     /// The placement of workers in the cluster.
@@ -93,7 +93,7 @@ impl Request<CoordinatorRPC> for Submission {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Termination {
     /// Identifier of the job to terminate.
-    pub query: JobId,
+    pub job: JobId,
 }
 
 /// The error type for failed job termination requests.
@@ -149,7 +149,7 @@ pub struct JobToken {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AddWorkerGroup {
     /// The identifier of the job this group belongs to.
-    pub query: JobId,
+    pub job: JobId,
     /// The index of this group within the list of groups of the job.
     pub group: usize,
 }

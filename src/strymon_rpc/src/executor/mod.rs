@@ -40,7 +40,7 @@ impl Name for ExecutorRPC {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SpawnJob {
     /// The meta-data of the job worker group to spawn.
-    pub query: Job,
+    pub job: Job,
     /// The hostlist to be passed to `timely_communication`.
     pub hostlist: Vec<String>,
 }
@@ -71,7 +71,7 @@ impl Request<ExecutorRPC> for SpawnJob {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TerminateJob {
     /// The job to terminate.
-    pub query: JobId,
+    pub job: JobId,
 }
 
 /// The error message returned by the executor if job termination fails.

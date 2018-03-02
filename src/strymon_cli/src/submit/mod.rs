@@ -113,7 +113,7 @@ fn submit_binary(binary: String, args: &ArgMatches) -> Result<JobId, Error> {
         Vec::new()
     };
 
-    let query = JobProgram {
+    let job = JobProgram {
         binary_name: binary_name,
         source: url,
         format: ExecutionFormat::NativeExecutable,
@@ -121,7 +121,7 @@ fn submit_binary(binary: String, args: &ArgMatches) -> Result<JobId, Error> {
     };
 
     let res = submitter
-        .submit(query, desc, placement)
+        .submit(job, desc, placement)
         .wait_unwrap()
         .map_err(|e| format_err!("Failed to submit job: {:?}", e).into());
 

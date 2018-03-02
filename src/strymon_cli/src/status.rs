@@ -33,7 +33,7 @@ pub fn main(args: &ArgMatches) -> Result<(), Error> {
     let submitter = Submitter::new(&network, &*coord)?;
 
     let executors = submitter.executors()?;
-    let queries = submitter.queries()?;
+    let jobs = submitter.jobs()?;
     let publications = submitter.publications()?;
     let subscriptions = submitter.subscriptions()?;
     let topics = submitter
@@ -46,20 +46,20 @@ pub fn main(args: &ArgMatches) -> Result<(), Error> {
     for executor in executors {
         let id = executor.id.0;
         println!(" Executor {}: host={:?}", id, executor.host);
-        for query in queries.iter().filter(
+        for job in jobs.iter().filter(
             |q| q.executors.contains(&executor.id),
         )
         {
-            let id = query.id.0;
-            let name = query
+            let id = job.id.0;
+            let name = job
                 .name
                 .as_ref()
                 .map(|n| format!("{:?}", n))
                 .unwrap_or_else(|| String::from("<unnamed>"));
 
-            println!("  Job {}: name={}, workers={}", id, name, query.workers);
+            println!("  Job {}: name={}, workers={}", id, name, job.workers);
 
-            for publication in publications.iter().filter(|p| p.0 == query.id) {
+            for publication in publications.iter().filter(|p| p.0 == job.id) {
                 let topic = &topics[&publication.1];
                 println!(
                     "   Publication on Topic {}: name={:?}, schema={}",
@@ -69,7 +69,7 @@ pub fn main(args: &ArgMatches) -> Result<(), Error> {
                 );
             }
 
-            for subscription in subscriptions.iter().filter(|p| p.0 == query.id) {
+            for subscription in subscriptions.iter().filter(|p| p.0 == job.id) {
                 let topic = &topics[&subscription.1];
                 println!(
                     "   Subscription on Topic {}: name={:?}, schema={}",

@@ -66,13 +66,13 @@ impl ExecutorState {
     }
 
     fn terminate(&self, job_id: JobId) -> Response<ExecutorRPC, TerminateJob> {
-        self.tx.request(&TerminateJob { query: job_id })
+        self.tx.request(&TerminateJob { job: job_id })
     }
 }
 
 enum JobState {
     Spawning {
-        query: Job,
+        job: Job,
         submitter: Sender<Result<JobId, SubmissionError>>,
         waiting: Vec<Sender<Result<JobToken, WorkerGroupError>>>,
     },
@@ -92,11 +92,11 @@ pub struct Coordinator {
     reactor: Handle,
     catalog: Catalog,
 
-    queryid: Generator<JobId>,
+    jobid: Generator<JobId>,
     executorid: Generator<ExecutorId>,
 
     executors: BTreeMap<ExecutorId, ExecutorState>,
-    queries: BTreeMap<JobId, WorkerGroup>,
+    jobs: BTreeMap<JobId, WorkerGroup>,
     lookups: HashMap<String, Vec<Sender<Result<Topic, SubscribeError>>>>,
 }
 
@@ -105,10 +105,10 @@ impl Coordinator {
         let coord = Coordinator {
             handle: Weak::new(),
             catalog: catalog,
-            queryid: Generator::new(),
+            jobid: Generator::new(),
             executorid: Generator::new(),
             executors: BTreeMap::new(),
-            queries: BTreeMap::new(),
+            jobs: BTreeMap::new(),
             lookups: HashMap::new(),
             reactor: reactor,
         };
@@ -128,14 +128,14 @@ impl Coordinator {
         let handle = self.handle();
         let executor_res = &mut self.executors;
 
-        // step 1: generate query id
-        let queryid = self.queryid.generate();
+        // step 1: generate job id
+        let jobid = self.jobid.generate();
 
         // step 2: Select suitable executors
         let (executors, num_executors, num_workers) = {
             // step 2.1: filter out executors with the wrong format,
             // and the ones with no more free network ports
-            let format = &req.query.format;
+            let format = &req.job.format;
             let executors = self.catalog
                 .executors()
                 .filter(|e| e.format == *format)
@@ -198,25 +198,25 @@ impl Coordinator {
             .unwrap_or(0);
 
         let executor_ids: Vec<_> = executors.iter().map(|e| e.id).collect();
-        let query = Job {
-            id: queryid,
+        let job = Job {
+            id: jobid,
             name: req.name,
-            program: req.query,
+            program: req.job,
             workers: num_executors * num_workers,
             executors: executor_ids.clone(),
             start_time: start_time,
         };
-        let spawnquery = SpawnJob {
-            query: query.clone(),
+        let spawnjob = SpawnJob {
+            job: job.clone(),
             hostlist: hostlist,
         };
 
         // step 4: send requests to the selected coordinators
-        debug!("selected executors for {:?}:{:?}", query.id, executors);
+        debug!("selected executors for {:?}:{:?}", job.id, executors);
         for executor in &executors {
             let handle = handle.clone();
             let executor = &executor_res[&executor.id];
-            let response = executor.spawn(&spawnquery)
+            let response = executor.spawn(&spawnjob)
                 .map_err(move |err| {
                     let err = match err {
                         Ok(err) => SubmissionError::SpawnError(err),
@@ -225,17 +225,17 @@ impl Coordinator {
                             SubmissionError::ExecutorUnreachable
                         }
                     };
-                    handle.borrow_mut().cancel_submission(queryid, err);
+                    handle.borrow_mut().cancel_submission(jobid, err);
                 });
 
             self.reactor.spawn(response);
         }
 
         // TODO(swicki) add a timeout that triggers SpawnFailed here
-        debug!("add pending submission for {:?}", query.id);
+        debug!("add pending submission for {:?}", job.id);
         let (tx, rx) = channel();
         let state = JobState::Spawning {
-            query: query,
+            job: job,
             submitter: tx,
             waiting: vec![],
         };
@@ -246,22 +246,22 @@ impl Coordinator {
             ports: ports,
             executors: executor_ids,
         };
-        self.queries.insert(queryid, worker_group);
+        self.jobs.insert(jobid, worker_group);
 
         Box::new(rx.then(|res| res.expect("submission canceled?!")))
     }
 
     fn cancel_submission(&mut self, id: JobId, err: SubmissionError) {
         debug!("canceling pending submission for {:?}", id);
-        if let Some(query) = self.queries.remove(&id) {
-            if let JobState::Spawning { submitter, waiting, .. } = query.state {
+        if let Some(job) = self.jobs.remove(&id) {
+            if let JobState::Spawning { submitter, waiting, .. } = job.state {
                 let _ = submitter.send(Err(err));
                 for worker in waiting {
                     let _ = worker.send(Err(WorkerGroupError::PeerFailed));
                 }
             }
 
-            for (id, port) in query.ports {
+            for (id, port) in job.ports {
                 self.executors.get_mut(&id).map(|e| e.free_port(port));
             }
         }
@@ -270,17 +270,17 @@ impl Coordinator {
     fn add_worker_group(&mut self, id: JobId,_group: usize)
         -> Box<Future<Item=JobToken, Error=WorkerGroupError>>
     {
-        let query = self.queries.get_mut(&id);
+        let job = self.jobs.get_mut(&id);
 
-        // step 1: check if we actually know about this query
-        let query = if query.is_none() {
+        // step 1: check if we actually know about this job
+        let job = if job.is_none() {
             return Box::new(futures::failed(WorkerGroupError::SpawningAborted));
         } else {
-            query.unwrap()
+            job.unwrap()
         };
 
         // step 2: add current request to waiting workers
-        let (connected, rx) = match query.state {
+        let (connected, rx) = match job.state {
             JobState::Spawning { ref mut waiting, .. } => {
                 let (tx, rx) = channel();
                 let rx = rx.then(|res| res.expect("spawning worker group failed"));
@@ -293,22 +293,22 @@ impl Coordinator {
         };
 
         // check if we need to wait for others to arrive
-        debug!("{:?}: {} of {} are connected", id, connected, query.count);
-        if connected < query.count {
+        debug!("{:?}: {} of {} are connected", id, connected, job.count);
+        if connected < job.count {
             return rx;
         }
 
         // step 3: at this point, all worker groups have registered themselves
-        let waiting = mem::replace(&mut query.state, JobState::Running);
-        let (submitter, waiting, query) = match waiting {
-            JobState::Spawning { submitter, waiting, query } => {
-                (submitter, waiting, query)
+        let waiting = mem::replace(&mut job.state, JobState::Running);
+        let (submitter, waiting, job) = match waiting {
+            JobState::Spawning { submitter, waiting, job } => {
+                (submitter, waiting, job)
             }
             _ => unreachable!(),
         };
 
-        // step 4: add query to catalog
-        self.catalog.add_query(query);
+        // step 4: add job to catalog
+        self.catalog.add_job(job);
 
         // step 5: respond to everyone
         let token = JobToken {
@@ -325,8 +325,8 @@ impl Coordinator {
     }
 
     fn remove_worker_group(&mut self, id: JobId) {
-        let mut query = match self.queries.entry(id) {
-            Entry::Occupied(query) => query,
+        let mut job = match self.jobs.entry(id) {
+            Entry::Occupied(job) => job,
             Entry::Vacant(_) => {
                 warn!("request to remove inexisting worker group");
                 return;
@@ -335,28 +335,28 @@ impl Coordinator {
 
         // decrease counter, set to terminating
         let count = {
-            let query = query.get_mut();
-            query.state = JobState::Terminating;
-            query.count -= 1;
+            let job = job.get_mut();
+            job.state = JobState::Terminating;
+            job.count -= 1;
 
-            query.count
+            job.count
         };
 
         // and we're done
         if count == 0 {
-            self.catalog.remove_query(id);
-            let query = query.remove();
+            self.catalog.remove_job(id);
+            let job = job.remove();
 
-            for (id, port) in query.ports {
+            for (id, port) in job.ports {
                 self.executors.get_mut(&id).map(|e| e.free_port(port));
             }
         }
     }
 
     fn termination(&mut self, req: Termination) -> Box<Future<Item=(), Error=TerminationError>> {
-        let job_id = req.query;
+        let job_id = req.job;
         // extract the executor ids from the worker groups
-        let executor_ids = match self.queries.get(&job_id) {
+        let executor_ids = match self.jobs.get(&job_id) {
             Some(group) => group.executors.iter(),
             None => return Box::new(futures::failed(TerminationError::NotFound)),
         };
@@ -420,8 +420,8 @@ impl Coordinator {
     }
 
     fn publish(&mut self, req: Publish) -> Result<Topic, PublishError> {
-        let query = req.token.id;
-        let result = self.catalog.publish(query, req.name, req.addr, req.schema);
+        let job = req.token.id;
+        let result = self.catalog.publish(job, req.name, req.addr, req.schema);
         if let Ok(ref topic) = result {
             debug!("resolving lookup for topic: {:?}", &topic.name);
             if let Some(pending) = self.lookups.remove(&topic.name) {
@@ -434,19 +434,19 @@ impl Coordinator {
     }
 
     fn unpublish(&mut self,
-                 query_id: JobId,
+                 job_id: JobId,
                  topic_id: TopicId)
                  -> Result<(), UnpublishError> {
-        self.catalog.unpublish(query_id, topic_id)
+        self.catalog.unpublish(job_id, topic_id)
     }
 
     fn subscribe(&mut self,
                  req: Subscribe)
                  -> Box<Future<Item = Topic, Error = SubscribeError>> {
-        let query = req.token.id;
+        let job = req.token.id;
 
         if let Some(topic) = self.catalog.lookup(&req.name) {
-            self.catalog.subscribe(query, topic.id);
+            self.catalog.subscribe(job, topic.id);
             return Box::new(futures::finished(topic));
         } else if req.blocking {
             debug!("inserting blocking lookup for topic: {:?}", &req.name);
@@ -459,7 +459,7 @@ impl Coordinator {
                     res.unwrap_or(Err(SubscribeError::TopicNotFound))
                 })
                 .and_then(move |topic: Topic| {
-                    handle.borrow_mut().catalog.subscribe(query, topic.id);
+                    handle.borrow_mut().catalog.subscribe(job, topic.id);
                     Ok(topic)
                 });
 
@@ -470,10 +470,10 @@ impl Coordinator {
     }
 
     fn unsubscribe(&mut self,
-                   query_id: JobId,
+                   job_id: JobId,
                    topic_id: TopicId)
                    -> Result<(), UnsubscribeError> {
-        self.catalog.unsubscribe(query_id, topic_id)
+        self.catalog.unsubscribe(job_id, topic_id)
     }
 
     fn lookup(&self, name: &str) -> Result<Topic, ()> {
@@ -485,7 +485,7 @@ impl Coordinator {
 }
 
 struct State {
-    query: Vec<JobToken>,
+    job: Vec<JobToken>,
     executor: Vec<ExecutorId>,
     publication: Vec<(JobId, TopicId)>,
     subscription: Vec<(JobId, TopicId)>,
@@ -494,7 +494,7 @@ struct State {
 impl State {
     fn empty() -> Self {
         State {
-            query: Vec::new(),
+            job: Vec::new(),
             executor: Vec::new(),
             publication: Vec::new(),
             subscription: Vec::new(),
@@ -502,7 +502,7 @@ impl State {
     }
 
     fn authenticate(&self, auth: &JobToken) -> bool {
-        self.query.iter().any(|token| auth == token)
+        self.job.iter().any(|token| auth == token)
     }
 }
 
@@ -547,7 +547,7 @@ impl CoordinatorRef {
             .borrow_mut()
             .add_worker_group(id, group)
             .and_then(move |token| {
-                state.borrow_mut().query.push(token);
+                state.borrow_mut().job.push(token);
                 Ok(token)
             });
 
@@ -556,8 +556,8 @@ impl CoordinatorRef {
 
     pub fn publish(&mut self, req: Publish) -> Result<Topic, PublishError> {
         trace!("incoming {:?}", req);
-        let query = req.token;
-        if !self.state.borrow().authenticate(&query) {
+        let job = req.token;
+        if !self.state.borrow().authenticate(&job) {
             return Err(PublishError::AuthenticationFailure);
         }
 
@@ -566,27 +566,27 @@ impl CoordinatorRef {
             .publish(req)
             .and_then(|topic| {
                 let topic_id = topic.id;
-                let query_id = query.id;
-                self.state.borrow_mut().publication.push((query_id, topic_id));
+                let job_id = job.id;
+                self.state.borrow_mut().publication.push((job_id, topic_id));
                 Ok(topic)
             })
     }
 
     pub fn unpublish(&mut self,
-                     query: JobToken,
+                     job: JobToken,
                      topic_id: TopicId)
                      -> Result<(), UnpublishError> {
         trace!("incoming Unpublish {{ topic_id: {:?} }}", topic_id);
-        if !self.state.borrow().authenticate(&query) {
+        if !self.state.borrow().authenticate(&job) {
             return Err(UnpublishError::AuthenticationFailure);
         }
 
-        let query_id = query.id;
+        let job_id = job.id;
         self.coord
             .borrow_mut()
-            .unpublish(query_id, topic_id)
+            .unpublish(job_id, topic_id)
             .and_then(|_| {
-                let to_remove = (query_id, topic_id);
+                let to_remove = (job_id, topic_id);
                 self.state.borrow_mut().publication.retain(|&p| p != to_remove);
                 Ok(())
             })
@@ -596,8 +596,8 @@ impl CoordinatorRef {
                      req: Subscribe)
                      -> Box<Future<Item = Topic, Error = SubscribeError>> {
         trace!("incoming {:?}", req);
-        let query = req.token;
-        if !self.state.borrow().authenticate(&query) {
+        let job = req.token;
+        if !self.state.borrow().authenticate(&job) {
             return Box::new(futures::failed(SubscribeError::AuthenticationFailure));
         }
 
@@ -607,28 +607,28 @@ impl CoordinatorRef {
             .subscribe(req)
             .and_then(move |topic| {
                 let topic_id = topic.id;
-                let query_id = query.id;
-                state.borrow_mut().subscription.push((query_id, topic_id));
+                let job_id = job.id;
+                state.borrow_mut().subscription.push((job_id, topic_id));
                 Ok(topic)
             });
         Box::new(future)
     }
 
     pub fn unsubscribe(&mut self,
-                       query: JobToken,
+                       job: JobToken,
                        topic_id: TopicId)
                        -> Result<(), UnsubscribeError> {
         trace!("incoming Unsubscribe {{ topic_id: {:?} }}", topic_id);
-        if !self.state.borrow().authenticate(&query) {
+        if !self.state.borrow().authenticate(&job) {
             return Err(UnsubscribeError::AuthenticationFailure);
         }
 
-        let query_id = query.id;
+        let job_id = job.id;
         self.coord
             .borrow_mut()
-            .unsubscribe(query_id, topic_id)
+            .unsubscribe(job_id, topic_id)
             .and_then(|_| {
-                let to_remove = (query_id, topic_id);
+                let to_remove = (job_id, topic_id);
                 let mut state = self.state.borrow_mut();
                 if let Some(pos) = state.subscription
                     .iter()
@@ -664,20 +664,20 @@ impl Drop for CoordinatorRef {
         let mut state = self.state.borrow_mut();
         let mut coord = self.coord.borrow_mut();
 
-        for (query, topic) in state.subscription.drain(..) {
-            if let Err(err) = coord.unsubscribe(query, topic) {
+        for (job, topic) in state.subscription.drain(..) {
+            if let Err(err) = coord.unsubscribe(job, topic) {
                 warn!("error while cleaning subscriptions: {:?}", err);
             }
         }
 
-        for (query, topic) in state.publication.drain(..) {
-            if let Err(err) = coord.unpublish(query, topic) {
+        for (job, topic) in state.publication.drain(..) {
+            if let Err(err) = coord.unpublish(job, topic) {
                 warn!("error while cleaning publications: {:?}", err);
             }
         }
 
-        for query in state.query.drain(..) {
-            coord.remove_worker_group(query.id);
+        for job in state.job.drain(..) {
+            coord.remove_worker_group(job.id);
         }
 
         for executor in state.executor.drain(..) {

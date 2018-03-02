@@ -100,7 +100,7 @@ impl Coordinator {
         let (tx, _) = network.client::<CoordinatorRPC, _>(&*coord)?;
 
         let announce = tx.request(&AddWorkerGroup {
-            query: id,
+            job: id,
             group: process,
         });
 
