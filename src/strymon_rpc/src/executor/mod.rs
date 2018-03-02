@@ -40,7 +40,7 @@ impl Name for ExecutorRPC {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SpawnQuery {
     /// The meta-data of the job worker group to spawn.
-    pub query: Query,
+    pub query: Job,
     /// The hostlist to be passed to `timely_communication`.
     pub hostlist: Vec<String>,
 }

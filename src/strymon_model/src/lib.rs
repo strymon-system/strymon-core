@@ -147,7 +147,7 @@ impl From<u64> for JobId {
 
 /// The meta-data of a submitted and running job.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Abomonation, TypeName)]
-pub struct Query {
+pub struct Job {
     /// A unique identifier for this job.
     pub id: JobId,
     /// A human-readable description of the job.

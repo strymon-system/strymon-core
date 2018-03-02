@@ -57,7 +57,7 @@ pub fn main(args: &ArgMatches) -> Result<(), Error> {
                 .map(|n| format!("{:?}", n))
                 .unwrap_or_else(|| String::from("<unnamed>"));
 
-            println!("  Query {}: name={}, workers={}", id, name, query.workers);
+            println!("  Job {}: name={}, workers={}", id, name, query.workers);
 
             for publication in publications.iter().filter(|p| p.0 == query.id) {
                 let topic = &topics[&publication.1];

@@ -30,7 +30,7 @@ pub struct Catalog {
 
     topics: HashMap<TopicId, Topic>,
     executors: HashMap<ExecutorId, Executor>,
-    queries: HashMap<JobId, Query>,
+    queries: HashMap<JobId, Job>,
 
     publications: HashSet<Publication>,
     subscriptions: HashSet<Subscription>,
@@ -74,7 +74,7 @@ impl Catalog {
         Executors { inner: self.executors.values() }
     }
 
-    pub fn add_query(&mut self, query: Query) {
+    pub fn add_query(&mut self, query: Job) {
         debug!("add_query: {:?}", query);
         self.queries.insert(query.id, query);
     }

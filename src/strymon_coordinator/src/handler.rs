@@ -72,7 +72,7 @@ impl ExecutorState {
 
 enum QueryState {
     Spawning {
-        query: Query,
+        query: Job,
         submitter: Sender<Result<JobId, SubmissionError>>,
         waiting: Vec<Sender<Result<QueryToken, WorkerGroupError>>>,
     },
@@ -198,7 +198,7 @@ impl Coordinator {
             .unwrap_or(0);
 
         let executor_ids: Vec<_> = executors.iter().map(|e| e.id).collect();
-        let query = Query {
+        let query = Job {
             id: queryid,
             name: req.name,
             program: req.query,

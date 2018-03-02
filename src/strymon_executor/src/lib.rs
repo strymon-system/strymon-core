@@ -84,7 +84,7 @@ impl ExecutorService {
         }
     }
 
-    fn spawn(&mut self, query: Query, hostlist: Vec<String>) -> Result<(), SpawnError> {
+    fn spawn(&mut self, query: Job, hostlist: Vec<String>) -> Result<(), SpawnError> {
         let process = query.executors
             .iter()
             .position(|&id| self.id == id)
