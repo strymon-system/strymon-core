@@ -74,7 +74,7 @@ enum QueryState {
     Spawning {
         query: Job,
         submitter: Sender<Result<JobId, SubmissionError>>,
-        waiting: Vec<Sender<Result<QueryToken, WorkerGroupError>>>,
+        waiting: Vec<Sender<Result<JobToken, WorkerGroupError>>>,
     },
     Running,
     Terminating,
@@ -268,7 +268,7 @@ impl Coordinator {
     }
 
     fn add_worker_group(&mut self, id: JobId,_group: usize)
-        -> Box<Future<Item=QueryToken, Error=WorkerGroupError>>
+        -> Box<Future<Item=JobToken, Error=WorkerGroupError>>
     {
         let query = self.queries.get_mut(&id);
 
@@ -311,7 +311,7 @@ impl Coordinator {
         self.catalog.add_query(query);
 
         // step 5: respond to everyone
-        let token = QueryToken {
+        let token = JobToken {
             id: id,
             auth: rand::random::<u64>(),
         };
@@ -485,7 +485,7 @@ impl Coordinator {
 }
 
 struct State {
-    query: Vec<QueryToken>,
+    query: Vec<JobToken>,
     executor: Vec<ExecutorId>,
     publication: Vec<(JobId, TopicId)>,
     subscription: Vec<(JobId, TopicId)>,
@@ -501,7 +501,7 @@ impl State {
         }
     }
 
-    fn authenticate(&self, auth: &QueryToken) -> bool {
+    fn authenticate(&self, auth: &JobToken) -> bool {
         self.query.iter().any(|token| auth == token)
     }
 }
@@ -539,7 +539,7 @@ impl CoordinatorRef {
     }
 
     pub fn add_worker_group(&mut self, id: JobId, group: usize)
-         -> Box<Future<Item = QueryToken, Error = WorkerGroupError>>
+         -> Box<Future<Item = JobToken, Error = WorkerGroupError>>
     {
         trace!("incoming AddWorkerGroup {{ id: {:?} }}", id);
         let state = self.state.clone();
@@ -573,7 +573,7 @@ impl CoordinatorRef {
     }
 
     pub fn unpublish(&mut self,
-                     query: QueryToken,
+                     query: JobToken,
                      topic_id: TopicId)
                      -> Result<(), UnpublishError> {
         trace!("incoming Unpublish {{ topic_id: {:?} }}", topic_id);
@@ -615,7 +615,7 @@ impl CoordinatorRef {
     }
 
     pub fn unsubscribe(&mut self,
-                       query: QueryToken,
+                       query: JobToken,
                        topic_id: TopicId)
                        -> Result<(), UnsubscribeError> {
         trace!("incoming Unsubscribe {{ topic_id: {:?} }}", topic_id);

@@ -138,7 +138,7 @@ impl Request<CoordinatorRPC> for AddExecutor {
 
 /// An opaque token used by job worker groups to authenticate themselves at the coordinator.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct QueryToken {
+pub struct JobToken {
     /// The job identifier of the token owner.
     pub id: JobId,
     /// A opaque random number only known to the job process and the coordinator.
@@ -166,7 +166,7 @@ pub enum WorkerGroupError {
 }
 
 impl Request<CoordinatorRPC> for AddWorkerGroup {
-    type Success = QueryToken;
+    type Success = JobToken;
     type Error = WorkerGroupError;
 
     const NAME: CoordinatorRPC = CoordinatorRPC::AddWorkerGroup;
@@ -181,7 +181,7 @@ pub struct Subscribe {
     /// Otherwise, an error message is returned indicating that the requested topic does not exist.
     pub blocking: bool,
     /// A token authenticating the the submitter as a successfully spawned job.
-    pub token: QueryToken,
+    pub token: JobToken,
 }
 
 /// The error message sent back to unsuccessful subscription requests.
@@ -206,7 +206,7 @@ pub struct Unsubscribe {
     /// The identifier of the subscribed topic.
     pub topic: TopicId,
     /// A token authenticating the the submitter as a successfully spawned job.
-    pub token: QueryToken,
+    pub token: JobToken,
 }
 
 /// The error message sent back for failed unsubscription request.
@@ -235,7 +235,7 @@ pub struct Publish {
     /// The kind of topic being published.
     pub schema: TopicSchema,
     /// A token authenticating the the submitter as a successfully spawned job.
-    pub token: QueryToken,
+    pub token: JobToken,
 }
 
 /// The error message sent back for failed publication request.
@@ -260,7 +260,7 @@ pub struct Unpublish {
     /// The identifier of the topic to unpublish.
     pub topic: TopicId,
     /// A token authenticating the the submitter as a successfully spawned job.
-    pub token: QueryToken,
+    pub token: JobToken,
 }
 
 /// The error message sent back for failed unpublication request.

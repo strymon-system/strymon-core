@@ -72,7 +72,7 @@ use timely_communication::initialize::{Configuration, WorkerGuards};
 use strymon_communication::Network;
 use strymon_communication::rpc::Outgoing;
 
-use strymon_rpc::coordinator::{QueryToken, AddWorkerGroup, CoordinatorRPC};
+use strymon_rpc::coordinator::{JobToken, AddWorkerGroup, CoordinatorRPC};
 use strymon_model::JobId;
 use strymon_model::config::job::Process;
 
@@ -83,7 +83,7 @@ use strymon_model::config::job::Process;
 /// users must register the current process with `strymon_job::execute`.
 #[derive(Clone)]
 pub struct Coordinator {
-    token: QueryToken,
+    token: JobToken,
     network: Network,
     tx: Outgoing,
 }
