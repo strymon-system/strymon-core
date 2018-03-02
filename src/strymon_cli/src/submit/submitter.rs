@@ -54,7 +54,7 @@ impl Submitter {
         self.coord.request(&submission)
     }
 
-    pub fn terminate(&self, id: QueryId) -> Response<CoordinatorRPC, Termination> {
+    pub fn terminate(&self, id: JobId) -> Response<CoordinatorRPC, Termination> {
         let termination = Termination { query: id };
 
         self.coord.request(&termination)

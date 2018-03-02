@@ -65,7 +65,7 @@ impl ExecutorState {
         self.tx.request(req)
     }
 
-    fn terminate(&self, job_id: QueryId) -> Response<ExecutorRPC, TerminateQuery> {
+    fn terminate(&self, job_id: JobId) -> Response<ExecutorRPC, TerminateQuery> {
         self.tx.request(&TerminateQuery { query: job_id })
     }
 }
@@ -73,7 +73,7 @@ impl ExecutorState {
 enum QueryState {
     Spawning {
         query: Query,
-        submitter: Sender<Result<QueryId, SubmissionError>>,
+        submitter: Sender<Result<JobId, SubmissionError>>,
         waiting: Vec<Sender<Result<QueryToken, WorkerGroupError>>>,
     },
     Running,
@@ -92,11 +92,11 @@ pub struct Coordinator {
     reactor: Handle,
     catalog: Catalog,
 
-    queryid: Generator<QueryId>,
+    queryid: Generator<JobId>,
     executorid: Generator<ExecutorId>,
 
     executors: BTreeMap<ExecutorId, ExecutorState>,
-    queries: BTreeMap<QueryId, WorkerGroup>,
+    queries: BTreeMap<JobId, WorkerGroup>,
     lookups: HashMap<String, Vec<Sender<Result<Topic, SubscribeError>>>>,
 }
 
@@ -123,7 +123,7 @@ impl Coordinator {
         self.handle.upgrade().expect("`self` has been deallocated?!")
     }
 
-    fn submission(&mut self, req: Submission) -> Box<Future<Item=QueryId, Error=SubmissionError>> {
+    fn submission(&mut self, req: Submission) -> Box<Future<Item=JobId, Error=SubmissionError>> {
         // workaround: prevent closures borrowing `self`
         let handle = self.handle();
         let executor_res = &mut self.executors;
@@ -251,7 +251,7 @@ impl Coordinator {
         Box::new(rx.then(|res| res.expect("submission canceled?!")))
     }
 
-    fn cancel_submission(&mut self, id: QueryId, err: SubmissionError) {
+    fn cancel_submission(&mut self, id: JobId, err: SubmissionError) {
         debug!("canceling pending submission for {:?}", id);
         if let Some(query) = self.queries.remove(&id) {
             if let QueryState::Spawning { submitter, waiting, .. } = query.state {
@@ -267,7 +267,7 @@ impl Coordinator {
         }
     }
 
-    fn add_worker_group(&mut self, id: QueryId,_group: usize)
+    fn add_worker_group(&mut self, id: JobId,_group: usize)
         -> Box<Future<Item=QueryToken, Error=WorkerGroupError>>
     {
         let query = self.queries.get_mut(&id);
@@ -324,7 +324,7 @@ impl Coordinator {
         rx
     }
 
-    fn remove_worker_group(&mut self, id: QueryId) {
+    fn remove_worker_group(&mut self, id: JobId) {
         let mut query = match self.queries.entry(id) {
             Entry::Occupied(query) => query,
             Entry::Vacant(_) => {
@@ -434,7 +434,7 @@ impl Coordinator {
     }
 
     fn unpublish(&mut self,
-                 query_id: QueryId,
+                 query_id: JobId,
                  topic_id: TopicId)
                  -> Result<(), UnpublishError> {
         self.catalog.unpublish(query_id, topic_id)
@@ -470,7 +470,7 @@ impl Coordinator {
     }
 
     fn unsubscribe(&mut self,
-                   query_id: QueryId,
+                   query_id: JobId,
                    topic_id: TopicId)
                    -> Result<(), UnsubscribeError> {
         self.catalog.unsubscribe(query_id, topic_id)
@@ -487,8 +487,8 @@ impl Coordinator {
 struct State {
     query: Vec<QueryToken>,
     executor: Vec<ExecutorId>,
-    publication: Vec<(QueryId, TopicId)>,
-    subscription: Vec<(QueryId, TopicId)>,
+    publication: Vec<(JobId, TopicId)>,
+    subscription: Vec<(JobId, TopicId)>,
 }
 
 impl State {
@@ -521,7 +521,7 @@ impl CoordinatorRef {
 
     pub fn submission(&self,
                       req: Submission)
-                      -> Box<Future<Item = QueryId, Error = SubmissionError>> {
+                      -> Box<Future<Item = JobId, Error = SubmissionError>> {
         trace!("incoming {:?}", req);
         self.coord.borrow_mut().submission(req)
     }
@@ -538,7 +538,7 @@ impl CoordinatorRef {
         id
     }
 
-    pub fn add_worker_group(&mut self, id: QueryId, group: usize)
+    pub fn add_worker_group(&mut self, id: JobId, group: usize)
          -> Box<Future<Item = QueryToken, Error = WorkerGroupError>>
     {
         trace!("incoming AddWorkerGroup {{ id: {:?} }}", id);

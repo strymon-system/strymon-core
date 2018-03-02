@@ -71,7 +71,7 @@ impl Request<ExecutorRPC> for SpawnQuery {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TerminateQuery {
     /// The job to terminate.
-    pub query: QueryId,
+    pub query: JobId,
 }
 
 /// The error message returned by the executor if job termination fails.

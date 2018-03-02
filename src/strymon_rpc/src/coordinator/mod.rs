@@ -83,7 +83,7 @@ pub enum SubmissionError {
 }
 
 impl Request<CoordinatorRPC> for Submission {
-    type Success = QueryId;
+    type Success = JobId;
     type Error = SubmissionError;
 
     const NAME: CoordinatorRPC = CoordinatorRPC::Submission;
@@ -93,7 +93,7 @@ impl Request<CoordinatorRPC> for Submission {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Termination {
     /// Identifier of the job to terminate.
-    pub query: QueryId,
+    pub query: JobId,
 }
 
 /// The error type for failed job termination requests.
@@ -140,7 +140,7 @@ impl Request<CoordinatorRPC> for AddExecutor {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct QueryToken {
     /// The job identifier of the token owner.
-    pub id: QueryId,
+    pub id: JobId,
     /// A opaque random number only known to the job process and the coordinator.
     pub auth: u64,
 }
@@ -149,7 +149,7 @@ pub struct QueryToken {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AddWorkerGroup {
     /// The identifier of the job this group belongs to.
-    pub query: QueryId,
+    pub query: JobId,
     /// The index of this group within the list of groups of the job.
     pub group: usize,
 }

@@ -14,7 +14,7 @@ use clap::{App, AppSettings, Arg, ArgGroup, ArgMatches, SubCommand};
 use failure::{Error, ResultExt};
 
 use strymon_communication::Network;
-use strymon_model::{QueryProgram, QueryId, ExecutionFormat, Executor, ExecutorId};
+use strymon_model::{QueryProgram, JobId, ExecutionFormat, Executor, ExecutorId};
 use strymon_rpc::coordinator::Placement;
 
 pub use self::submitter::Submitter;
@@ -72,7 +72,7 @@ fn parse_placement(args: &ArgMatches, executors: Vec<Executor>) -> Result<Placem
     }
 }
 
-fn submit_binary(binary: String, args: &ArgMatches) -> Result<QueryId, Error> {
+fn submit_binary(binary: String, args: &ArgMatches) -> Result<JobId, Error> {
     eprintln!("Submitting binary {:?}", binary);
 
     let coord = args.value_of("coordinator").unwrap_or("localhost:9189");

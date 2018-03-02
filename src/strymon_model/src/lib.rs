@@ -137,11 +137,11 @@ pub struct Topic {
 /// A unique numerical identifier for a job.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
          Abomonation, TypeName)]
-pub struct QueryId(pub u64);
+pub struct JobId(pub u64);
 
-impl From<u64> for QueryId {
-    fn from(id: u64) -> QueryId {
-        QueryId(id)
+impl From<u64> for JobId {
+    fn from(id: u64) -> JobId {
+        JobId(id)
     }
 }
 
@@ -149,7 +149,7 @@ impl From<u64> for QueryId {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Abomonation, TypeName)]
 pub struct Query {
     /// A unique identifier for this job.
-    pub id: QueryId,
+    pub id: JobId,
     /// A human-readable description of the job.
     pub name: Option<String>,
     /// Information about the job executable.
@@ -213,11 +213,11 @@ pub struct Executor {
 /// There can only be a single publication per topic. A job might publish multiple topics.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
          Abomonation, TypeName)]
-pub struct Publication(pub QueryId, pub TopicId);
+pub struct Publication(pub JobId, pub TopicId);
 
 /// Associates the subscription to a *topic* by a subscribing *job*.
 ///
 /// There can be many subscriptions on a topic. A job might subscribe to multiple topics.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
          Abomonation, TypeName)]
-pub struct Subscription(pub QueryId, pub TopicId);
+pub struct Subscription(pub JobId, pub TopicId);

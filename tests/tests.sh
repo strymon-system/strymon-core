@@ -37,7 +37,7 @@ terminate() {
 wait_job_output() {
     local executor_log="${OUTDIR}/executor_localhost.log"
     for i in $(seq 10); do
-        if grep -F "QueryId(${1}) |" "${executor_log}" | grep -qE "${2}" ; then
+        if grep -F "JobId(${1}) |" "${executor_log}" | grep -qE "${2}" ; then
             return 0
         fi
         sleep 1

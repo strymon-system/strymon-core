@@ -30,7 +30,7 @@ pub struct Catalog {
 
     topics: HashMap<TopicId, Topic>,
     executors: HashMap<ExecutorId, Executor>,
-    queries: HashMap<QueryId, Query>,
+    queries: HashMap<JobId, Query>,
 
     publications: HashSet<Publication>,
     subscriptions: HashSet<Subscription>,
@@ -79,13 +79,13 @@ impl Catalog {
         self.queries.insert(query.id, query);
     }
 
-    pub fn remove_query(&mut self, id: QueryId) {
+    pub fn remove_query(&mut self, id: JobId) {
         debug!("remove_query: {:?}", id);
         self.queries.remove(&id);
     }
 
     pub fn publish(&mut self,
-                   query: QueryId,
+                   query: JobId,
                    name: String,
                    addr: (String, u16),
                    schema: TopicSchema)
@@ -115,7 +115,7 @@ impl Catalog {
     }
 
     pub fn unpublish(&mut self,
-                     query_id: QueryId,
+                     query_id: JobId,
                      topic: TopicId)
                      -> Result<(), UnpublishError> {
         let publication = Publication(query_id, topic);
@@ -138,14 +138,14 @@ impl Catalog {
         }
     }
 
-    pub fn subscribe(&mut self, query_id: QueryId, topic: TopicId) {
+    pub fn subscribe(&mut self, query_id: JobId, topic: TopicId) {
         let subscription = Subscription(query_id, topic);
         debug!("subscribe: {:?}", subscription);
         self.subscriptions.insert(subscription);
     }
 
     pub fn unsubscribe(&mut self,
-                       query_id: QueryId,
+                       query_id: JobId,
                        topic: TopicId)
                        -> Result<(), UnsubscribeError> {
         let subscription = Subscription(query_id, topic);

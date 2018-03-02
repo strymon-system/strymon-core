@@ -73,7 +73,7 @@ use strymon_communication::Network;
 use strymon_communication::rpc::Outgoing;
 
 use strymon_rpc::coordinator::{QueryToken, AddWorkerGroup, CoordinatorRPC};
-use strymon_model::QueryId;
+use strymon_model::JobId;
 use strymon_model::config::job::Process;
 
 /// Handle to communicate with the Strymon coordinator.
@@ -91,7 +91,7 @@ pub struct Coordinator {
 impl Coordinator {
     /// Registers the local job at the coordinator at address `coord`.
     fn initialize(
-        id: QueryId,
+        id: JobId,
         process: usize,
         coord: String,
         hostname: String,
