@@ -30,7 +30,7 @@ pub struct Catalog {
 
     topics: HashMap<TopicId, Topic>,
     executors: HashMap<ExecutorId, Executor>,
-    queries: HashMap<QueryId, Query>,
+    jobs: HashMap<JobId, Job>,
 
     publications: HashSet<Publication>,
     subscriptions: HashSet<Subscription>,
@@ -74,28 +74,28 @@ impl Catalog {
         Executors { inner: self.executors.values() }
     }
 
-    pub fn add_query(&mut self, query: Query) {
-        debug!("add_query: {:?}", query);
-        self.queries.insert(query.id, query);
+    pub fn add_job(&mut self, job: Job) {
+        debug!("add_job: {:?}", job);
+        self.jobs.insert(job.id, job);
     }
 
-    pub fn remove_query(&mut self, id: QueryId) {
-        debug!("remove_query: {:?}", id);
-        self.queries.remove(&id);
+    pub fn remove_job(&mut self, id: JobId) {
+        debug!("remove_job: {:?}", id);
+        self.jobs.remove(&id);
     }
 
     pub fn publish(&mut self,
-                   query: QueryId,
+                   job: JobId,
                    name: String,
                    addr: (String, u16),
                    schema: TopicSchema)
                    -> Result<Topic, PublishError> {
-        // TODO(swicki): Check if query actually exists
+        // TODO(swicki): Check if job actually exists
         match self.directory.entry(name.clone()) {
             Entry::Occupied(_) => Err(PublishError::TopicAlreadyExists),
             Entry::Vacant(entry) => {
                 let id = self.generator.generate();
-                let publication = Publication(query, id);
+                let publication = Publication(job, id);
                 let topic = Topic {
                     id: id,
                     name: name,
@@ -115,10 +115,10 @@ impl Catalog {
     }
 
     pub fn unpublish(&mut self,
-                     query_id: QueryId,
+                     job_id: JobId,
                      topic: TopicId)
                      -> Result<(), UnpublishError> {
-        let publication = Publication(query_id, topic);
+        let publication = Publication(job_id, topic);
         debug!("unpublish: {:?}", publication);
 
         if let Some(name) = self.topics.get(&topic).map(|t| &*t.name) {
@@ -138,17 +138,17 @@ impl Catalog {
         }
     }
 
-    pub fn subscribe(&mut self, query_id: QueryId, topic: TopicId) {
-        let subscription = Subscription(query_id, topic);
+    pub fn subscribe(&mut self, job_id: JobId, topic: TopicId) {
+        let subscription = Subscription(job_id, topic);
         debug!("subscribe: {:?}", subscription);
         self.subscriptions.insert(subscription);
     }
 
     pub fn unsubscribe(&mut self,
-                       query_id: QueryId,
+                       job_id: JobId,
                        topic: TopicId)
                        -> Result<(), UnsubscribeError> {
-        let subscription = Subscription(query_id, topic);
+        let subscription = Subscription(job_id, topic);
         debug!("unsubscribe: {:?}", subscription);
         self.subscriptions.remove(&subscription);
         Ok(())
@@ -164,9 +164,9 @@ impl Catalog {
                 let (_, resp) = req.decode::<AllExecutors>()?;
                 resp.respond(Ok(self.executors.values().cloned().collect()));
             },
-            CatalogRPC::AllQueries => {
-                let (_, resp) = req.decode::<AllQueries>()?;
-                resp.respond(Ok(self.queries.values().cloned().collect()));
+            CatalogRPC::AllJobs => {
+                let (_, resp) = req.decode::<AllJobs>()?;
+                resp.respond(Ok(self.jobs.values().cloned().collect()));
             },
             CatalogRPC::AllPublications => {
                 let (_, resp) = req.decode::<AllPublications>()?;

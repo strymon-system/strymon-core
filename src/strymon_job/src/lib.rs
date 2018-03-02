@@ -72,8 +72,8 @@ use timely_communication::initialize::{Configuration, WorkerGuards};
 use strymon_communication::Network;
 use strymon_communication::rpc::Outgoing;
 
-use strymon_rpc::coordinator::{QueryToken, AddWorkerGroup, CoordinatorRPC};
-use strymon_model::QueryId;
+use strymon_rpc::coordinator::{JobToken, AddWorkerGroup, CoordinatorRPC};
+use strymon_model::JobId;
 use strymon_model::config::job::Process;
 
 /// Handle to communicate with the Strymon coordinator.
@@ -83,7 +83,7 @@ use strymon_model::config::job::Process;
 /// users must register the current process with `strymon_job::execute`.
 #[derive(Clone)]
 pub struct Coordinator {
-    token: QueryToken,
+    token: JobToken,
     network: Network,
     tx: Outgoing,
 }
@@ -91,7 +91,7 @@ pub struct Coordinator {
 impl Coordinator {
     /// Registers the local job at the coordinator at address `coord`.
     fn initialize(
-        id: QueryId,
+        id: JobId,
         process: usize,
         coord: String,
         hostname: String,
@@ -100,7 +100,7 @@ impl Coordinator {
         let (tx, _) = network.client::<CoordinatorRPC, _>(&*coord)?;
 
         let announce = tx.request(&AddWorkerGroup {
-            query: id,
+            job: id,
             group: process,
         });
 

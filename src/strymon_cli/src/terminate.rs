@@ -9,7 +9,7 @@
 use clap::{App, Arg, ArgMatches, SubCommand};
 use failure::{Error, ResultExt};
 
-use strymon_model::QueryId;
+use strymon_model::JobId;
 use strymon_communication::Network;
 use super::submit::Submitter;
 
@@ -40,7 +40,7 @@ pub fn main(args: &ArgMatches) -> Result<(), Error> {
     let id = value_t!(args.value_of("job"), u64).context(
         "Unable to parse job id",
     )?;
-    submitter.terminate(QueryId(id)).wait_unwrap().map_err(
+    submitter.terminate(JobId(id)).wait_unwrap().map_err(
         |e| {
             format_err!("Failed to terminate job: {:?}", e)
         },

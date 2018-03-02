@@ -38,7 +38,7 @@ impl Submitter {
 
     pub fn submit<N>(
         &self,
-        query: QueryProgram,
+        job: JobProgram,
         name: N,
         placement: Placement,
     ) -> Response<CoordinatorRPC, Submission>
@@ -46,7 +46,7 @@ impl Submitter {
         N: Into<Option<String>>,
     {
         let submission = Submission {
-            query: query,
+            job: job,
             name: name.into(),
             placement: placement,
         };
@@ -54,8 +54,8 @@ impl Submitter {
         self.coord.request(&submission)
     }
 
-    pub fn terminate(&self, id: QueryId) -> Response<CoordinatorRPC, Termination> {
-        let termination = Termination { query: id };
+    pub fn terminate(&self, id: JobId) -> Response<CoordinatorRPC, Termination> {
+        let termination = Termination { job: id };
 
         self.coord.request(&termination)
     }
@@ -76,8 +76,8 @@ impl Submitter {
         )
     }
 
-    pub fn queries(&self) -> Result<Vec<Query>> {
-        self.catalog.request(&AllQueries::new()).wait().map_err(
+    pub fn jobs(&self) -> Result<Vec<Job>> {
+        self.catalog.request(&AllJobs::new()).wait().map_err(
             |err| {
                 err.unwrap_err()
             },

@@ -64,7 +64,7 @@ pub enum Placement {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Submission {
     /// Specifies the job executable.
-    pub query: QueryProgram,
+    pub job: JobProgram,
     /// An optional human-readable description.
     pub name: Option<String>,
     /// The placement of workers in the cluster.
@@ -83,7 +83,7 @@ pub enum SubmissionError {
 }
 
 impl Request<CoordinatorRPC> for Submission {
-    type Success = QueryId;
+    type Success = JobId;
     type Error = SubmissionError;
 
     const NAME: CoordinatorRPC = CoordinatorRPC::Submission;
@@ -93,7 +93,7 @@ impl Request<CoordinatorRPC> for Submission {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Termination {
     /// Identifier of the job to terminate.
-    pub query: QueryId,
+    pub job: JobId,
 }
 
 /// The error type for failed job termination requests.
@@ -138,9 +138,9 @@ impl Request<CoordinatorRPC> for AddExecutor {
 
 /// An opaque token used by job worker groups to authenticate themselves at the coordinator.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct QueryToken {
+pub struct JobToken {
     /// The job identifier of the token owner.
-    pub id: QueryId,
+    pub id: JobId,
     /// A opaque random number only known to the job process and the coordinator.
     pub auth: u64,
 }
@@ -149,7 +149,7 @@ pub struct QueryToken {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AddWorkerGroup {
     /// The identifier of the job this group belongs to.
-    pub query: QueryId,
+    pub job: JobId,
     /// The index of this group within the list of groups of the job.
     pub group: usize,
 }
@@ -166,7 +166,7 @@ pub enum WorkerGroupError {
 }
 
 impl Request<CoordinatorRPC> for AddWorkerGroup {
-    type Success = QueryToken;
+    type Success = JobToken;
     type Error = WorkerGroupError;
 
     const NAME: CoordinatorRPC = CoordinatorRPC::AddWorkerGroup;
@@ -181,7 +181,7 @@ pub struct Subscribe {
     /// Otherwise, an error message is returned indicating that the requested topic does not exist.
     pub blocking: bool,
     /// A token authenticating the the submitter as a successfully spawned job.
-    pub token: QueryToken,
+    pub token: JobToken,
 }
 
 /// The error message sent back to unsuccessful subscription requests.
@@ -206,7 +206,7 @@ pub struct Unsubscribe {
     /// The identifier of the subscribed topic.
     pub topic: TopicId,
     /// A token authenticating the the submitter as a successfully spawned job.
-    pub token: QueryToken,
+    pub token: JobToken,
 }
 
 /// The error message sent back for failed unsubscription request.
@@ -235,7 +235,7 @@ pub struct Publish {
     /// The kind of topic being published.
     pub schema: TopicSchema,
     /// A token authenticating the the submitter as a successfully spawned job.
-    pub token: QueryToken,
+    pub token: JobToken,
 }
 
 /// The error message sent back for failed publication request.
@@ -260,7 +260,7 @@ pub struct Unpublish {
     /// The identifier of the topic to unpublish.
     pub topic: TopicId,
     /// A token authenticating the the submitter as a successfully spawned job.
-    pub token: QueryToken,
+    pub token: JobToken,
 }
 
 /// The error message sent back for failed unpublication request.

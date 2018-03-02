@@ -21,7 +21,7 @@ use tokio_io;
 use tokio_core::reactor::Handle;
 use tokio_process::{Child, CommandExt};
 
-use strymon_model::QueryId;
+use strymon_model::JobId;
 use strymon_model::config::job::Process;
 use strymon_rpc::executor::{SpawnError, TerminateError};
 
@@ -92,7 +92,7 @@ type ProcessId = u32;
 #[derive(Debug)]
 pub struct ProcessService {
     /// currently running child processes
-    running: Rc<RefCell<HashMap<QueryId, ProcessId>>>,
+    running: Rc<RefCell<HashMap<JobId, ProcessId>>>,
     /// handle for spawning futures in tokio
     handle: Handle,
     /// strymon configuration, to be passed down to spawned jobs
@@ -114,7 +114,7 @@ impl ProcessService {
     }
 
     /// handles and logs the stdout/stderr of the spawned child process
-    fn log_output(&mut self, id: QueryId, child: &mut Child) {
+    fn log_output(&mut self, id: JobId, child: &mut Child) {
         let stdout = child.stdout().take().unwrap();
         let reader = BufReader::new(stdout);
         let lines = tokio_io::io::lines(reader).map_err(|err| {
@@ -137,7 +137,7 @@ impl ProcessService {
     }
 
     // sets up output handling, stores the PID for termination and installs a "SIGCHILD handler"
-    fn supervise(&mut self, job_id: QueryId, mut child: Child) {
+    fn supervise(&mut self, job_id: JobId, mut child: Child) {
         // keep the pid of the running child for termination
         self.running.borrow_mut().insert(job_id, child.id());
         // setup the logging of stdout/stderr
@@ -163,7 +163,7 @@ impl ProcessService {
     /// Spawns a new process to be supervised by this process service. The Timely
     /// configuration stored in the Builder is extracted and passed down to the
     /// spawned child process.
-    pub fn spawn(&mut self, id: QueryId, builder: Builder) -> Result<(), SpawnError> {
+    pub fn spawn(&mut self, id: JobId, builder: Builder) -> Result<(), SpawnError> {
         let conf = Process {
             job_id: id,
             index: builder.process,
@@ -190,7 +190,7 @@ impl ProcessService {
 
     /// Tries to terminate the process assigned to a given job identifier, this
     /// will result in a SIGTERM being send to the child on Unix platforms.
-    pub fn terminate(&mut self, job_id: QueryId) -> Result<(), TerminateError> {
+    pub fn terminate(&mut self, job_id: JobId) -> Result<(), TerminateError> {
         if let Some(pid) = self.running.borrow_mut().remove(&job_id) {
             terminate_process(pid)
         } else {

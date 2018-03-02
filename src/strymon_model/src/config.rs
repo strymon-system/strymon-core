@@ -14,7 +14,7 @@ pub mod job {
     use std::env;
     use std::num;
 
-    use QueryId;
+    use JobId;
 
     /// The configuration of a job processes.
     ///
@@ -22,7 +22,7 @@ pub mod job {
     #[derive(Clone, Debug, PartialEq, Eq)]
     pub struct Process {
         /// Job this process belongs to
-        pub job_id: QueryId,
+        pub job_id: JobId,
         /// Index of this process (worker group)
         pub index: usize,
         /// Addresses of all worker groups of this same job
@@ -46,7 +46,7 @@ pub mod job {
         /// Decodes the process configuration from the environment, i.e. using `std::env::var`.
         pub fn from_env() -> Result<Self, EnvError> {
             Ok(Process {
-                job_id: QueryId::from(env::var(JOB_ID)?.parse::<u64>()?),
+                job_id: JobId::from(env::var(JOB_ID)?.parse::<u64>()?),
                 index: env::var(PROCESS_INDEX)?.parse::<usize>()?,
                 addrs: env::var(PROCESS_ADDRS)?
                     .split('|')
@@ -121,7 +121,7 @@ pub mod job {
     #[cfg(test)]
     mod tests {
         use std::env;
-        use QueryId;
+        use JobId;
         use config::job::Process;
 
         #[test]
@@ -142,7 +142,7 @@ pub mod job {
             }
 
             assert_env_invariant(Process {
-                job_id: QueryId(1),
+                job_id: JobId(1),
                 index: 0,
                 addrs: vec![],
                 threads: 1,
@@ -150,7 +150,7 @@ pub mod job {
                 hostname: "bar".into(),
             });
             assert_env_invariant(Process {
-                job_id: QueryId(2),
+                job_id: JobId(2),
                 index: 0,
                 addrs: vec!["foo".into()],
                 threads: 4,
@@ -158,7 +158,7 @@ pub mod job {
                 hostname: "bar".into(),
             });
             assert_env_invariant(Process {
-                job_id: QueryId(3),
+                job_id: JobId(3),
                 index: 1,
                 addrs: vec!["host:1".into(), "host:2".into()],
                 threads: 1,

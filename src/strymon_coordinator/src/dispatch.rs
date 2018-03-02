@@ -52,10 +52,10 @@ impl Dispatch {
                 self.handle.spawn(termination);
             }
             AddWorkerGroup::NAME => {
-                let (AddWorkerGroup { query, group }, resp) =
+                let (AddWorkerGroup { job, group }, resp) =
                     req.decode::<AddWorkerGroup>()?;
                 let response = self.coord
-                    .add_worker_group(query, group)
+                    .add_worker_group(job, group)
                     .then(|res| Ok(resp.respond(res)));
                 self.handle.spawn(response);
             }

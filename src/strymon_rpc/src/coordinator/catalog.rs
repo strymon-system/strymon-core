@@ -23,7 +23,7 @@ pub enum CatalogRPC {
     /// Return a list of all available executors.
     AllExecutors = 2,
     /// Return a list of all running jobs.
-    AllQueries = 3,
+    AllJobs = 3,
     /// Return a list of all publications.
     AllPublications = 4,
     /// Return a list of all subscriptions.
@@ -69,6 +69,6 @@ macro_rules! impl_request {
 
 impl_request!(AllTopics, Vec<Topic>, "The request type use to query a list of all topics.");
 impl_request!(AllExecutors, Vec<Executor>, "The request type use to query a list of all executors.");
-impl_request!(AllQueries, Vec<Query>, "The request type use to query a list of all jobs.");
+impl_request!(AllJobs, Vec<Job>, "The request type use to query a list of all jobs.");
 impl_request!(AllPublications, Vec<Publication>, "The request type use to query a list of all publications.");
 impl_request!(AllSubscriptions, Vec<Subscription>, "The request type use to query a list of all subscriptions.");
