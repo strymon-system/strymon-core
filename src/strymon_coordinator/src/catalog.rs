@@ -164,8 +164,8 @@ impl Catalog {
                 let (_, resp) = req.decode::<AllExecutors>()?;
                 resp.respond(Ok(self.executors.values().cloned().collect()));
             },
-            CatalogRPC::AllQueries => {
-                let (_, resp) = req.decode::<AllQueries>()?;
+            CatalogRPC::AllJobs => {
+                let (_, resp) = req.decode::<AllJobs>()?;
                 resp.respond(Ok(self.queries.values().cloned().collect()));
             },
             CatalogRPC::AllPublications => {

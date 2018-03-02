@@ -77,7 +77,7 @@ impl Submitter {
     }
 
     pub fn queries(&self) -> Result<Vec<Job>> {
-        self.catalog.request(&AllQueries::new()).wait().map_err(
+        self.catalog.request(&AllJobs::new()).wait().map_err(
             |err| {
                 err.unwrap_err()
             },
