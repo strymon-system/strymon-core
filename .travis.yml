@@ -2,12 +2,14 @@ language: rust
 rust:
   - stable
   - nightly
-script:
-  - cargo test --verbose --all
-  - bash -x ./tests/tests.sh
+
+script: cargo test --verbose --all
 
 jobs:
   include:
+    - stage: test
+      script: bash -x ./tests/tests.sh
+      rust: stable
     - stage: deploy
       rust: stable
       script: ./bin/build-docs.sh
