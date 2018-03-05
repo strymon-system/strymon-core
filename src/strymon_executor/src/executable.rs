@@ -6,6 +6,12 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+//! Job supervision logic for native executables.
+//!
+//! This module implements the logic for running a submitted job as an operating system process.
+//! New job processes are configured using the [`Builder`](struct.Builder.html) type and then
+//! spawned using the [`ProcessService`](struct.ProcessService.html).
+
 use std::rc::Rc;
 use std::cell::RefCell;
 use std::process::{Command, Stdio};
@@ -25,6 +31,20 @@ use strymon_model::JobId;
 use strymon_model::config::job::Process;
 use strymon_rpc::executor::{SpawnError, TerminateError};
 
+/// A builder for configuring a new job process.
+///
+/// In order to spawn a configured binary, it has to be passed to a running `ProcessService`
+/// instance:
+///
+/// # Examples
+/// ```rust,no_run
+/// use strymon_executor::executable::Builder;
+///
+/// let mut process = Builder::new("my_job", &["arg1"]).unwrap();
+/// process
+///     .process(0)
+///     .threads(4);
+/// ```
 #[derive(Debug)]
 pub struct Builder {
     // executable, including command line arguments
@@ -36,7 +56,7 @@ pub struct Builder {
 }
 
 impl Builder {
-    /// Creates a new builder for the given native executable.
+    /// Creates a new builder for the given native executable file.
     pub fn new<T, S, I>(executable: T, args: I) -> Result<Self, SpawnError>
         where T: AsRef<Path>, S: AsRef<OsStr>, I: IntoIterator<Item = S>
     {
@@ -54,25 +74,25 @@ impl Builder {
         })
     }
 
-    /// Sets the number of Timely threads *per worker* (default: 1)
+    /// Sets the number of Timely threads *per worker* (default: `1`)
     pub fn threads(&mut self, threads: usize) -> &mut Self {
         self.threads = threads;
         self
     }
 
-    /// Sets the current Timely process id (default: 0)
+    /// Sets the current Timely process id (default: `0`)
     pub fn process(&mut self, process: usize) -> &mut Self {
         self.process = process;
         self
     }
 
-    /// Specify the host names of all Timely processes (default: [])
+    /// Specify the host names of all Timely processes (default: `[]`)
     pub fn hostlist(&mut self, hostlist: Vec<String>) -> &mut Self {
         self.hostlist = hostlist;
         self
     }
 
-    /// Sets the working directory of the child process (default: the current working directory)
+    /// Sets the working directory of the child process (default: `std::env::current_dir()`)
     pub fn working_directory<P: AsRef<Path>>(&mut self, workdir: P) -> &mut Self {
         self.cmd.current_dir(workdir);
         self
@@ -82,7 +102,7 @@ impl Builder {
 // On Windows, we might want to keep a RawHandle instead of the PID
 type ProcessId = u32;
 
-/// The process supervision logic.
+/// Strymon job process spawning and supervision service.
 ///
 /// This structure is responsible for keeping track of the currently running
 /// child processes, their output and handles potential termination requests.
@@ -101,9 +121,10 @@ pub struct ProcessService {
 }
 
 impl ProcessService {
-    /// Create a new service which will spawn processes using the tokio event
-    /// loop of the `handle`. The `coord` and `hostname` configuration values
-    /// are passed down to the spawned jobs
+    /// Create a new service instance.
+    ///
+    /// This will spawn processes using the tokio event loop of the `handle`.
+    /// The `coord` and `hostname` configuration values are passed down to the spawned jobs.
     pub fn new(handle: &Handle, coord: String, hostname: String) -> Self {
         ProcessService {
             running: Default::default(),
@@ -160,9 +181,10 @@ impl ProcessService {
         }));
     }
 
-    /// Spawns a new process to be supervised by this process service. The Timely
-    /// configuration stored in the Builder is extracted and passed down to the
-    /// spawned child process.
+    /// Spawns a new process to be supervised by this process service.
+    ///
+    /// The Timely configuration stored in the Builder is extracted and passed down to the spawned
+    /// child process.
     pub fn spawn(&mut self, id: JobId, builder: Builder) -> Result<(), SpawnError> {
         let conf = Process {
             job_id: id,
@@ -188,8 +210,9 @@ impl ProcessService {
         Ok(())
     }
 
-    /// Tries to terminate the process assigned to a given job identifier, this
-    /// will result in a SIGTERM being send to the child on Unix platforms.
+    /// Tries to terminate the process assigned to a given job identifier.
+    ///
+    /// This will result in a SIGTERM being send to the child on Unix platforms.
     pub fn terminate(&mut self, job_id: JobId) -> Result<(), TerminateError> {
         if let Some(pid) = self.running.borrow_mut().remove(&job_id) {
             terminate_process(pid)
