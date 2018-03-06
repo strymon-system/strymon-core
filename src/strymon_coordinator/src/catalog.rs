@@ -6,6 +6,15 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+//! The catalog contains meta-data about the current state of the system.
+//!
+//! It can be queried by jobs and external entities using the
+//! [`CatalogRPC`](../strymon_rpc/coordinator/catalog/index.html) interface, which is exposed by
+//! by the [`Service`](struct.Service.html). Incoming catalog requests are processed
+//! by the [`Catalog::request`](struct.Catalog.html#method.request) method.
+//! The other public methods are for use in the [`Coordinator`](../handler/struct.Coordinator.html)
+//! implementation.
+
 use std::io;
 use std::collections::{HashMap, HashSet};
 use std::collections::hash_map::{Entry, Values};
@@ -23,6 +32,7 @@ use super::util::Generator;
 
 type Addr = (String, u16);
 
+/// A representation of the current catalog state.
 #[derive(Debug, Clone, Default)]
 pub struct Catalog {
     generator: Generator<TopicId>,
@@ -37,6 +47,11 @@ pub struct Catalog {
 }
 
 impl Catalog {
+    /// Creates a new catalog instance, containing a self-referring topic.
+    ///
+    /// The created instance will contain a single topic announcing the address of
+    /// the catalog itself (given through the `addr` argument). The created initial topic will
+    /// have the name `"$catalog"` and is of schema `Service(CatalogRPC)`.
     pub fn new(addr: Addr) -> Self {
         let mut generator = Generator::<TopicId>::new();
         let mut directory = HashMap::<String, TopicId>::new();
@@ -60,30 +75,38 @@ impl Catalog {
        }
     }
 
+    /// Inserts a new available executor into the catalog.
     pub fn add_executor(&mut self, executor: Executor) {
         debug!("add_executor: {:?}", executor);
         self.executors.insert(executor.id, executor);
     }
 
+    /// Removes an existing executor from the catalog.
     pub fn remove_executor(&mut self, id: ExecutorId) {
         debug!("remove_executor: {:?}", id);
         self.executors.remove(&id);
     }
 
+    /// Returns an iterator over all existing executors.
     pub fn executors<'a>(&'a self) -> Executors<'a> {
         Executors { inner: self.executors.values() }
     }
 
+    /// Adds a new completely spawned job.
     pub fn add_job(&mut self, job: Job) {
         debug!("add_job: {:?}", job);
         self.jobs.insert(job.id, job);
     }
 
+    /// Removes a job from the catalog.
     pub fn remove_job(&mut self, id: JobId) {
         debug!("remove_job: {:?}", id);
         self.jobs.remove(&id);
     }
 
+    /// Creates and announces a new topic.
+    ///
+    /// This fails if a topic with the same name already exists.
     pub fn publish(&mut self,
                    job: JobId,
                    name: String,
@@ -114,6 +137,7 @@ impl Catalog {
         }
     }
 
+    /// Removes a publication from the catalog.
     pub fn unpublish(&mut self,
                      job_id: JobId,
                      topic: TopicId)
@@ -130,6 +154,9 @@ impl Catalog {
         Ok(())
     }
 
+    /// Finds a topic by name.
+    ///
+    /// Returns `None` if the topic does not exist.
     pub fn lookup(&self, name: &str) -> Option<Topic> {
         if let Some(id) = self.directory.get(name) {
             self.topics.get(&id).cloned()
@@ -138,12 +165,14 @@ impl Catalog {
         }
     }
 
+    /// Adds a new subscription to the catalog.
     pub fn subscribe(&mut self, job_id: JobId, topic: TopicId) {
         let subscription = Subscription(job_id, topic);
         debug!("subscribe: {:?}", subscription);
         self.subscriptions.insert(subscription);
     }
 
+    /// Removes a subscription from the catalog.
     pub fn unsubscribe(&mut self,
                        job_id: JobId,
                        topic: TopicId)
@@ -154,6 +183,7 @@ impl Catalog {
         Ok(())
     }
 
+    /// Decodes and responds to an incoming catalog service request.
     pub fn request(&self, req: RequestBuf<CatalogRPC>) -> io::Result<()> {
         match *req.name() {
             CatalogRPC::AllTopics => {
@@ -181,6 +211,7 @@ impl Catalog {
     }
 }
 
+/// An iterator over all the executors of the catalog.
 pub struct Executors<'a> {
     inner: Values<'a, ExecutorId, Executor>,
 }
@@ -193,11 +224,15 @@ impl<'a> Iterator for Executors<'a> {
     }
 }
 
+/// The service for the catalog.
+///
+/// Handles connection to incoming clients and forwards their `CatalogRPC` requests.
 pub struct Service {
     stream: mpsc::UnboundedReceiver<RequestBuf<CatalogRPC>>,
 }
 
 impl Service {
+    /// Creates a new service, returning the address of its endpoint.
     pub fn new(network: &Network, handle: &Handle) -> io::Result<(Addr, Self)> {
         let server = network.server::<CatalogRPC, _>(None)?;
         let addr = {
