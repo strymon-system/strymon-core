@@ -6,16 +6,20 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+//! Client dispatch and request completion logic.
+
 use std::io::Error;
 
 use futures::future::Future;
+use futures::stream::Stream;
 use tokio_core::reactor::Handle;
 
-use strymon_communication::rpc::{Outgoing, Request, RequestBuf};
+use strymon_communication::rpc::{Incoming, Outgoing, Request, RequestBuf};
 
 use handler::CoordinatorRef;
 use strymon_rpc::coordinator::*;
 
+/// The dispatcher assigned to each incoming connection.
 pub struct Dispatch {
     coord: CoordinatorRef,
     handle: Handle,
@@ -23,6 +27,7 @@ pub struct Dispatch {
 }
 
 impl Dispatch {
+    /// Creates a new dispatcher instance.
     pub fn new(coord: CoordinatorRef, handle: Handle, tx: Outgoing) -> Self {
         debug!("dispatching on new incoming connection");
         Dispatch {
@@ -32,7 +37,8 @@ impl Dispatch {
         }
     }
 
-    pub fn dispatch<'a>(&'a mut self, req: RequestBuf<CoordinatorRPC>) -> Result<(), Error> {
+    /// Decodes a single incoming request, spawns a new completion task where necessary.
+    fn dispatch<'a>(&'a mut self, req: RequestBuf<CoordinatorRPC>) -> Result<(), Error> {
         debug!("dispatching request {:?}", req.name());
         match *req.name() {
             Submission::NAME => {
@@ -89,6 +95,19 @@ impl Dispatch {
             }
         }
 
+        Ok(())
+    }
+
+    /// Decodes and dispatches each incoming request.
+    pub fn client(mut self, rx: Incoming<CoordinatorRPC>) -> Result<(), Error> {
+        let handle = self.handle.clone();
+        let client = rx.for_each(move |req| self.dispatch(req))
+            .map_err(|err| {
+                error!("failed to dispatch client: {:?}", err);
+            });
+
+        // handle client asynchronously
+        handle.spawn(client);
         Ok(())
     }
 }
