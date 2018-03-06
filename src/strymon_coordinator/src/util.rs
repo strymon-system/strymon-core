@@ -9,6 +9,7 @@
 use std::ops::RangeFrom;
 use std::marker::PhantomData;
 
+/// A helper type for generating sequential identifiers
 #[derive(Debug, Clone)]
 pub struct Generator<T> {
     generator: RangeFrom<u64>,
@@ -16,6 +17,7 @@ pub struct Generator<T> {
 }
 
 impl<T: From<u64>> Generator<T> {
+    /// Creates a new generator starting at `From::from(0)`
     pub fn new() -> Self {
         Generator {
             generator: 0..,
@@ -23,6 +25,7 @@ impl<T: From<u64>> Generator<T> {
         }
     }
 
+    /// Generates the next sequence number.
     pub fn generate(&mut self) -> T {
         From::from(self.generator.next().unwrap())
     }
