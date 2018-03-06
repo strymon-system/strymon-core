@@ -34,6 +34,16 @@ use clap::{App, AppSettings, Arg};
 use env_logger::{Builder, Target};
 use failure::Error;
 
+/// Parses the command line arguments and invokes any matching subcommands.
+///
+/// Each subcommand (e.g. `status`, `submit`, `manage`, etc) is implemented in its own submodule
+/// and must export the following two functions:
+/// ```rust,ignore
+/// // Constructs an `App` definition for argument parsing and printing.
+/// pub fn usage<'a, 'b>() -> clap::App<'a, 'b>;
+/// // Executes the subcommand given the parsed arguments.
+/// pub fn main(args: &clap::ArgMatches) -> Result<(), failure::Error>;
+/// ```
 fn dispatch() -> Result<(), Error> {
     let matches = App::new("Strymon")
         .version("0.1")
@@ -75,11 +85,12 @@ fn dispatch() -> Result<(), Error> {
 fn main() {
     if let Err(err) = dispatch() {
         eprintln!("Error: {}", err);
-
         for cause in err.causes().skip(1) {
             eprintln!("Caused by: {}", cause);
         }
 
+        // with `failure 0.1`, the backtrace is only printed if `RUST_BACKTRACE=1` is set as an
+        // environment variable
         for line in err.backtrace().to_string().lines() {
             error!("{}", line);
         }

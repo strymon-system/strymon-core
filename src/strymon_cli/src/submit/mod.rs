@@ -22,6 +22,8 @@ pub use self::submitter::Submitter;
 mod submitter;
 mod build;
 
+/// Parses the `--placement-strategy` argument, given the list of available executors. See the
+/// `AFTER_HELP` text below for the input format.
 fn parse_placement(args: &ArgMatches, executors: Vec<Executor>) -> Result<Placement, Error> {
     fn parse_err(arg: &str) -> String {
         format!("Failed to parse value of '--{}' option", arg)
@@ -72,6 +74,8 @@ fn parse_placement(args: &ArgMatches, executors: Vec<Executor>) -> Result<Placem
     }
 }
 
+/// Given a path to a Strymon job binary (and a its configuration in the form of command-line
+/// arguments), issues a submission request to the coordinator and waits for it to return.
 fn submit_binary(binary: String, args: &ArgMatches) -> Result<JobId, Error> {
     eprintln!("Submitting binary {:?}", binary);
 

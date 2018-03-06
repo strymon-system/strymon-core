@@ -15,6 +15,10 @@ use failure::{Error, err_msg};
 use log::Level;
 use serde_json::{Value, Deserializer};
 
+/// Given a `path` to a Cargo project, builds it and returns a path to the binary.
+///
+/// This makes use of Cargo's JSON metadata output. It also parses additional Cargo arguments
+/// passed down in `args` (e.g. for feature selection), see the `usage` function for details.
 pub fn binary(path: &Path, args: &ArgMatches) -> Result<String, Error> {
     let mut cargo = Command::new("cargo");
     cargo.arg("build").args(&["--message-format", "json"]);
