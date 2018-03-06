@@ -11,6 +11,8 @@ Please follow the [documentation](http://strymon-system.github.io/docs/) and gui
 
  - [Getting started](https://strymon-system.github.io/docs/getting-started)
  - [Running the example](http://strymon-system.github.io/docs/running-the-example)
+ - [API documentation](https://strymon-system.github.io/strymon-core)
+
 
 ## Requirements
 
