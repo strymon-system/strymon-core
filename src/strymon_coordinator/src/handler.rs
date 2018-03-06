@@ -20,11 +20,12 @@ use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::collections::btree_map::Entry;
 use std::rc::{Rc, Weak};
 use std::cell::RefCell;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use futures::{self, Future};
 use futures::stream::{self, Stream};
 use futures::unsync::oneshot::{channel, Sender};
+use futures_timer::ext::FutureExt;
 use tokio_core::reactor::Handle;
 
 use rand;
@@ -40,6 +41,8 @@ use strymon_rpc::coordinator::catalog::CatalogRPC;
 use catalog::Catalog;
 
 use super::util::Generator;
+
+const JOB_SUBMISSION_TIMEOUT_SECS: u64 = 30;
 
 /// The connection and available `timely_communication` ports of an registered executor.
 struct ExecutorResources {
@@ -276,7 +279,6 @@ impl Coordinator {
             self.reactor.spawn(response);
         }
 
-        // TODO(swicki) add a timeout that triggers SpawnFailed here
         debug!("add pending submission for {:?}", job.id);
         let (tx, rx) = channel();
         let state = JobState::Spawning {
@@ -293,7 +295,15 @@ impl Coordinator {
         };
         self.jobs.insert(jobid, job_resources);
 
-        Box::new(rx.then(|res| res.expect("submission canceled?!")))
+        let response = rx
+            .then(|res| res.unwrap_or(Err(SubmissionError::Other)))
+            .timeout(Duration::from_secs(JOB_SUBMISSION_TIMEOUT_SECS))
+            .map_err(move |err| {
+                handle.borrow_mut().cancel_submission(jobid, err.clone());
+                err
+            });
+
+        Box::new(response)
     }
 
     /// Cancels a pending submission, informing already available workers to shut down.

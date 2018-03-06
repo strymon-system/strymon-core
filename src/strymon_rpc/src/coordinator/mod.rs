@@ -11,6 +11,8 @@
 
 pub mod catalog;
 
+use std::io;
+
 use num_traits::FromPrimitive;
 
 use strymon_model::*;
@@ -80,6 +82,16 @@ pub enum SubmissionError {
     ExecutorUnreachable,
     /// An executor reported an error while spawning.
     SpawnError(::executor::SpawnError),
+    /// The coordinator timed out waiting for worker groups to arrive
+    TimedOut,
+    /// An unknown error occured.
+    Other,
+}
+
+impl From<io::Error> for SubmissionError {
+    fn from(_: io::Error) -> SubmissionError {
+        SubmissionError::TimedOut
+    }
 }
 
 impl Request<CoordinatorRPC> for Submission {
