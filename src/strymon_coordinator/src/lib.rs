@@ -63,6 +63,7 @@
 extern crate log;
 extern crate rand;
 extern crate futures;
+extern crate futures_timer;
 extern crate tokio_core;
 
 extern crate strymon_rpc;

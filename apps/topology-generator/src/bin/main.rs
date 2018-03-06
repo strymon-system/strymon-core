@@ -8,7 +8,7 @@
 
 extern crate rand;
 extern crate futures;
-extern crate tokio_timer;
+extern crate futures_timer;
 
 extern crate strymon_job;
 extern crate strymon_communication;
@@ -21,9 +21,9 @@ use std::time::Duration;
 
 use futures::future::Future;
 use futures::stream::{Stream, FuturesUnordered};
+use futures_timer::Delay;
 
 use rand::{ThreadRng, Rng};
-use tokio_timer::Timer;
 
 use timely::dataflow::operators::{Input, Probe};
 
@@ -97,7 +97,6 @@ struct TopologyServer {
     pending: FuturesUnordered<Box<Future<Item=Vec<Connection>, Error=io::Error>>>,
     server: Service<TopologyService>,
     topo: TopologyManager,
-    timer: Timer,
 }
 
 enum Event {
@@ -109,7 +108,6 @@ impl TopologyServer {
     fn new(topo: Topology, server: Service<TopologyService>) -> Self {
         TopologyServer {
             pending: FuturesUnordered::new(),
-            timer: Timer::default(),
             server: server,
             topo: TopologyManager::new(topo),
         }
@@ -133,10 +131,8 @@ impl TopologyServer {
                     .map(|&e| (Entity::Connection(e), -1))
                     .collect();
 
-                let restore = self.timer
-                    .sleep(Duration::from_secs(FAULT_DURATION_SECS))
-                    .and_then(move |_| Ok(removed))
-                    .map_err(|err| io::Error::new(io::ErrorKind::Other, err));
+                let restore = Delay::new(Duration::from_secs(FAULT_DURATION_SECS))
+                    .and_then(move |()| Ok(removed));
 
                 resp.respond(Ok(()));
                 self.pending.push(Box::new(restore));
