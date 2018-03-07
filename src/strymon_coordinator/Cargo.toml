@@ -1,13 +1,13 @@
 [package]
 name = "strymon_coordinator"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Sebastian Wicki <swicki@inf.ethz.ch>"]
 
 [dependencies]
 log = "0.4"
 futures = "0.1"
 futures-timer = "0.1"
-rand = "0.3"
+rand = "0.4"
 tokio-core = "0.1"
 
 [dependencies.strymon_communication]
