@@ -190,7 +190,8 @@ impl Coordinator {
             let (executors, num_executors, num_workers) = match req.placement {
                 Placement::Random(num_executors, num_workers) => {
                     let mut rng = rand::thread_rng();
-                    let selected = rand::sample(&mut rng, executors, num_executors);
+                    let selected = rand::seq::sample_iter(&mut rng, executors, num_executors)
+                        .unwrap_or_else(|e| e);
                     (selected, num_executors, num_workers)
                 }
                 Placement::Fixed(executor_ids, num_workers) => {

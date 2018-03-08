@@ -46,7 +46,7 @@ use failure::Error;
 /// ```
 fn dispatch() -> Result<(), Error> {
     let matches = App::new("Strymon")
-        .version("0.1")
+        .version("0.2")
         .author("Systems Group, ETH Zürich")
         .setting(AppSettings::SubcommandRequiredElseHelp)
         .subcommand(status::usage())

@@ -1,10 +1,10 @@
 [package]
 authors = ["Sebastian Wicki <swicki@inf.ethz.ch>"]
 name = "topology_generator"
-version = "0.1.1"
+version = "0.2.0"
 
 [dependencies]
-rand = "0.3.17"
+rand = "0.4"
 timely = "0.5"
 abomonation = "0.5"
 abomonation_derive = "0.3"
