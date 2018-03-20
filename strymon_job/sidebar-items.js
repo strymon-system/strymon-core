@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["execute","Executes a Timely dataflow within this Strymon job."]],"mod":[["operators","Types used by Strymon-specific operators such as `publish` and `subscribe`."]],"struct":[["Coordinator","Handle to communicate with the Strymon coordinator."]]});

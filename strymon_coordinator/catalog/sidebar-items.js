@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Catalog","A representation of the current catalog state."],["Executors","An iterator over all the executors of the catalog."],["Service","The service for the catalog."]]});

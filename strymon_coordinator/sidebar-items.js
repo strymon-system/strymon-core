@@ -1,0 +1,1 @@
+initSidebarItems({"mod":[["catalog","The catalog contains meta-data about the current state of the system."],["dispatch","Client dispatch and request completion logic."],["handler","The coordinator request handler."]],"struct":[["Builder","Creates a new coordinator instance."]]});

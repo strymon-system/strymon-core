@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Listener","A queue handle accepting incoming connections."],["Receiver","A queue handle for receiving messages on the channel."],["Sender","A queue handle to send messages on the channel."]]});

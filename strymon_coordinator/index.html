@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="API documentation for the Rust `strymon_coordinator` crate.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, strymon_coordinator">
+
+    <title>strymon_coordinator - Rust</title>
+
+    <link rel="stylesheet" type="text/css" href="../normalize.css">
+    <link rel="stylesheet" type="text/css" href="../rustdoc.css">
+    <link rel="stylesheet" type="text/css" href="../main.css">
+    
+
+    
+    
+</head>
+<body class="rustdoc mod">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <nav class="sidebar">
+        <div class="sidebar-menu">&#9776;</div>
+        
+        <p class='location'>Crate strymon_coordinator</p><div class="sidebar-elems"><div class="block items"><ul><li><a href="#modules">Modules</a></li><li><a href="#structs">Structs</a></li></ul></div><p class='location'></p><script>window.sidebarCurrent = {name: 'strymon_coordinator', ty: 'mod', relpath: '../'};</script></div>
+    </nav>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press ‘S’ to search, ‘?’ for more options…"
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content">
+<h1 class='fqn'><span class='in-band'>Crate <a class="mod" href=''>strymon_coordinator</a></span><span class='out-of-band'><span id='render-detail'>
+                   <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
+                       [<span class='inner'>&#x2212;</span>]
+                   </a>
+               </span><a class='srclink' href='../src/strymon_coordinator/lib.rs.html#9-171' title='goto source code'>[src]</a></span></h1>
+<div class='docblock'><p>Internal APIs of the Strymon coordinator.</p>
+
+<p>This library contains the implementation and the internals of the Strymon coordinator. This
+crate is not intended to be used by end-users directly. Most likely, you will want to use the
+<a href="https://strymon-system.github.io/docs/command-line-interface"><code>strymon</code> command line utility</a>
+to start a new coordinator instead.</p>
+
+<h1 id='implementation' class='section-header'><a href='#implementation'>Implementation</a></h1>
+<p>The Strymon coordinator maintains a connection with most components of a running Strymon
+cluster. In order to be able to handle concurrent requests, it&#39;s implementation is heavly
+based on on <a href="https://docs.rs/futures"><code>futures</code></a>. Each potentially blocking request is
+transformed into a future and polled to completion by a <code>tokio-core</code> reactor (this dependency is
+likely to be replaced by the <code>LocalPool</code> executor in futures 0.2, as the implementation does
+not rely on Tokio&#39;s asynchronous I/O primitives).</p>
+
+<p>Part of the coordinator implementation is also the <a href="catalog/index.html"><strong>Catalog</strong></a>, a data
+structure representing the current state of the Strymon cluster.</p>
+
+<h2 id='exposed-network-services' class='section-header'><a href='#exposed-network-services'>Exposed network services</a></h2>
+<p>The coordinator exposes two
+<strong><a href="../strymon_communication/rpc/index.html"><code>strymon_communication::rpc</code></a></strong> interfaces:</p>
+
+<ol>
+<li><a href="../strymon_rpc/coordinator/index.html"><code>CoordinatorRPC</code></a> for submitting and managing jobs.
+It&#39;s address has to be known by any client in advance. By default, the coordinator will try
+to expose this service on TCP port <code>9189</code>.</li>
+<li><a href="../strymon_rpc/coordinator/catalog/index.html"><code>CatalogRPC</code></a> for querying the catalog
+using the <a href="../strymon_job/operators/service/struct.Client.html"><code>Client</code></a> infrastructure of
+<a href="../strymon_job/index.html"><code>strymon_job</code></a>. It is exported on an ephemerial TCP port which
+can be obtained through a <code>Subscription</code> or <code>Lookup</code> request on the coordinator interface.</li>
+</ol>
+
+<h2 id='handling-clients-and-concurrent-requests' class='section-header'><a href='#handling-clients-and-concurrent-requests'>Handling clients and concurrent requests</a></h2>
+<p>The coordinator maintains a connection to each connected client (which can be a submitter, an
+executor or a job). Incoming client requests are handled by the
+<a href="dispatch/struct.Dispatch.html"><code>Dispatch</code></a> type, which is created for each accepted
+connection.</p>
+
+<p>The <a href="handler/struct.Coordinator.html"><code>Coordinator</code></a> type implements the bulk of request
+handling and contains the state shared by all clients. Its external interface is mirrored
+through the cloneable <a href="handler/struct.CoordinatorRef.html"><code>CoordinatorRef</code></a> handle. It is
+essentially wrapper around <code>Rc&lt;RefCell&lt;Coordinator&gt;&gt;</code>, however it also tracks state created
+by this client (such as issued publications). This allows us to automatically remove the state
+once the associated client disconnects.</p>
+
+<p>A client might issue a request which cannot be handled immediately. Such requests (e.g.
+a blocking subscription request which only resolves once a matching topic is published) are
+implemented as a future, which are polled to completion by the internal <code>tokio-core</code> reactor.</p>
+</div><h2 id='modules' class='section-header'><a href="#modules">Modules</a></h2>
+<table>
+                       <tr class=' module-item'>
+                           <td><a class="mod" href="catalog/index.html"
+                                  title='mod strymon_coordinator::catalog'>catalog</a></td>
+                           <td class='docblock-short'>
+                                <p>The catalog contains meta-data about the current state of the system.</p>
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="mod" href="dispatch/index.html"
+                                  title='mod strymon_coordinator::dispatch'>dispatch</a></td>
+                           <td class='docblock-short'>
+                                <p>Client dispatch and request completion logic.</p>
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="mod" href="handler/index.html"
+                                  title='mod strymon_coordinator::handler'>handler</a></td>
+                           <td class='docblock-short'>
+                                <p>The coordinator request handler.</p>
+                           </td>
+                       </tr></table><h2 id='structs' class='section-header'><a href="#structs">Structs</a></h2>
+<table>
+                       <tr class=' module-item'>
+                           <td><a class="struct" href="struct.Builder.html"
+                                  title='struct strymon_coordinator::Builder'>Builder</a></td>
+                           <td class='docblock-short'>
+                                <p>Creates a new coordinator instance.</p>
+                           </td>
+                       </tr></table></section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <aside id="help" class="hidden">
+        <div>
+            <h1 class="hidden">Help</h1>
+
+            <div class="shortcuts">
+                <h2>Keyboard Shortcuts</h2>
+
+                <dl>
+                    <dt>?</dt>
+                    <dd>Show this help dialog</dd>
+                    <dt>S</dt>
+                    <dd>Focus the search field</dd>
+                    <dt>↑</dt>
+                    <dd>Move up in search results</dd>
+                    <dt>↓</dt>
+                    <dd>Move down in search results</dd>
+                    <dt>↹</dt>
+                    <dd>Switch tab</dd>
+                    <dt>&#9166;</dt>
+                    <dd>Go to active search result</dd>
+                    <dt style="width:31px;">+ / -</dt>
+                    <dd>Collapse/expand all sections</dd>
+                </dl>
+            </div>
+
+            <div class="infos">
+                <h2>Search Tricks</h2>
+
+                <p>
+                    Prefix searches with a type followed by a colon (e.g.
+                    <code>fn:</code>) to restrict the search to a given type.
+                </p>
+
+                <p>
+                    Accepted types are: <code>fn</code>, <code>mod</code>,
+                    <code>struct</code>, <code>enum</code>,
+                    <code>trait</code>, <code>type</code>, <code>macro</code>,
+                    and <code>const</code>.
+                </p>
+
+                <p>
+                    Search functions by type signature (e.g.
+                    <code>vec -> usize</code> or <code>* -> vec</code>)
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    
+
+    <script>
+        window.rootPath = "../";
+        window.currentCrate = "strymon_coordinator";
+    </script>
+    <script src="../main.js"></script>
+    <script defer src="../search-index.js"></script>
+</body>
+</html>

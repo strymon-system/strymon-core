@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Handle","Handle for the file server. Closes the server when dropped."]]});

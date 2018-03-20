@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="API documentation for the Rust `MessageBuf` struct in crate `strymon_communication`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, MessageBuf">
+
+    <title>strymon_communication::message::MessageBuf - Rust</title>
+
+    <link rel="stylesheet" type="text/css" href="../../normalize.css">
+    <link rel="stylesheet" type="text/css" href="../../rustdoc.css">
+    <link rel="stylesheet" type="text/css" href="../../main.css">
+    
+
+    
+    
+</head>
+<body class="rustdoc struct">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <nav class="sidebar">
+        <div class="sidebar-menu">&#9776;</div>
+        
+        <p class='location'>Struct MessageBuf</p><div class="sidebar-elems"><div class="block items"><a class="sidebar-title" href="#methods">Methods</a><div class="sidebar-links"><a href="#method.new">new</a><a href="#method.empty">empty</a><a href="#method.is_empty">is_empty</a><a href="#method.push">push</a><a href="#method.pop">pop</a><a href="#method.peek">peek</a><a href="#method.write">write</a><a href="#method.read">read</a></div><a class="sidebar-title" href="#implementations">Trait Implementations</a><div class="sidebar-links"><a href="#impl-Clone">Clone</a><a href="#impl-Debug">Debug</a><a href="#impl-PartialEq">PartialEq</a><a href="#impl-Eq">Eq</a><a href="#impl-From%3CBytesMut%3E">From&lt;BytesMut&gt;</a><a href="#impl-Into%3CBytesMut%3E">Into&lt;BytesMut&gt;</a></div></div><p class='location'><a href='../index.html'>strymon_communication</a>::<wbr><a href='index.html'>message</a></p><script>window.sidebarCurrent = {name: 'MessageBuf', ty: 'struct', relpath: ''};</script><script defer src="sidebar-items.js"></script></div>
+    </nav>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press ‘S’ to search, ‘?’ for more options…"
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content">
+<h1 class='fqn'><span class='in-band'>Struct <a href='../index.html'>strymon_communication</a>::<wbr><a href='index.html'>message</a>::<wbr><a class="struct" href=''>MessageBuf</a></span><span class='out-of-band'><span id='render-detail'>
+                   <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
+                       [<span class='inner'>&#x2212;</span>]
+                   </a>
+               </span><a class='srclink' href='../../src/strymon_communication/message.rs.html#31-33' title='goto source code'>[src]</a></span></h1>
+<pre class='rust struct'>pub struct MessageBuf { /* fields omitted */ }</pre><div class='docblock'><p>A <code>MessageBuf</code> represents a contiguous buffer of <a href="https://msgpack.org/">MessagePack</a>
+encoded objects. It can be used as a multi-part message to allow partial
+deserialization. Partial messages can be inserted using the <code>push</code> method
+and are read in first-in, first-out order by the <code>pop</code> method.</p>
+
+<p>MessageBuf is a convenience wrapper around
+<a href="https://docs.rs/bytes/0.4/bytes/struct.BytesMut.html"><code>bytes::BytesMut</code></a>
+and thus inherets the same properties: No allocation is required for small
+objects; clones are reference-counted and implement copy-on-write semantics.</p>
+</div>
+                    <h2 id='methods' class='small-section-header'>
+                      Methods<a href='#methods' class='anchor'></a>
+                    </h2>
+                <h3 id='impl' class='impl'><span class='in-band'><code>impl <a class="struct" href="../../strymon_communication/message/struct.MessageBuf.html" title="struct strymon_communication::message::MessageBuf">MessageBuf</a></code><a href='#impl' class='anchor'></a></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/strymon_communication/message.rs.html#57-162' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'><h4 id='method.new' class="method"><span id='new.v' class='invisible'><code>pub fn <a href='#method.new' class='fnname'>new</a>&lt;S:&nbsp;<a class="trait" href="https://docs.rs/serde/1.0.33/serde/ser/trait.Serialize.html" title="trait serde::ser::Serialize">Serialize</a>&gt;(item: S) -&gt; <a class="type" href="https://doc.rust-lang.org/nightly/std/io/error/type.Result.html" title="type std::io::error::Result">Result</a>&lt;Self&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/strymon_communication/message.rs.html#59-66' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Create a new message buffer containing the serialized object.</p>
+</div><h4 id='method.empty' class="method"><span id='empty.v' class='invisible'><code>pub fn <a href='#method.empty' class='fnname'>empty</a>() -&gt; Self</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/strymon_communication/message.rs.html#72-76' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Create a new, empty message.</p>
+
+<p>Use one of the <code>From</code> impls to construct a message from an already
+existing buffer or object.</p>
+</div><h4 id='method.is_empty' class="method"><span id='is_empty.v' class='invisible'><code>pub fn <a href='#method.is_empty' class='fnname'>is_empty</a>(&amp;self) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a></code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/strymon_communication/message.rs.html#79-81' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Returns true if the contained bytes have a length of zero.</p>
+</div><h4 id='method.push' class="method"><span id='push.v' class='invisible'><code>pub fn <a href='#method.push' class='fnname'>push</a>&lt;S:&nbsp;<a class="trait" href="https://docs.rs/serde/1.0.33/serde/ser/trait.Serialize.html" title="trait serde::ser::Serialize">Serialize</a>&gt;(&amp;mut self, item: S) -&gt; <a class="type" href="https://doc.rust-lang.org/nightly/std/io/error/type.Result.html" title="type std::io::error::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.unit.html">()</a>&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/strymon_communication/message.rs.html#84-88' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Serialize and append an item to the message buffer.</p>
+</div><h4 id='method.pop' class="method"><span id='pop.v' class='invisible'><code>pub fn <a href='#method.pop' class='fnname'>pop</a>&lt;D:&nbsp;<a class="trait" href="https://docs.rs/serde/1.0.33/serde/de/trait.DeserializeOwned.html" title="trait serde::de::DeserializeOwned">DeserializeOwned</a>&gt;(&amp;mut self) -&gt; <a class="type" href="https://doc.rust-lang.org/nightly/std/io/error/type.Result.html" title="type std::io::error::Result">Result</a>&lt;D&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/strymon_communication/message.rs.html#94-112' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Remove and deserialize the top item in the message buffer.</p>
+
+<p>The object is not modified and kept in the buffer if deserialization fails.
+The <code>push</code> and <code>pop</code> operations implement FIFO semantics.</p>
+</div><h4 id='method.peek' class="method"><span id='peek.v' class='invisible'><code>pub fn <a href='#method.peek' class='fnname'>peek</a>&lt;'de, D:&nbsp;<a class="trait" href="https://docs.rs/serde/1.0.33/serde/de/trait.Deserialize.html" title="trait serde::de::Deserialize">Deserialize</a>&lt;'de&gt;&gt;(&amp;'de self) -&gt; <a class="type" href="https://doc.rust-lang.org/nightly/std/io/error/type.Result.html" title="type std::io::error::Result">Result</a>&lt;D&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/strymon_communication/message.rs.html#116-118' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Peek at the top item in the message buffer. This borrows the buffer
+for zero-copy deserialization.</p>
+</div><h4 id='method.write' class="method"><span id='write.v' class='invisible'><code>pub fn <a href='#method.write' class='fnname'>write</a>&lt;W:&nbsp;<a class="trait" href="https://doc.rust-lang.org/nightly/std/io/trait.Write.html" title="trait std::io::Write">Write</a>&gt;(&amp;self, writer: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;mut </a>W) -&gt; <a class="type" href="https://doc.rust-lang.org/nightly/std/io/error/type.Result.html" title="type std::io::error::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.unit.html">()</a>&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/strymon_communication/message.rs.html#124-129' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Copies the contained bytes into the provided writer.</p>
+
+<p>Prepends the size of the message in bytes as a big-endian 32 bit
+unsigned integer.</p>
+</div><h4 id='method.read' class="method"><span id='read.v' class='invisible'><code>pub fn <a href='#method.read' class='fnname'>read</a>&lt;R:&nbsp;<a class="trait" href="https://doc.rust-lang.org/nightly/std/io/trait.Read.html" title="trait std::io::Read">Read</a>&gt;(reader: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;mut </a>R) -&gt; <a class="type" href="https://doc.rust-lang.org/nightly/std/io/error/type.Result.html" title="type std::io::error::Result">Result</a>&lt;<a class="enum" href="https://doc.rust-lang.org/nightly/core/option/enum.Option.html" title="enum core::option::Option">Option</a>&lt;<a class="struct" href="../../strymon_communication/message/struct.MessageBuf.html" title="struct strymon_communication::message::MessageBuf">MessageBuf</a>&gt;&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/strymon_communication/message.rs.html#137-155' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Reads a message from a reader, expecting a frame length prefix.</p>
+
+<p>If first read of the message length field fails with an
+<code>ErrorKind::UnexpectedEof</code> then <code>Ok(None)</code> is returned to indicate
+that the reader closed gracefully. All other read errors, most notably
+<code>ErrorKind::WouldBlock</code>, are propagated verbatim.</p>
+</div></div>
+            <h2 id='implementations' class='small-section-header'>
+              Trait Implementations<a href='#implementations' class='anchor'></a>
+            </h2>
+        <h3 id='impl-Clone' class='impl'><span class='in-band'><code>impl <a class="trait" href="https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html" title="trait core::clone::Clone">Clone</a> for <a class="struct" href="../../strymon_communication/message/struct.MessageBuf.html" title="struct strymon_communication::message::MessageBuf">MessageBuf</a></code><a href='#impl-Clone' class='anchor'></a></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/strymon_communication/message.rs.html#30' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'><h4 id='method.clone' class="method"><span id='clone.v' class='invisible'><code>fn <a href='https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#tymethod.clone' class='fnname'>clone</a>(&amp;self) -&gt; <a class="struct" href="../../strymon_communication/message/struct.MessageBuf.html" title="struct strymon_communication::message::MessageBuf">MessageBuf</a></code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/strymon_communication/message.rs.html#30' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Returns a copy of the value. <a href="https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#tymethod.clone">Read more</a></p>
+</div><h4 id='method.clone_from' class="method"><span id='clone_from.v' class='invisible'><code>fn <a href='https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#method.clone_from' class='fnname'>clone_from</a>(&amp;mut self, source: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;</a>Self)</code></span><span class='out-of-band'><div class='ghost'></div><div class='since' title='Stable since Rust version 1.0.0'>1.0.0</div><a class='srclink' href='https://doc.rust-lang.org/nightly/src/core/clone.rs.html#112-114' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Performs copy-assignment from <code>source</code>. <a href="https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#method.clone_from">Read more</a></p>
+</div></div><h3 id='impl-Debug' class='impl'><span class='in-band'><code>impl <a class="trait" href="https://doc.rust-lang.org/nightly/core/fmt/trait.Debug.html" title="trait core::fmt::Debug">Debug</a> for <a class="struct" href="../../strymon_communication/message/struct.MessageBuf.html" title="struct strymon_communication::message::MessageBuf">MessageBuf</a></code><a href='#impl-Debug' class='anchor'></a></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/strymon_communication/message.rs.html#30' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'><h4 id='method.fmt' class="method"><span id='fmt.v' class='invisible'><code>fn <a href='https://doc.rust-lang.org/nightly/core/fmt/trait.Debug.html#tymethod.fmt' class='fnname'>fmt</a>(&amp;self, __arg_0: &amp;mut <a class="struct" href="https://doc.rust-lang.org/nightly/core/fmt/struct.Formatter.html" title="struct core::fmt::Formatter">Formatter</a>) -&gt; <a class="type" href="https://doc.rust-lang.org/nightly/core/fmt/type.Result.html" title="type core::fmt::Result">Result</a></code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/strymon_communication/message.rs.html#30' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Formats the value using the given formatter. <a href="https://doc.rust-lang.org/nightly/core/fmt/trait.Debug.html#tymethod.fmt">Read more</a></p>
+</div></div><h3 id='impl-PartialEq' class='impl'><span class='in-band'><code>impl <a class="trait" href="https://doc.rust-lang.org/nightly/core/cmp/trait.PartialEq.html" title="trait core::cmp::PartialEq">PartialEq</a> for <a class="struct" href="../../strymon_communication/message/struct.MessageBuf.html" title="struct strymon_communication::message::MessageBuf">MessageBuf</a></code><a href='#impl-PartialEq' class='anchor'></a></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/strymon_communication/message.rs.html#30' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'><h4 id='method.eq' class="method"><span id='eq.v' class='invisible'><code>fn <a href='https://doc.rust-lang.org/nightly/core/cmp/trait.PartialEq.html#tymethod.eq' class='fnname'>eq</a>(&amp;self, __arg_0: &amp;<a class="struct" href="../../strymon_communication/message/struct.MessageBuf.html" title="struct strymon_communication::message::MessageBuf">MessageBuf</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a></code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/strymon_communication/message.rs.html#30' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>This method tests for <code>self</code> and <code>other</code> values to be equal, and is used by <code>==</code>. <a href="https://doc.rust-lang.org/nightly/core/cmp/trait.PartialEq.html#tymethod.eq">Read more</a></p>
+</div><h4 id='method.ne' class="method"><span id='ne.v' class='invisible'><code>fn <a href='https://doc.rust-lang.org/nightly/core/cmp/trait.PartialEq.html#method.ne' class='fnname'>ne</a>(&amp;self, __arg_0: &amp;<a class="struct" href="../../strymon_communication/message/struct.MessageBuf.html" title="struct strymon_communication::message::MessageBuf">MessageBuf</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a></code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/strymon_communication/message.rs.html#30' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>This method tests for <code>!=</code>.</p>
+</div></div><h3 id='impl-Eq' class='impl'><span class='in-band'><code>impl <a class="trait" href="https://doc.rust-lang.org/nightly/core/cmp/trait.Eq.html" title="trait core::cmp::Eq">Eq</a> for <a class="struct" href="../../strymon_communication/message/struct.MessageBuf.html" title="struct strymon_communication::message::MessageBuf">MessageBuf</a></code><a href='#impl-Eq' class='anchor'></a></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/strymon_communication/message.rs.html#30' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'></div><h3 id='impl-From%3CBytesMut%3E' class='impl'><span class='in-band'><code>impl <a class="trait" href="https://doc.rust-lang.org/nightly/core/convert/trait.From.html" title="trait core::convert::From">From</a>&lt;<a class="struct" href="https://docs.rs/bytes/0.4.6/bytes/bytes/struct.BytesMut.html" title="struct bytes::bytes::BytesMut">BytesMut</a>&gt; for <a class="struct" href="../../strymon_communication/message/struct.MessageBuf.html" title="struct strymon_communication::message::MessageBuf">MessageBuf</a></code><a href='#impl-From%3CBytesMut%3E' class='anchor'></a></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/strymon_communication/message.rs.html#164-168' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'><h4 id='method.from' class="method"><span id='from.v' class='invisible'><code>fn <a href='https://doc.rust-lang.org/nightly/core/convert/trait.From.html#tymethod.from' class='fnname'>from</a>(buf: <a class="struct" href="https://docs.rs/bytes/0.4.6/bytes/bytes/struct.BytesMut.html" title="struct bytes::bytes::BytesMut">BytesMut</a>) -&gt; Self</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/strymon_communication/message.rs.html#165-167' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Performs the conversion.</p>
+</div></div><h3 id='impl-Into%3CBytesMut%3E' class='impl'><span class='in-band'><code>impl <a class="trait" href="https://doc.rust-lang.org/nightly/core/convert/trait.Into.html" title="trait core::convert::Into">Into</a>&lt;<a class="struct" href="https://docs.rs/bytes/0.4.6/bytes/bytes/struct.BytesMut.html" title="struct bytes::bytes::BytesMut">BytesMut</a>&gt; for <a class="struct" href="../../strymon_communication/message/struct.MessageBuf.html" title="struct strymon_communication::message::MessageBuf">MessageBuf</a></code><a href='#impl-Into%3CBytesMut%3E' class='anchor'></a></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/strymon_communication/message.rs.html#170-174' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'><h4 id='method.into' class="method"><span id='into.v' class='invisible'><code>fn <a href='https://doc.rust-lang.org/nightly/core/convert/trait.Into.html#tymethod.into' class='fnname'>into</a>(self) -&gt; <a class="struct" href="https://docs.rs/bytes/0.4.6/bytes/bytes/struct.BytesMut.html" title="struct bytes::bytes::BytesMut">BytesMut</a></code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/strymon_communication/message.rs.html#171-173' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Performs the conversion.</p>
+</div></div></section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <aside id="help" class="hidden">
+        <div>
+            <h1 class="hidden">Help</h1>
+
+            <div class="shortcuts">
+                <h2>Keyboard Shortcuts</h2>
+
+                <dl>
+                    <dt>?</dt>
+                    <dd>Show this help dialog</dd>
+                    <dt>S</dt>
+                    <dd>Focus the search field</dd>
+                    <dt>↑</dt>
+                    <dd>Move up in search results</dd>
+                    <dt>↓</dt>
+                    <dd>Move down in search results</dd>
+                    <dt>↹</dt>
+                    <dd>Switch tab</dd>
+                    <dt>&#9166;</dt>
+                    <dd>Go to active search result</dd>
+                    <dt style="width:31px;">+ / -</dt>
+                    <dd>Collapse/expand all sections</dd>
+                </dl>
+            </div>
+
+            <div class="infos">
+                <h2>Search Tricks</h2>
+
+                <p>
+                    Prefix searches with a type followed by a colon (e.g.
+                    <code>fn:</code>) to restrict the search to a given type.
+                </p>
+
+                <p>
+                    Accepted types are: <code>fn</code>, <code>mod</code>,
+                    <code>struct</code>, <code>enum</code>,
+                    <code>trait</code>, <code>type</code>, <code>macro</code>,
+                    and <code>const</code>.
+                </p>
+
+                <p>
+                    Search functions by type signature (e.g.
+                    <code>vec -> usize</code> or <code>* -> vec</code>)
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    
+
+    <script>
+        window.rootPath = "../../";
+        window.currentCrate = "strymon_communication";
+    </script>
+    <script src="../../main.js"></script>
+    <script defer src="../../search-index.js"></script>
+</body>
+</html>

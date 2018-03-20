@@ -1,0 +1,1 @@
+initSidebarItems({"mod":[["coordinator","This module contains all requests (and the respones) to the the coordinator by the `strymon submit` tool, submitted and running jobs, as well as connecting executors."],["executor","The interface exposed by executors. This interface is currently only intended to be used by the coordinator to send requests to a registered executor."]]});

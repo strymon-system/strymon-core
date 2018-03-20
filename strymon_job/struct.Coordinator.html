@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="API documentation for the Rust `Coordinator` struct in crate `strymon_job`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, Coordinator">
+
+    <title>strymon_job::Coordinator - Rust</title>
+
+    <link rel="stylesheet" type="text/css" href="../normalize.css">
+    <link rel="stylesheet" type="text/css" href="../rustdoc.css">
+    <link rel="stylesheet" type="text/css" href="../main.css">
+    
+
+    
+    
+</head>
+<body class="rustdoc struct">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <nav class="sidebar">
+        <div class="sidebar-menu">&#9776;</div>
+        
+        <p class='location'>Struct Coordinator</p><div class="sidebar-elems"><div class="block items"><a class="sidebar-title" href="#methods">Methods</a><div class="sidebar-links"><a href="#method.publish">publish</a><a href="#method.subscribe">subscribe</a><a href="#method.subscribe_group">subscribe_group</a><a href="#method.announce_service">announce_service</a><a href="#method.bind_service">bind_service</a></div><a class="sidebar-title" href="#implementations">Trait Implementations</a><div class="sidebar-links"><a href="#impl-Clone">Clone</a></div></div><p class='location'><a href='index.html'>strymon_job</a></p><script>window.sidebarCurrent = {name: 'Coordinator', ty: 'struct', relpath: ''};</script><script defer src="sidebar-items.js"></script></div>
+    </nav>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press ‘S’ to search, ‘?’ for more options…"
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content">
+<h1 class='fqn'><span class='in-band'>Struct <a href='index.html'>strymon_job</a>::<wbr><a class="struct" href=''>Coordinator</a></span><span class='out-of-band'><span id='render-detail'>
+                   <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
+                       [<span class='inner'>&#x2212;</span>]
+                   </a>
+               </span><a class='srclink' href='../src/strymon_job/lib.rs.html#85-89' title='goto source code'>[src]</a></span></h1>
+<pre class='rust struct'>pub struct Coordinator { /* fields omitted */ }</pre><div class='docblock'><p>Handle to communicate with the Strymon coordinator.</p>
+
+<p>The methods of this object can be used to publish or subscribe to
+topics available in the catalog. In order to obtain a <code>Coordinator</code> instance,
+users must register the current process with <code>strymon_job::execute</code>.</p>
+</div>
+                    <h2 id='methods' class='small-section-header'>
+                      Methods<a href='#methods' class='anchor'></a>
+                    </h2>
+                <h3 id='impl' class='impl'><span class='in-band'><code>impl <a class="struct" href="../strymon_job/struct.Coordinator.html" title="struct strymon_job::Coordinator">Coordinator</a></code><a href='#impl' class='anchor'></a></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../src/strymon_job/operators/publish.rs.html#146-230' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'><h4 id='method.publish' class="method"><span id='publish.v' class='invisible'><code>pub fn <a href='#method.publish' class='fnname'>publish</a>&lt;S, D&gt;(<br>&nbsp;&nbsp;&nbsp;&nbsp;&amp;self, <br>&nbsp;&nbsp;&nbsp;&nbsp;name: &amp;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.str.html">str</a>, <br>&nbsp;&nbsp;&nbsp;&nbsp;stream: &amp;Stream&lt;S, D&gt;, <br>&nbsp;&nbsp;&nbsp;&nbsp;partition: <a class="enum" href="../strymon_job/operators/publish/enum.Partition.html" title="enum strymon_job::operators::publish::Partition">Partition</a><br>) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;Stream&lt;S, D&gt;, <a class="enum" href="../strymon_job/operators/publish/enum.PublicationError.html" title="enum strymon_job::operators::publish::PublicationError">PublicationError</a>&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;D: ExchangeData + <a class="trait" href="https://docs.rs/serde/1.0.33/serde/ser/trait.Serialize.html" title="trait serde::ser::Serialize">Serialize</a> + TypeName,<br>&nbsp;&nbsp;&nbsp;&nbsp;S: Scope,<br>&nbsp;&nbsp;&nbsp;&nbsp;S::Timestamp: <a class="trait" href="../strymon_job/operators/trait.RemoteTimestamp.html" title="trait strymon_job::operators::RemoteTimestamp">RemoteTimestamp</a>,<br>&nbsp;&nbsp;&nbsp;&nbsp;&lt;S::Timestamp as <a class="trait" href="../strymon_job/operators/trait.RemoteTimestamp.html" title="trait strymon_job::operators::RemoteTimestamp">RemoteTimestamp</a>&gt;::<a class="type" href="../strymon_job/operators/trait.RemoteTimestamp.html#associatedtype.Remote" title="type strymon_job::operators::RemoteTimestamp::Remote">Remote</a>: TypeName,&nbsp;</span></code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../src/strymon_job/operators/publish.rs.html#182-218' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Publishes a local stream and creates a topic in the catalog.</p>
+
+<p>This will block the current worker until the coordinator has processed
+the publication request.</p>
+
+<p>Each published stream must have a globally unique name, which used to
+create a topic in the catalog. This method injects a publisher operator
+into the Timely dataflow which forwards all data and progress messages
+put into <code>stream</code>. The created topic is deregistered when the frontier
+of the input stream becomes empty. Upon deregisteration, the current
+worker is blocked until the queues of any still connected subscribers
+are drained.</p>
+
+<p>If the <code>Partition::Merge</code> strategy is used, a single topic is created
+whose name is specified in <code>name</code>. If a <code>Partition::PerWorker</code> partitioning
+scheme is used, one topic is created for each worker, with the worker&#39;s
+index appended, e.g. <code>foobar.1</code>.</p>
+</div></div><h3 id='impl-1' class='impl'><span class='in-band'><code>impl <a class="struct" href="../strymon_job/struct.Coordinator.html" title="struct strymon_job::Coordinator">Coordinator</a></code><a href='#impl-1' class='anchor'></a></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../src/strymon_job/operators/subscribe.rs.html#171-307' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'><h4 id='method.subscribe' class="method"><span id='subscribe.v' class='invisible'><code>pub fn <a href='#method.subscribe' class='fnname'>subscribe</a>&lt;T, D&gt;(<br>&nbsp;&nbsp;&nbsp;&nbsp;&amp;self, <br>&nbsp;&nbsp;&nbsp;&nbsp;name: &amp;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.str.html">str</a>, <br>&nbsp;&nbsp;&nbsp;&nbsp;blocking: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a><br>) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="struct" href="../strymon_job/operators/subscribe/struct.Subscription.html" title="struct strymon_job::operators::subscribe::Subscription">Subscription</a>&lt;T, D&gt;, <a class="enum" href="../strymon_job/operators/subscribe/enum.SubscriptionError.html" title="enum strymon_job::operators::subscribe::SubscriptionError">SubscriptionError</a>&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;T: <a class="trait" href="../strymon_job/operators/trait.RemoteTimestamp.html" title="trait strymon_job::operators::RemoteTimestamp">RemoteTimestamp</a>,<br>&nbsp;&nbsp;&nbsp;&nbsp;D: <a class="trait" href="https://docs.rs/serde/1.0.33/serde/de/trait.DeserializeOwned.html" title="trait serde::de::DeserializeOwned">DeserializeOwned</a> + TypeName,<br>&nbsp;&nbsp;&nbsp;&nbsp;T::<a class="type" href="../strymon_job/operators/trait.RemoteTimestamp.html#associatedtype.Remote" title="type strymon_job::operators::RemoteTimestamp::Remote">Remote</a>: TypeName,&nbsp;</span></code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../src/strymon_job/operators/subscribe.rs.html#257-275' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Creates a new subscription for a single topic.</p>
+
+<p>This method requests a subscription for a topic called <code>name</code> from
+the coordinator. The requested topic must be published with the same
+data and timestamp types <code>T</code>and <code>D</code> respectively.</p>
+
+<p>In to obtain progress tracking information from the upstream
+Timely computation(s), the subscription handle exposes a <code>frontier()</code>
+method which allows inspection of the current frontier.</p>
+
+<p>When <code>blocking</code> is true, this call blocks until a remote publisher
+creates a topic with a suitable name. If <code>blocking</code> is false, the call
+returns with an error if the catalog does not contain a topic with a
+matching name.</p>
+</div><h4 id='method.subscribe_group' class="method"><span id='subscribe_group.v' class='invisible'><code>pub fn <a href='#method.subscribe_group' class='fnname'>subscribe_group</a>&lt;T, D, I&gt;(<br>&nbsp;&nbsp;&nbsp;&nbsp;&amp;self, <br>&nbsp;&nbsp;&nbsp;&nbsp;prefix: &amp;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.str.html">str</a>, <br>&nbsp;&nbsp;&nbsp;&nbsp;partitions: I, <br>&nbsp;&nbsp;&nbsp;&nbsp;blocking: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a><br>) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="struct" href="../strymon_job/operators/subscribe/struct.Subscription.html" title="struct strymon_job::operators::subscribe::Subscription">Subscription</a>&lt;T, D&gt;, <a class="enum" href="../strymon_job/operators/subscribe/enum.SubscriptionError.html" title="enum strymon_job::operators::subscribe::SubscriptionError">SubscriptionError</a>&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;T: <a class="trait" href="../strymon_job/operators/trait.RemoteTimestamp.html" title="trait strymon_job::operators::RemoteTimestamp">RemoteTimestamp</a>,<br>&nbsp;&nbsp;&nbsp;&nbsp;D: <a class="trait" href="https://docs.rs/serde/1.0.33/serde/de/trait.DeserializeOwned.html" title="trait serde::de::DeserializeOwned">DeserializeOwned</a> + TypeName,<br>&nbsp;&nbsp;&nbsp;&nbsp;T::<a class="type" href="../strymon_job/operators/trait.RemoteTimestamp.html#associatedtype.Remote" title="type strymon_job::operators::RemoteTimestamp::Remote">Remote</a>: TypeName,<br>&nbsp;&nbsp;&nbsp;&nbsp;I: <a class="trait" href="https://doc.rust-lang.org/nightly/core/iter/traits/trait.IntoIterator.html" title="trait core::iter::traits::IntoIterator">IntoIterator</a>&lt;Item = <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.usize.html">usize</a>&gt;,&nbsp;</span></code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../src/strymon_job/operators/subscribe.rs.html#285-306' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Create a new subscription for a partitioned topic.</p>
+
+<p>This method requests a subscription for each provided partition and
+merges their stream. The partition number is attached to each topic name,
+e.g. for <code>prefix = &quot;foo&quot;</code> and <code>partitions = [0, 2, 5]</code>, the resulting
+subscriptions are for <code>&quot;foo.0&quot;, &quot;foo.2&quot;, &quot;foo.5&quot;</code>.</p>
+
+<p>See the <code>subscribe</code> method for more details.</p>
+</div></div><h3 id='impl-2' class='impl'><span class='in-band'><code>impl <a class="struct" href="../strymon_job/struct.Coordinator.html" title="struct strymon_job::Coordinator">Coordinator</a></code><a href='#impl-2' class='anchor'></a></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../src/strymon_job/operators/service.rs.html#92-157' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'><h4 id='method.announce_service' class="method"><span id='announce_service.v' class='invisible'><code>pub fn <a href='#method.announce_service' class='fnname'>announce_service</a>&lt;N:&nbsp;<a class="trait" href="../strymon_communication/rpc/trait.Name.html" title="trait strymon_communication::rpc::Name">Name</a> + TypeName&gt;(<br>&nbsp;&nbsp;&nbsp;&nbsp;&amp;self, <br>&nbsp;&nbsp;&nbsp;&nbsp;name: &amp;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.str.html">str</a><br>) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="struct" href="../strymon_job/operators/service/struct.Service.html" title="struct strymon_job::operators::service::Service">Service</a>&lt;N&gt;, <a class="enum" href="../strymon_job/operators/publish/enum.PublicationError.html" title="enum strymon_job::operators::publish::PublicationError">PublicationError</a>&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../src/strymon_job/operators/service.rs.html#98-120' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Creates a new request service and announces it in the catalog.</p>
+
+<p>Given a service interface definition and a name, creates a new server
+for receiving incoming requests. A topic is created under the specified
+name which is used by clients to bind to the service.</p>
+</div><h4 id='method.bind_service' class="method"><span id='bind_service.v' class='invisible'><code>pub fn <a href='#method.bind_service' class='fnname'>bind_service</a>&lt;N:&nbsp;<a class="trait" href="../strymon_communication/rpc/trait.Name.html" title="trait strymon_communication::rpc::Name">Name</a> + TypeName&gt;(<br>&nbsp;&nbsp;&nbsp;&nbsp;&amp;self, <br>&nbsp;&nbsp;&nbsp;&nbsp;name: &amp;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.str.html">str</a>, <br>&nbsp;&nbsp;&nbsp;&nbsp;blocking: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a><br>) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="struct" href="../strymon_job/operators/service/struct.Client.html" title="struct strymon_job::operators::service::Client">Client</a>&lt;N&gt;, <a class="enum" href="../strymon_job/operators/subscribe/enum.SubscriptionError.html" title="enum strymon_job::operators::subscribe::SubscriptionError">SubscriptionError</a>&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../src/strymon_job/operators/service.rs.html#132-156' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Creates a binding to a service topic for sending requests.</p>
+
+<p>Returns a handle for submitting requests to the given server. The
+binding created by this invocation is also stored in the catalog as
+a <code>Subscription</code>. The subscription is revoked once the <code>Client</code> handle
+is dropped.</p>
+
+<p>When <code>blocking</code> is true, this call blocks until a remote job registers
+a service with the matching name. If <code>blocking</code> is false, the call
+returns with an error if the topic does not exist.</p>
+</div></div>
+            <h2 id='implementations' class='small-section-header'>
+              Trait Implementations<a href='#implementations' class='anchor'></a>
+            </h2>
+        <h3 id='impl-Clone' class='impl'><span class='in-band'><code>impl <a class="trait" href="https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html" title="trait core::clone::Clone">Clone</a> for <a class="struct" href="../strymon_job/struct.Coordinator.html" title="struct strymon_job::Coordinator">Coordinator</a></code><a href='#impl-Clone' class='anchor'></a></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../src/strymon_job/lib.rs.html#84' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'><h4 id='method.clone' class="method"><span id='clone.v' class='invisible'><code>fn <a href='https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#tymethod.clone' class='fnname'>clone</a>(&amp;self) -&gt; <a class="struct" href="../strymon_job/struct.Coordinator.html" title="struct strymon_job::Coordinator">Coordinator</a></code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../src/strymon_job/lib.rs.html#84' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Returns a copy of the value. <a href="https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#tymethod.clone">Read more</a></p>
+</div><h4 id='method.clone_from' class="method"><span id='clone_from.v' class='invisible'><code>fn <a href='https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#method.clone_from' class='fnname'>clone_from</a>(&amp;mut self, source: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;</a>Self)</code></span><span class='out-of-band'><div class='ghost'></div><div class='since' title='Stable since Rust version 1.0.0'>1.0.0</div><a class='srclink' href='https://doc.rust-lang.org/nightly/src/core/clone.rs.html#112-114' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Performs copy-assignment from <code>source</code>. <a href="https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#method.clone_from">Read more</a></p>
+</div></div></section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <aside id="help" class="hidden">
+        <div>
+            <h1 class="hidden">Help</h1>
+
+            <div class="shortcuts">
+                <h2>Keyboard Shortcuts</h2>
+
+                <dl>
+                    <dt>?</dt>
+                    <dd>Show this help dialog</dd>
+                    <dt>S</dt>
+                    <dd>Focus the search field</dd>
+                    <dt>↑</dt>
+                    <dd>Move up in search results</dd>
+                    <dt>↓</dt>
+                    <dd>Move down in search results</dd>
+                    <dt>↹</dt>
+                    <dd>Switch tab</dd>
+                    <dt>&#9166;</dt>
+                    <dd>Go to active search result</dd>
+                    <dt style="width:31px;">+ / -</dt>
+                    <dd>Collapse/expand all sections</dd>
+                </dl>
+            </div>
+
+            <div class="infos">
+                <h2>Search Tricks</h2>
+
+                <p>
+                    Prefix searches with a type followed by a colon (e.g.
+                    <code>fn:</code>) to restrict the search to a given type.
+                </p>
+
+                <p>
+                    Accepted types are: <code>fn</code>, <code>mod</code>,
+                    <code>struct</code>, <code>enum</code>,
+                    <code>trait</code>, <code>type</code>, <code>macro</code>,
+                    and <code>const</code>.
+                </p>
+
+                <p>
+                    Search functions by type signature (e.g.
+                    <code>vec -> usize</code> or <code>* -> vec</code>)
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    
+
+    <script>
+        window.rootPath = "../";
+        window.currentCrate = "strymon_job";
+    </script>
+    <script src="../main.js"></script>
+    <script defer src="../search-index.js"></script>
+</body>
+</html>

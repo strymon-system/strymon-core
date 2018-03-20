@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["Partition","Marker to specify topic partitioning."],["PublicationError","Failure states of a publication."]]});

@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Client","Client handle for sending requests to a announced service."],["Service","A source of incoming requests."]]});

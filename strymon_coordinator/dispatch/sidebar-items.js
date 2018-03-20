@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Dispatch","The dispatcher assigned to each incoming connection."]]});

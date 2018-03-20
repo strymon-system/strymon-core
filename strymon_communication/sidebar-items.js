@@ -1,0 +1,1 @@
+initSidebarItems({"mod":[["fetch","Utilities for sending files over the network."],["message","Reference-counted buffer for multi-part messages."],["rpc","Asynchronous remote procedure calls."],["transport","Asynchronous point-to-point message channels."]],"struct":[["Network","Handle to the networking subsystem."]]});

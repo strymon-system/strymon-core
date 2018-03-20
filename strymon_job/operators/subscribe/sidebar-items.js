@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["SubscriptionError","Failure states when subscribting to a topic."],["SubscriptionEvent","Data or frontier events emitted by a subscription."]],"struct":[["IntoIter","A blocking iterator, yielding `io::Result<T, Vec<D>)>` tuples."],["Subscription","A subscription handle used to receive data from a topic."]]});

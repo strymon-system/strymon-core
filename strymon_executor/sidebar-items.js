@@ -1,0 +1,1 @@
+initSidebarItems({"mod":[["executable","Job supervision logic for native executables."]],"struct":[["Builder","A builder type to initialize and run a new executor instance."],["ExecutorService","A running Strymon executor instance."]]});

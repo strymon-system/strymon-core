@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="API documentation for the Rust `CoordinatorRef` struct in crate `strymon_coordinator`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, CoordinatorRef">
+
+    <title>strymon_coordinator::handler::CoordinatorRef - Rust</title>
+
+    <link rel="stylesheet" type="text/css" href="../../normalize.css">
+    <link rel="stylesheet" type="text/css" href="../../rustdoc.css">
+    <link rel="stylesheet" type="text/css" href="../../main.css">
+    
+
+    
+    
+</head>
+<body class="rustdoc struct">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <nav class="sidebar">
+        <div class="sidebar-menu">&#9776;</div>
+        
+        <p class='location'>Struct CoordinatorRef</p><div class="sidebar-elems"><div class="block items"><a class="sidebar-title" href="#methods">Methods</a><div class="sidebar-links"><a href="#method.submission">submission</a><a href="#method.termination">termination</a><a href="#method.add_executor">add_executor</a><a href="#method.add_worker_group">add_worker_group</a><a href="#method.publish">publish</a><a href="#method.unpublish">unpublish</a><a href="#method.subscribe">subscribe</a><a href="#method.unsubscribe">unsubscribe</a><a href="#method.lookup">lookup</a><a href="#method.catalog_request">catalog_request</a></div><a class="sidebar-title" href="#implementations">Trait Implementations</a><div class="sidebar-links"><a href="#impl-Clone">Clone</a><a href="#impl-Drop">Drop</a></div></div><p class='location'><a href='../index.html'>strymon_coordinator</a>::<wbr><a href='index.html'>handler</a></p><script>window.sidebarCurrent = {name: 'CoordinatorRef', ty: 'struct', relpath: ''};</script><script defer src="sidebar-items.js"></script></div>
+    </nav>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press ‘S’ to search, ‘?’ for more options…"
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content">
+<h1 class='fqn'><span class='in-band'>Struct <a href='../index.html'>strymon_coordinator</a>::<wbr><a href='index.html'>handler</a>::<wbr><a class="struct" href=''>CoordinatorRef</a></span><span class='out-of-band'><span id='render-detail'>
+                   <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
+                       [<span class='inner'>&#x2212;</span>]
+                   </a>
+               </span><a class='srclink' href='../../src/strymon_coordinator/handler.rs.html#607-610' title='goto source code'>[src]</a></span></h1>
+<pre class='rust struct'>pub struct CoordinatorRef { /* fields omitted */ }</pre><div class='docblock'><p>A cloneable reference to the coordinator instance, tracking any state created by this handle.</p>
+
+<p>The initial handle is obtained by creating a new coordinator instance with
+<a href="../struct.Coordinator.html#method.new"><code>Coordinator::new</code></a>.</p>
+
+<p>Note that cloning this handle will not clone any tracked state.</p>
+</div>
+                    <h2 id='methods' class='small-section-header'>
+                      Methods<a href='#methods' class='anchor'></a>
+                    </h2>
+                <h3 id='impl' class='impl'><span class='in-band'><code>impl <a class="struct" href="../../strymon_coordinator/handler/struct.CoordinatorRef.html" title="struct strymon_coordinator::handler::CoordinatorRef">CoordinatorRef</a></code><a href='#impl' class='anchor'></a></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/strymon_coordinator/handler.rs.html#612-776' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'><h4 id='method.submission' class="method"><span id='submission.v' class='invisible'><code>pub fn <a href='#method.submission' class='fnname'>submission</a>(<br>&nbsp;&nbsp;&nbsp;&nbsp;&amp;self, <br>&nbsp;&nbsp;&nbsp;&nbsp;req: Submission<br>) -&gt; <a class="struct" href="https://doc.rust-lang.org/nightly/alloc/boxed/struct.Box.html" title="struct alloc::boxed::Box">Box</a>&lt;<a class="trait" href="https://docs.rs/futures/0.1/futures/future/trait.Future.html" title="trait futures::future::Future">Future</a>&lt;Item = JobId, Error = SubmissionError&gt;&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/strymon_coordinator/handler.rs.html#625-630' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Handles a new job submission request.</p>
+
+<p>The returned future resolves with the allocated job identifier once all processes have
+registered themselves at the coordinator (or when an error occurs).</p>
+</div><h4 id='method.termination' class="method"><span id='termination.v' class='invisible'><code>pub fn <a href='#method.termination' class='fnname'>termination</a>(<br>&nbsp;&nbsp;&nbsp;&nbsp;&amp;self, <br>&nbsp;&nbsp;&nbsp;&nbsp;req: Termination<br>) -&gt; <a class="struct" href="https://doc.rust-lang.org/nightly/alloc/boxed/struct.Box.html" title="struct alloc::boxed::Box">Box</a>&lt;<a class="trait" href="https://docs.rs/futures/0.1/futures/future/trait.Future.html" title="trait futures::future::Future">Future</a>&lt;Item = <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.unit.html">()</a>, Error = TerminationError&gt;&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/strymon_coordinator/handler.rs.html#636-639' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Handles a new job termination request.</p>
+
+<p>The returned future resolves once all executors have acknowledged the request, or the
+first executor has reported an error.</p>
+</div><h4 id='method.add_executor' class="method"><span id='add_executor.v' class='invisible'><code>pub fn <a href='#method.add_executor' class='fnname'>add_executor</a>(&amp;self, req: AddExecutor, tx: <a class="struct" href="../../strymon_communication/rpc/struct.Outgoing.html" title="struct strymon_communication::rpc::Outgoing">Outgoing</a>) -&gt; ExecutorId</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/strymon_coordinator/handler.rs.html#642-647' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Registers a new executor instance. Returns the newly assigned identifier for this executor.</p>
+</div><h4 id='method.add_worker_group' class="method"><span id='add_worker_group.v' class='invisible'><code>pub fn <a href='#method.add_worker_group' class='fnname'>add_worker_group</a>(<br>&nbsp;&nbsp;&nbsp;&nbsp;&amp;self, <br>&nbsp;&nbsp;&nbsp;&nbsp;id: JobId, <br>&nbsp;&nbsp;&nbsp;&nbsp;group: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.usize.html">usize</a><br>) -&gt; <a class="struct" href="https://doc.rust-lang.org/nightly/alloc/boxed/struct.Box.html" title="struct alloc::boxed::Box">Box</a>&lt;<a class="trait" href="https://docs.rs/futures/0.1/futures/future/trait.Future.html" title="trait futures::future::Future">Future</a>&lt;Item = JobToken, Error = WorkerGroupError&gt;&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/strymon_coordinator/handler.rs.html#653-667' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Marks job worker group (e.g. a process hosting some worker threads) as ready.</p>
+
+<p>The returned future resolves with the job identifier for the newly spawned job once all
+other worker groups have registered themselves, or if an error occured.</p>
+</div><h4 id='method.publish' class="method"><span id='publish.v' class='invisible'><code>pub fn <a href='#method.publish' class='fnname'>publish</a>(&amp;self, req: Publish) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;Topic, PublishError&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/strymon_coordinator/handler.rs.html#670-686' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Creates a new publication in the catalog. Returns the created topic.</p>
+</div><h4 id='method.unpublish' class="method"><span id='unpublish.v' class='invisible'><code>pub fn <a href='#method.unpublish' class='fnname'>unpublish</a>(<br>&nbsp;&nbsp;&nbsp;&nbsp;&amp;self, <br>&nbsp;&nbsp;&nbsp;&nbsp;job: JobToken, <br>&nbsp;&nbsp;&nbsp;&nbsp;topic_id: TopicId<br>) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.unit.html">()</a>, UnpublishError&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/strymon_coordinator/handler.rs.html#689-707' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Removes a publication from the catalog.</p>
+</div><h4 id='method.subscribe' class="method"><span id='subscribe.v' class='invisible'><code>pub fn <a href='#method.subscribe' class='fnname'>subscribe</a>(<br>&nbsp;&nbsp;&nbsp;&nbsp;&amp;self, <br>&nbsp;&nbsp;&nbsp;&nbsp;req: Subscribe<br>) -&gt; <a class="struct" href="https://doc.rust-lang.org/nightly/alloc/boxed/struct.Box.html" title="struct alloc::boxed::Box">Box</a>&lt;<a class="trait" href="https://docs.rs/futures/0.1/futures/future/trait.Future.html" title="trait futures::future::Future">Future</a>&lt;Item = Topic, Error = SubscribeError&gt;&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/strymon_coordinator/handler.rs.html#713-733' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Handles a new subscription request.</p>
+
+<p>The returned future resolves either immediately for non-blocking lookups, or once a
+matching topic is created by a later publication.</p>
+</div><h4 id='method.unsubscribe' class="method"><span id='unsubscribe.v' class='invisible'><code>pub fn <a href='#method.unsubscribe' class='fnname'>unsubscribe</a>(<br>&nbsp;&nbsp;&nbsp;&nbsp;&amp;self, <br>&nbsp;&nbsp;&nbsp;&nbsp;job: JobToken, <br>&nbsp;&nbsp;&nbsp;&nbsp;topic_id: TopicId<br>) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.unit.html">()</a>, UnsubscribeError&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/strymon_coordinator/handler.rs.html#736-761' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Removes a subscription from the catalog.</p>
+</div><h4 id='method.lookup' class="method"><span id='lookup.v' class='invisible'><code>pub fn <a href='#method.lookup' class='fnname'>lookup</a>(&amp;self, name: &amp;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.str.html">str</a>) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;Topic, <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.unit.html">()</a>&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/strymon_coordinator/handler.rs.html#764-767' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Performs a non-blocking, non-subscribing topic lookup.</p>
+</div><h4 id='method.catalog_request' class="method"><span id='catalog_request.v' class='invisible'><code>pub fn <a href='#method.catalog_request' class='fnname'>catalog_request</a>(&amp;self, req: <a class="struct" href="../../strymon_communication/rpc/struct.RequestBuf.html" title="struct strymon_communication::rpc::RequestBuf">RequestBuf</a>&lt;CatalogRPC&gt;) -&gt; <a class="type" href="https://doc.rust-lang.org/nightly/std/io/error/type.Result.html" title="type std::io::error::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.unit.html">()</a>&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/strymon_coordinator/handler.rs.html#773-775' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Forwards an encoded query to the catalog.</p>
+
+<p>The catalog which will decode and execute the query and respond to it immediately. Might
+fail if the request could not be decoded.</p>
+</div></div>
+            <h2 id='implementations' class='small-section-header'>
+              Trait Implementations<a href='#implementations' class='anchor'></a>
+            </h2>
+        <h3 id='impl-Clone' class='impl'><span class='in-band'><code>impl <a class="trait" href="https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html" title="trait core::clone::Clone">Clone</a> for <a class="struct" href="../../strymon_coordinator/handler/struct.CoordinatorRef.html" title="struct strymon_coordinator::handler::CoordinatorRef">CoordinatorRef</a></code><a href='#impl-Clone' class='anchor'></a></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/strymon_coordinator/handler.rs.html#781-785' title='goto source code'>[src]</a></span></h3>
+<div class='docblock'><p>Performs a (shallow) clone to obtain a new handle to the coordinator.</p>
+
+<p>This will not clone any state tracked by the <code>self</code>.</p>
+</div><div class='impl-items'><h4 id='method.clone' class="method"><span id='clone.v' class='invisible'><code>fn <a href='https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#tymethod.clone' class='fnname'>clone</a>(&amp;self) -&gt; Self</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/strymon_coordinator/handler.rs.html#782-784' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Returns a copy of the value. <a href="https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#tymethod.clone">Read more</a></p>
+</div><h4 id='method.clone_from' class="method"><span id='clone_from.v' class='invisible'><code>fn <a href='https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#method.clone_from' class='fnname'>clone_from</a>(&amp;mut self, source: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;</a>Self)</code></span><span class='out-of-band'><div class='ghost'></div><div class='since' title='Stable since Rust version 1.0.0'>1.0.0</div><a class='srclink' href='https://doc.rust-lang.org/nightly/src/core/clone.rs.html#112-114' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Performs copy-assignment from <code>source</code>. <a href="https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#method.clone_from">Read more</a></p>
+</div></div><h3 id='impl-Drop' class='impl'><span class='in-band'><code>impl <a class="trait" href="https://doc.rust-lang.org/nightly/core/ops/drop/trait.Drop.html" title="trait core::ops::drop::Drop">Drop</a> for <a class="struct" href="../../strymon_coordinator/handler/struct.CoordinatorRef.html" title="struct strymon_coordinator::handler::CoordinatorRef">CoordinatorRef</a></code><a href='#impl-Drop' class='anchor'></a></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/strymon_coordinator/handler.rs.html#788-814' title='goto source code'>[src]</a></span></h3>
+<div class='docblock'><p>Removes any state associated with the client owning this handle.</p>
+</div><div class='impl-items'><h4 id='method.drop' class="method"><span id='drop.v' class='invisible'><code>fn <a href='https://doc.rust-lang.org/nightly/core/ops/drop/trait.Drop.html#tymethod.drop' class='fnname'>drop</a>(&amp;mut self)</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/strymon_coordinator/handler.rs.html#789-813' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Executes the destructor for this type. <a href="https://doc.rust-lang.org/nightly/core/ops/drop/trait.Drop.html#tymethod.drop">Read more</a></p>
+</div></div></section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <aside id="help" class="hidden">
+        <div>
+            <h1 class="hidden">Help</h1>
+
+            <div class="shortcuts">
+                <h2>Keyboard Shortcuts</h2>
+
+                <dl>
+                    <dt>?</dt>
+                    <dd>Show this help dialog</dd>
+                    <dt>S</dt>
+                    <dd>Focus the search field</dd>
+                    <dt>↑</dt>
+                    <dd>Move up in search results</dd>
+                    <dt>↓</dt>
+                    <dd>Move down in search results</dd>
+                    <dt>↹</dt>
+                    <dd>Switch tab</dd>
+                    <dt>&#9166;</dt>
+                    <dd>Go to active search result</dd>
+                    <dt style="width:31px;">+ / -</dt>
+                    <dd>Collapse/expand all sections</dd>
+                </dl>
+            </div>
+
+            <div class="infos">
+                <h2>Search Tricks</h2>
+
+                <p>
+                    Prefix searches with a type followed by a colon (e.g.
+                    <code>fn:</code>) to restrict the search to a given type.
+                </p>
+
+                <p>
+                    Accepted types are: <code>fn</code>, <code>mod</code>,
+                    <code>struct</code>, <code>enum</code>,
+                    <code>trait</code>, <code>type</code>, <code>macro</code>,
+                    and <code>const</code>.
+                </p>
+
+                <p>
+                    Search functions by type signature (e.g.
+                    <code>vec -> usize</code> or <code>* -> vec</code>)
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    
+
+    <script>
+        window.rootPath = "../../";
+        window.currentCrate = "strymon_coordinator";
+    </script>
+    <script src="../../main.js"></script>
+    <script defer src="../../search-index.js"></script>
+</body>
+</html>

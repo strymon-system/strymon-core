@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="API documentation for the Rust `Request` trait in crate `strymon_communication`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, Request">
+
+    <title>strymon_communication::rpc::Request - Rust</title>
+
+    <link rel="stylesheet" type="text/css" href="../../normalize.css">
+    <link rel="stylesheet" type="text/css" href="../../rustdoc.css">
+    <link rel="stylesheet" type="text/css" href="../../main.css">
+    
+
+    
+    
+</head>
+<body class="rustdoc trait">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <nav class="sidebar">
+        <div class="sidebar-menu">&#9776;</div>
+        
+        <p class='location'>Trait Request</p><div class="sidebar-elems"><div class="block items"><a class="sidebar-title" href="#associated-types">Associated Types</a><div class="sidebar-links"><a href="#associatedtype.Success">Success</a><a href="#associatedtype.Error">Error</a></div><a class="sidebar-title" href="#associated-const">Associated Constants</a><div class="sidebar-links"><a href="#associatedconstant.NAME">NAME</a></div><a class="sidebar-title" href="#implementors">Implementors</a></div><p class='location'><a href='../index.html'>strymon_communication</a>::<wbr><a href='index.html'>rpc</a></p><script>window.sidebarCurrent = {name: 'Request', ty: 'trait', relpath: ''};</script><script defer src="sidebar-items.js"></script></div>
+    </nav>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press ‘S’ to search, ‘?’ for more options…"
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content">
+<h1 class='fqn'><span class='in-band'>Trait <a href='../index.html'>strymon_communication</a>::<wbr><a href='index.html'>rpc</a>::<wbr><a class="trait" href=''>Request</a></span><span class='out-of-band'><span id='render-detail'>
+                   <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
+                       [<span class='inner'>&#x2212;</span>]
+                   </a>
+               </span><a class='srclink' href='../../src/strymon_communication/rpc.rs.html#165-175' title='goto source code'>[src]</a></span></h1>
+<pre class='rust trait'>pub trait Request&lt;N:&nbsp;<a class="trait" href="../../strymon_communication/rpc/trait.Name.html" title="trait strymon_communication::rpc::Name">Name</a>&gt;: <a class="trait" href="https://docs.rs/serde/1.0.33/serde/ser/trait.Serialize.html" title="trait serde::ser::Serialize">Serialize</a> + <a class="trait" href="https://docs.rs/serde/1.0.33/serde/de/trait.DeserializeOwned.html" title="trait serde::de::DeserializeOwned">DeserializeOwned</a> {
+    type <a href='#associatedtype.Success' class="type">Success</a>: <a class="trait" href="https://docs.rs/serde/1.0.33/serde/ser/trait.Serialize.html" title="trait serde::ser::Serialize">Serialize</a> + <a class="trait" href="https://docs.rs/serde/1.0.33/serde/de/trait.DeserializeOwned.html" title="trait serde::de::DeserializeOwned">DeserializeOwned</a>;
+    type <a href='#associatedtype.Error' class="type">Error</a>: <a class="trait" href="https://docs.rs/serde/1.0.33/serde/ser/trait.Serialize.html" title="trait serde::ser::Serialize">Serialize</a> + <a class="trait" href="https://docs.rs/serde/1.0.33/serde/de/trait.DeserializeOwned.html" title="trait serde::de::DeserializeOwned">DeserializeOwned</a>;
+
+    const <a href='#associatedconstant.NAME' class="constant"><b>NAME</b></a>: N;
+}</pre><div class='docblock'><p>A trait for defining the signature of a remote procedure.</p>
+
+<p>Within this framework, a new request type can be defined by implementing
+this trait. The type implementing <code>Request</code> stores the arguments sent to
+the remote receiver and then has to respond with either <code>Ok(Request::Success)</code>
+or <code>Err(Request::Error)</code>. In order for the receiver to be able to distinguish
+the different incoming requests without fully decoding it, each request
+type must define an associated constant <code>Request::NAME</code> for this purpose.</p>
+
+<h1 id='examples' class='section-header'><a href='#examples'>Examples</a></h1>
+<div class='information'><div class='tooltip ignore'>ⓘ<span class='tooltiptext'>This example is not tested</span></div></div><pre class="rust rust-example-rendered ignore">
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>)]</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">GetNamesForId</span> {
+    <span class="kw">pub</span> <span class="ident">arg</span>: <span class="ident">u32</span>,
+}
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>)]</span>
+<span class="kw">struct</span> <span class="ident">InvalidId</span>;
+
+<span class="comment">// CustomRPC is an enum implementing the `Name` trait</span>
+<span class="kw">impl</span> <span class="ident">Request</span><span class="op">&lt;</span><span class="ident">CustomRPC</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">GetNamesForId</span> {
+    <span class="comment">// A unique identifier for this method</span>
+    <span class="kw">const</span> <span class="ident">NAME</span> <span class="op">=</span> <span class="ident">CustomRPC</span>::<span class="ident">GetNamesForId</span>;
+
+    <span class="comment">// Return type of a successful response</span>
+    <span class="kw">type</span> <span class="ident">Success</span> <span class="op">=</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>;
+    <span class="comment">// Return type of a failed invocation</span>
+    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">InvalidId</span>;
+}</pre>
+</div>
+            <h2 id='associated-types' class='small-section-header'>
+              Associated Types<a href='#associated-types' class='anchor'></a>
+            </h2>
+            <div class='methods'>
+        <h3 id='associatedtype.Success' class='method'><span id='Success.t' class='invisible'><code>type <a href='#associatedtype.Success' class="type">Success</a>: <a class="trait" href="https://docs.rs/serde/1.0.33/serde/ser/trait.Serialize.html" title="trait serde::ser::Serialize">Serialize</a> + <a class="trait" href="https://docs.rs/serde/1.0.33/serde/de/trait.DeserializeOwned.html" title="trait serde::de::DeserializeOwned">DeserializeOwned</a></code></span></h3><div class='docblock'><p>The type of a successful response.</p>
+</div><h3 id='associatedtype.Error' class='method'><span id='Error.t' class='invisible'><code>type <a href='#associatedtype.Error' class="type">Error</a>: <a class="trait" href="https://docs.rs/serde/1.0.33/serde/ser/trait.Serialize.html" title="trait serde::ser::Serialize">Serialize</a> + <a class="trait" href="https://docs.rs/serde/1.0.33/serde/de/trait.DeserializeOwned.html" title="trait serde::de::DeserializeOwned">DeserializeOwned</a></code></span></h3><div class='docblock'><p>The type of a failed response.</p>
+</div></div>
+            <h2 id='associated-const' class='small-section-header'>
+              Associated Constants<a href='#associated-const' class='anchor'></a>
+            </h2>
+            <div class='methods'>
+        <h3 id='associatedconstant.NAME' class='method'><span id='NAME.v' class='invisible'><code>const <a href='#associatedconstant.NAME' class="constant"><b>NAME</b></a>: N</code></span></h3><div class='docblock'><p>A unique value identifying this type of request.</p>
+</div></div>
+        <h2 id='implementors' class='small-section-header'>
+          Implementors<a href='#implementors' class='anchor'></a>
+        </h2>
+        <ul class='item-list' id='implementors-list'>
+    </ul><script type="text/javascript" async
+                         src="../../implementors/strymon_communication/rpc/trait.Request.js">
+                 </script></section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <aside id="help" class="hidden">
+        <div>
+            <h1 class="hidden">Help</h1>
+
+            <div class="shortcuts">
+                <h2>Keyboard Shortcuts</h2>
+
+                <dl>
+                    <dt>?</dt>
+                    <dd>Show this help dialog</dd>
+                    <dt>S</dt>
+                    <dd>Focus the search field</dd>
+                    <dt>↑</dt>
+                    <dd>Move up in search results</dd>
+                    <dt>↓</dt>
+                    <dd>Move down in search results</dd>
+                    <dt>↹</dt>
+                    <dd>Switch tab</dd>
+                    <dt>&#9166;</dt>
+                    <dd>Go to active search result</dd>
+                    <dt style="width:31px;">+ / -</dt>
+                    <dd>Collapse/expand all sections</dd>
+                </dl>
+            </div>
+
+            <div class="infos">
+                <h2>Search Tricks</h2>
+
+                <p>
+                    Prefix searches with a type followed by a colon (e.g.
+                    <code>fn:</code>) to restrict the search to a given type.
+                </p>
+
+                <p>
+                    Accepted types are: <code>fn</code>, <code>mod</code>,
+                    <code>struct</code>, <code>enum</code>,
+                    <code>trait</code>, <code>type</code>, <code>macro</code>,
+                    and <code>const</code>.
+                </p>
+
+                <p>
+                    Search functions by type signature (e.g.
+                    <code>vec -> usize</code> or <code>* -> vec</code>)
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    
+
+    <script>
+        window.rootPath = "../../";
+        window.currentCrate = "strymon_communication";
+    </script>
+    <script src="../../main.js"></script>
+    <script defer src="../../search-index.js"></script>
+</body>
+</html>

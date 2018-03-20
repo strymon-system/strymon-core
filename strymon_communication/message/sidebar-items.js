@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["MessageBuf","A `MessageBuf` represents a contiguous buffer of MessagePack encoded objects. It can be used as a multi-part message to allow partial deserialization. Partial messages can be inserted using the `push` method and are read in first-in, first-out order by the `pop` method."]]});

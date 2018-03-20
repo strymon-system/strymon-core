@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="API documentation for the Rust `rpc` mod in crate `strymon_communication`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, rpc">
+
+    <title>strymon_communication::rpc - Rust</title>
+
+    <link rel="stylesheet" type="text/css" href="../../normalize.css">
+    <link rel="stylesheet" type="text/css" href="../../rustdoc.css">
+    <link rel="stylesheet" type="text/css" href="../../main.css">
+    
+
+    
+    
+</head>
+<body class="rustdoc mod">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <nav class="sidebar">
+        <div class="sidebar-menu">&#9776;</div>
+        
+        <p class='location'>Module rpc</p><div class="sidebar-elems"><div class="block items"><ul><li><a href="#structs">Structs</a></li><li><a href="#traits">Traits</a></li></ul></div><p class='location'><a href='../index.html'>strymon_communication</a></p><script>window.sidebarCurrent = {name: 'rpc', ty: 'mod', relpath: '../'};</script><script defer src="../sidebar-items.js"></script></div>
+    </nav>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press ‘S’ to search, ‘?’ for more options…"
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content">
+<h1 class='fqn'><span class='in-band'>Module <a href='../index.html'>strymon_communication</a>::<wbr><a class="mod" href=''>rpc</a></span><span class='out-of-band'><span id='render-detail'>
+                   <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
+                       [<span class='inner'>&#x2212;</span>]
+                   </a>
+               </span><a class='srclink' href='../../src/strymon_communication/rpc.rs.html#9-581' title='goto source code'>[src]</a></span></h1>
+<div class='docblock'><p>Asynchronous remote procedure calls.</p>
+
+<p>This implements a small framework for receiving and sending requests and
+responses between two connected peers.
+During set-up, one of the peers acts as a <em>server</em>, listening on a server
+socket to accept new incoming <em>clients</em>. Clients connect to a server
+using the socket address.</p>
+
+<p>Once a connection between two peers is established, their initial role as
+server and client becomes irrelevant, as they take on the role of either
+being a <em>sender</em> or <em>receiver</em> (or both) of requests.</p>
+
+<h1 id='1-defining-a-custom-protocol' class='section-header'><a href='#1-defining-a-custom-protocol'>1. Defining a custom protocol</a></h1>
+<p>In order to use this framework, client code must first define the types
+to be used for a request-response protocol. It is not using a custom
+interface description language (IDL) but rather is based on implementing
+certain Rust traits. Different types of requests must be distinguished
+from each other through a value called the <em>name</em> (i.e. the name of the
+remote procedure). Since the name is typically used for dispatching on the
+receiver-side, it is recommended to use an <code>enum</code> for it.</p>
+
+<p>The name, argument and return types of a method are defined by implementing
+the <a href="trait.Request.html"><code>Request</code></a> type. Each invocation can either return
+successfully with the type specified in
+<a href="trait.Request.html#associatedtype.Success"><code>Request::Success</code></a> or fail with
+an application-specific error defined in
+<a href="trait.Request.html#associatedtype.Error"><code>Request::Error</code></a>.</p>
+
+<h1 id='2-connection-set-up' class='section-header'><a href='#2-connection-set-up'>2. Connection set-up</a></h1>
+<p>During connection set-up, one peer needs to act as a server. To instantiate
+a server, invoke <a href="struct.Network.html#method.server"><code>Network::server()</code></a>
+to obtain a handle for new incoming clients.</p>
+
+<p>The client is expected to call
+<a href="struct.Network.html#method.client"><code>Network::client()</code></a> with the
+corresponding socket address to connect to the server. Both peers will
+obtain a pair of
+(<a href="struct.Incoming.html"><code>Incoming</code></a>, <a href="struct.Outgoing.html"><code>Outgoing</code></a>)
+queue handles. These are used to either <em>receive</em> incoming requests, or
+<em>send</em> out outgoing requests.</p>
+
+<h1 id='3-handling-requests--responses' class='section-header'><a href='#3-handling-requests--responses'>3. Handling requests &amp; responses</a></h1>
+<p>Once connected, a peer might decide to send requests by invoking
+<a href="struct.Outgoing.html#method.request"><code>Outgoing::request()</code></a> with an
+argument implementing the <a href="trait.Request.html"><code>Request</code></a> trait. The
+remote peer will receive this request on its
+<a href="struct.Incoming.html"><code>Incoming</code></a> queue in the form of an encoded
+<a href="struct.RequestBuf.html"><code>RequestBuf</code></a> object. To decode this object, it
+is common to match on the method name returned by
+<a href="struct.RequestBuf.html#method.name"><code>RequestBuf::name()</code></a> and then decode
+the request payload using
+<a href="struct.RequestBuf.html#method.decode"><code>RequestBuf::decode()</code></a>. Decoding
+a request successfully returns the decoded payload, as well as a
+<a href="struct.Responder.html"><code>Responder</code></a> object which is used to send back the
+response to the origin.</p>
+
+<p>Once the response arrives back at the original sender, the
+<a href="struct.Response.html"><code>Response</code></a> future will resolve to the decoded
+response.</p>
+
+<h2 id='examples' class='section-header'><a href='#examples'>Examples:</a></h2>
+<p>Please refer to <code>tests/calc.rs</code> for a complete example of how to use
+this module.</p>
+</div><h2 id='structs' class='section-header'><a href="#structs">Structs</a></h2>
+<table>
+                       <tr class=' module-item'>
+                           <td><a class="struct" href="struct.Incoming.html"
+                                  title='struct strymon_communication::rpc::Incoming'>Incoming</a></td>
+                           <td class='docblock-short'>
+                                <p>Receiver-side queue of incoming requests.</p>
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="struct" href="struct.Outgoing.html"
+                                  title='struct strymon_communication::rpc::Outgoing'>Outgoing</a></td>
+                           <td class='docblock-short'>
+                                <p>Sender-side queue for sending out requests.</p>
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="struct" href="struct.RequestBuf.html"
+                                  title='struct strymon_communication::rpc::RequestBuf'>RequestBuf</a></td>
+                           <td class='docblock-short'>
+                                <p>Receiver-side buffer containing an incoming request.</p>
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="struct" href="struct.Responder.html"
+                                  title='struct strymon_communication::rpc::Responder'>Responder</a></td>
+                           <td class='docblock-short'>
+                                <p>Receiver-side handle for responding to a given request.</p>
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="struct" href="struct.Response.html"
+                                  title='struct strymon_communication::rpc::Response'>Response</a></td>
+                           <td class='docblock-short'>
+                                <p>Sender-side future eventually yielding the response for a request.</p>
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="struct" href="struct.Server.html"
+                                  title='struct strymon_communication::rpc::Server'>Server</a></td>
+                           <td class='docblock-short'>
+                                <p>Handle for queue of newly connected peers.</p>
+                           </td>
+                       </tr></table><h2 id='traits' class='section-header'><a href="#traits">Traits</a></h2>
+<table>
+                       <tr class=' module-item'>
+                           <td><a class="trait" href="trait.Name.html"
+                                  title='trait strymon_communication::rpc::Name'>Name</a></td>
+                           <td class='docblock-short'>
+                                <p>A trait to distinguish remote procedure calls.</p>
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="trait" href="trait.Request.html"
+                                  title='trait strymon_communication::rpc::Request'>Request</a></td>
+                           <td class='docblock-short'>
+                                <p>A trait for defining the signature of a remote procedure.</p>
+                           </td>
+                       </tr></table></section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <aside id="help" class="hidden">
+        <div>
+            <h1 class="hidden">Help</h1>
+
+            <div class="shortcuts">
+                <h2>Keyboard Shortcuts</h2>
+
+                <dl>
+                    <dt>?</dt>
+                    <dd>Show this help dialog</dd>
+                    <dt>S</dt>
+                    <dd>Focus the search field</dd>
+                    <dt>↑</dt>
+                    <dd>Move up in search results</dd>
+                    <dt>↓</dt>
+                    <dd>Move down in search results</dd>
+                    <dt>↹</dt>
+                    <dd>Switch tab</dd>
+                    <dt>&#9166;</dt>
+                    <dd>Go to active search result</dd>
+                    <dt style="width:31px;">+ / -</dt>
+                    <dd>Collapse/expand all sections</dd>
+                </dl>
+            </div>
+
+            <div class="infos">
+                <h2>Search Tricks</h2>
+
+                <p>
+                    Prefix searches with a type followed by a colon (e.g.
+                    <code>fn:</code>) to restrict the search to a given type.
+                </p>
+
+                <p>
+                    Accepted types are: <code>fn</code>, <code>mod</code>,
+                    <code>struct</code>, <code>enum</code>,
+                    <code>trait</code>, <code>type</code>, <code>macro</code>,
+                    and <code>const</code>.
+                </p>
+
+                <p>
+                    Search functions by type signature (e.g.
+                    <code>vec -> usize</code> or <code>* -> vec</code>)
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    
+
+    <script>
+        window.rootPath = "../../";
+        window.currentCrate = "strymon_communication";
+    </script>
+    <script src="../../main.js"></script>
+    <script defer src="../../search-index.js"></script>
+</body>
+</html>
